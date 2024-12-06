@@ -1,0 +1,36 @@
+# Compiler files
+cache/
+out/
+
+# Ignores development broadcast logs
+!/broadcast
+/broadcast/*/31337/
+/broadcast/**/dry-run/
+
+# Docs
+docs/
+
+# Dotenv file
+.env
+
+node_modules
+lib/
+external/
+
+#coverage
+coverage
+
+#broadcast
+broadcast
+
+# Mac OS X files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+**/.DS_Store
+.AppleDouble
+.LSOverride
