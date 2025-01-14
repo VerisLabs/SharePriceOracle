@@ -44,6 +44,7 @@ interface ISharePriceOracle {
     error InvalidRole();
     error InvalidChainId(uint32 receivedChainId);
     error InvalidReporter();
+    error NoReportsAvailable(uint32 chainId, address vault);
 
     /*//////////////////////////////////////////////////////////////
                             VIEW FUNCTIONS

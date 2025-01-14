@@ -234,6 +234,11 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     ) external view override returns (VaultReport memory) {
         bytes32 key = getPriceKey(_srcChainId, _vaultAddress);
         VaultReport[] storage vaultReports = sharePrices[key];
+        
+        if (vaultReports.length == 0) {
+            revert NoReportsAvailable(_srcChainId, _vaultAddress);
+        }
+        
         return vaultReports[vaultReports.length - 1];
     }
     
