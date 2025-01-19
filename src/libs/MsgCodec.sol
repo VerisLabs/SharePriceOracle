@@ -9,7 +9,7 @@ library MsgCodec {
     error InvalidOptionFormat();
 
     // Proper ABI encoded sizes
-    uint256 private constant VAULT_REPORT_SIZE = 32 * 5; // Each field padded to 32 bytes in ABI encoding
+    uint256 private constant VAULT_REPORT_SIZE = 32 * 7; // Each field padded to 32 bytes in ABI encoding
     uint256 private constant HEADER_SIZE = 32 * 5; // msgType + array offset + length + rewardsDelegate
     uint256 private constant EXTRA_OPTION_SIZE = 3 * 32; // option + offset pointer + length
     uint256 private constant MIN_MESSAGE_SIZE = 32; // Minimum size for any encoded message
