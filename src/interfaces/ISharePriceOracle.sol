@@ -69,6 +69,9 @@ interface ISharePriceOracle {
     error InvalidChainId(uint32 receivedChainId);
     error InvalidReporter();
     error PriceFeedNotFound();
+    error InvalidFeed();
+    error InvalidPrice();
+    error ExceedsMaxReports();
 
     /*//////////////////////////////////////////////////////////////
                             VIEW FUNCTIONS
@@ -96,12 +99,6 @@ interface ISharePriceOracle {
     function getSharePrices(
         address[] calldata vaultAddresses,
         address rewardsDelegate
-    ) external view returns (VaultReport[] memory);
-
-    /// @notice Get stored share prices for multiple vaults
-    function getSharePriceReports(
-        uint32 _srcChainId,
-        address[] calldata _vaultAddresses
     ) external view returns (VaultReport[] memory);
 
     /// @notice Get latest share price for a specific vault

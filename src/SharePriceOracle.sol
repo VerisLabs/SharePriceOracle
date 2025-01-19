@@ -4,12 +4,16 @@ pragma solidity 0.8.19;
 import {ISharePriceOracle, VaultReport, ChainlinkResponse} from "./interfaces/ISharePriceOracle.sol";
 import {IERC4626} from "./interfaces/IERC4626.sol";
 import {IERC20Metadata} from "./interfaces/IERC20Metadata.sol";
-import {AggregatorV3Interface} from "./interfaces/AggregatorV3Interface.sol";
 import {OwnableRoles} from "@solady/auth/OwnableRoles.sol";
-import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
+
+import {ChainlinkLib} from "./libs/ChainlinkLib.sol";
+import {VaultLib} from "./libs/VaultLib.sol";
+import {PriceConversionLib} from "./libs/PriceConversionLib.sol";
 
 contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
-    using FixedPointMathLib for uint256;
+    using ChainlinkLib for address;
+    using VaultLib for IERC4626;
+    using PriceConversionLib for PriceConversionLib.PriceConversion;
 
     ////////////////////////////////////////////////////////////////
     ///                        CONSTANTS                           ///
@@ -24,6 +28,8 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     /// @notice Staleness tolerance for share prices
     uint256 public constant SHARE_PRICE_STALENESS_TOLERANCE = 8 hours;
 
+    uint256 public constant MAX_REPORTS = 10;
+
     ////////////////////////////////////////////////////////////////
     ///                      STATE VARIABLES                       ///
     ////////////////////////////////////////////////////////////////
@@ -35,7 +41,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
 
     /// @notice Mapping from price key to array of vault reports
     /// @dev Key is keccak256(abi.encodePacked(srcChainId, vaultAddress))
-    mapping(bytes32 => VaultReport[]) public sharePrices;
+    mapping(bytes32 => VaultReport) public sharePrices;
 
     /// @notice Mapping from Chainlink feed address to chain ID to asset address
     /// 1st level key: chain Id
@@ -103,9 +109,10 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     ) external onlyAdmin {
         if (_chainId == 0) revert InvalidChainId(_chainId);
         if (_asset == address(0)) revert ZeroAddress();
-        if (_priceFeed == address(0)) revert ZeroAddress();
+        ChainlinkResponse memory response = _priceFeed.getPrice();
+        if (response.price == 0) revert InvalidFeed();
 
-        priceFeeds[chainId][_asset] = _priceFeed;
+        priceFeeds[_chainId][_asset] = _priceFeed;
 
         emit PriceFeedSet(_chainId, _asset, _priceFeed);
     }
@@ -162,8 +169,9 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
                 if (report.chainId != _srcChainId) {
                     revert InvalidChainId(report.chainId);
                 }
+                if (report.sharePrice == 0) revert InvalidPrice();
                 key = getPriceKey(_srcChainId, report.vaultAddress);
-                sharePrices[key].push(report);
+                sharePrices[key] = report;
 
                 emit SharePriceUpdated(
                     _srcChainId,
@@ -178,43 +186,146 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     ////////////////////////////////////////////////////////////////
     ///                     INTERNAL FUNCTIONS                    ///
     ////////////////////////////////////////////////////////////////
+
     /**
-     * @notice Gets and validates Chainlink price data
-     * @param feed Chainlink price feed address
+     * @notice Gets share price for a vault on the same chain as the oracle
+     * @param _vaultAddress Address of the vault
+     * @param _dstAsset Asset to get the price in
+     * @return sharePrice Current share price in terms of _dstAsset
+     * @return timestamp Timestamp of the price data
      */
-    function _getChainlinkPrice(
-        address feed
-    ) internal view returns (ChainlinkResponse memory response) {
-        try AggregatorV3Interface(feed).latestRoundData() returns (
-            uint80 roundId,
-            int256 price,
-            uint256,
-            uint256 updatedAt,
-            uint80 answeredInRound
-        ) {
-            // If price is negative or zero, return invalid response
-            if (price <= 0) {
-                return ChainlinkResponse(0, 0, 0, 0, 0);
-            }
+    function _getSameChainSharePrice(
+        address _vaultAddress,
+        address _dstAsset
+    ) internal view returns (uint256 sharePrice, uint64 timestamp) {
+        VaultReport memory report = _getVaultSharePrice(
+            _vaultAddress,
+            address(0) // Not needed for this function
+        );
 
-            uint8 decimals;
-            try AggregatorV3Interface(feed).decimals() returns (uint8 dec) {
-                decimals = dec;
-            } catch {
-                return ChainlinkResponse(0, 0, 0, 0, 0);
-            }
-
-            return
-                ChainlinkResponse({
-                    price: uint256(price),
-                    decimals: decimals,
-                    timestamp: updatedAt,
-                    roundId: roundId,
-                    answeredInRound: answeredInRound
-                });
-        } catch {
-            return ChainlinkResponse(0, 0, 0, 0, 0);
+        if (report.sharePrice == 0) {
+            return (0, 0);
         }
+
+        if (report.asset == _dstAsset) {
+            return (report.sharePrice, report.lastUpdate);
+        }
+
+        return
+            _convertAssetPrice(
+                report.sharePrice,
+                chainId,
+                report.asset,
+                _dstAsset
+            );
+    }
+
+    /**
+     * @notice Gets vault share price information
+     * @param _vaultAddress Address of the vault
+     * @param _rewardsDelegate Address to delegate rewards to
+     * @return report VaultReport containing price and metadata
+     */
+    function _getVaultSharePrice(
+        address _vaultAddress,
+        address _rewardsDelegate
+    ) internal view returns (VaultReport memory report) {
+        return
+            VaultLib.getVaultSharePrice(
+                _vaultAddress,
+                _rewardsDelegate,
+                chainId
+            );
+    }
+
+    /**
+     * @notice Gets share price for a vault on a different chain
+     * @param _srcChainId Source chain ID
+     * @param _vaultAddress Vault address
+     * @param _dstAsset Asset to get the price in
+     * @return sharePrice Current share price in terms of _dstAsset
+     * @return timestamp Timestamp of the price data
+     */
+    function _getCrossChainSharePrice(
+        uint32 _srcChainId,
+        address _vaultAddress,
+        address _dstAsset
+    ) internal view returns (uint256 sharePrice, uint64 timestamp) {
+        VaultReport memory report = getLatestSharePriceReport(
+            _srcChainId,
+            _vaultAddress
+        );
+
+        unchecked {
+            if (
+                report.lastUpdate + SHARE_PRICE_STALENESS_TOLERANCE <
+                block.timestamp
+            ) {
+                return (0, 0);
+            }
+        }
+
+        return
+            _convertAssetPrice(
+                report.sharePrice,
+                _srcChainId,
+                report.asset,
+                _dstAsset
+            );
+    }
+
+    function _getAssetDecimals(
+        address srcAsset,
+        address dstAsset
+    )
+        internal
+        view
+        returns (uint8 srcDecimals, uint8 dstDecimals, bool success)
+    {
+        try IERC20Metadata(dstAsset).decimals() returns (uint8 dstDec) {
+            try IERC20Metadata(srcAsset).decimals() returns (uint8 srcDec) {
+                return (srcDec, dstDec, true);
+            } catch {
+                return (0, 0, false);
+            }
+        } catch {
+            return (0, 0, false);
+        }
+    }
+
+    function _convertAssetPrice(
+        uint256 amount,
+        uint32 _srcChainId,
+        address _srcAsset,
+        address _dstAsset
+    ) internal view returns (uint256 price, uint64 timestamp) {
+        address srcFeed = priceFeeds[_srcChainId][_srcAsset];
+        address dstFeed = priceFeeds[chainId][_dstAsset];
+        if (srcFeed == address(0) || dstFeed == address(0)) return (0, 0);
+
+        ChainlinkResponse memory src = srcFeed.getPrice();
+        ChainlinkResponse memory dst = dstFeed.getPrice();
+        if (src.price == 0 || dst.price == 0) return (0, 0);
+
+        (
+            uint8 srcDecimals,
+            uint8 dstDecimals,
+            bool success
+        ) = _getAssetDecimals(_srcAsset, _dstAsset);
+        if (!success) return (0, 0);
+
+        return
+            PriceConversionLib.convertAssetPrice(
+                PriceConversionLib.PriceConversion({
+                    amount: amount,
+                    srcPrice: src.price,
+                    dstPrice: dst.price,
+                    srcDecimals: srcDecimals,
+                    dstDecimals: dstDecimals,
+                    srcTimestamp: src.timestamp,
+                    dstTimestamp: dst.timestamp
+                })
+            );
     }
 
     ////////////////////////////////////////////////////////////////
@@ -231,54 +342,18 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
         address rewardsDelegate
     ) external view override returns (VaultReport[] memory) {
         uint256 len = vaultAddresses.length;
+        if (len > MAX_REPORTS) revert ExceedsMaxReports();
+
         VaultReport[] memory reports = new VaultReport[](len);
-        uint64 timestamp = uint64(block.timestamp);
 
         unchecked {
             for (uint256 i; i < len; ++i) {
-                address vaultAddress = vaultAddresses[i];
-                IERC4626 vault = IERC4626(vaultAddress);
-                address asset = vault.asset();
-                uint256 decimals = vault.decimals();
-                uint256 sharePrice = vault.convertToAssets(10 ** decimals);
-
-                reports[i].lastUpdate = timestamp;
-                reports[i].chainId = chainId;
-                reports[i].vaultAddress = vaultAddress;
-                reports[i].sharePrice = sharePrice;
-                reports[i].rewardsDelegate = rewardsDelegate;
-                reports[i].asset = asset;
-                reports[i].assetDecimals = decimals;
+                reports[i] = _getVaultSharePrice(
+                    vaultAddresses[i],
+                    rewardsDelegate
+                );
             }
         }
-        return reports;
-    }
-
-    /**
-     * @notice Gets share price reports for multiple vaults
-     * @param _srcChainId Source chain ID
-     * @param _vaultAddresses Array of vault addresses
-     * @return VaultReport[] Array of vault reports
-     */
-    function getSharePriceReports(
-        uint32 _srcChainId,
-        address[] calldata _vaultAddresses
-    ) external view override returns (VaultReport[] memory) {
-        uint256 len = _vaultAddresses.length;
-        VaultReport[] memory reports = new VaultReport[](len * 10); // remove hardcoded
-        uint256 reportIndex = 0;
-
-        unchecked {
-            for (uint256 i; i < len; ++i) {
-                bytes32 key = getPriceKey(_srcChainId, _vaultAddresses[i]);
-                VaultReport[] storage vaultReports = sharePrices[key];
-                uint256 vaultReportsLen = vaultReports.length;
-                for (uint256 j; j < vaultReportsLen; ++j) {
-                    reports[reportIndex++] = vaultReports[j];
-                }
-            }
-        }
-
         return reports;
     }
 
@@ -286,15 +361,14 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
      * @notice Gets latest share price for a specific vault
      * @param _srcChainId Source chain ID
      * @param _vaultAddress Vault address
-     * @return VaultReport The latest vault report
+     * @return vaultReport The latest vault report for that key
      */
     function getLatestSharePriceReport(
         uint32 _srcChainId,
         address _vaultAddress
-    ) public view override returns (VaultReport memory) {
+    ) public view override returns (VaultReport memory vaultReport) {
         bytes32 key = getPriceKey(_srcChainId, _vaultAddress);
-        VaultReport[] storage vaultReports = sharePrices[key];
-        return vaultReports[vaultReports.length - 1];
+        return vaultReport = sharePrices[key];
     }
 
     /**
@@ -310,42 +384,10 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
         address _vaultAddress,
         address _dstAsset
     ) external view override returns (uint256 sharePrice, uint64 timestamp) {
-        VaultReport memory report = getLatestSharePriceReport(
-            _srcChainId,
-            _vaultAddress
-        );
-
-        if (
-            report.lastUpdate + SHARE_PRICE_STALENESS_TOLERANCE <
-            block.timestamp
-        ) return (0, 0);
-
-        address sourceFeed = priceFeeds[_srcChainId][report.asset];
-        address dstFeed = priceFeeds[chainId][_dstAsset];
-
-        if (sourceFeed == address(0) || dstFeed == address(0)) return (0, 0);
-
-        ChainlinkResponse memory sourceResp = _getChainlinkPrice(sourceFeed);
-        ChainlinkResponse memory dstResp = _getChainlinkPrice(dstFeed);
-
-        if (sourceResp.price == 0 || dstResp.price == 0) {
-            return (0, 0);
+        if (_srcChainId == chainId) {
+            return _getSameChainSharePrice(_vaultAddress, _dstAsset);
         }
-
-        uint8 dstAssetDecimals = IERC20Metadata(_dstAsset).decimals();
-
-        sharePrice = report.sharePrice.fullMulDiv(
-            sourceResp.price * (10 ** dstAssetDecimals),
-            dstResp.price * (10 ** report.assetDecimals)
-        );
-
-        timestamp = uint64(
-            sourceResp.timestamp < dstResp.timestamp
-                ? sourceResp.timestamp
-                : dstResp.timestamp
-        );
-
-        return (sharePrice, timestamp);
+        return _getCrossChainSharePrice(_srcChainId, _vaultAddress, _dstAsset);
     }
 
     /**
