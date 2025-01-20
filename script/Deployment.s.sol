@@ -5,6 +5,7 @@ import "forge-std/Script.sol";
 import "../src/SharePriceOracle.sol";
 import "../src/MaxLzEndpoint.sol";
 
+/*
 contract DeploymentScript is Script {
     function run() public {
         // address LzOptimism = 0x1a44076050125825900e736c501f859c50fE728c; EID = 30213
@@ -32,3 +33,4 @@ contract DeploymentScript is Script {
         vm.stopBroadcast();
     }
 }
+*/
