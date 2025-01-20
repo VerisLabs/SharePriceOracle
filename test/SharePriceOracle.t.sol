@@ -35,41 +35,30 @@ contract SharePriceOracleTest is Test {
         admin = makeAddr("admin");
         endpoint = makeAddr("endpoint");
         user = makeAddr("user");
-        
+
         // Deploy mock price feeds
         ethUsdFeed = new MockPriceFeed();
         tokenAFeed = new MockPriceFeed();
         tokenBFeed = new MockPriceFeed();
-        
+
         // Set initial prices
         ethUsdFeed.setPrice(2000e8); // $2000 USD/ETH
-        tokenAFeed.setPrice(100e8);  // $100 USD/TokenA
-        tokenBFeed.setPrice(50e8);   // $50 USD/TokenB
-        
+        tokenAFeed.setPrice(100e8); // $100 USD/TokenA
+        tokenBFeed.setPrice(50e8); // $50 USD/TokenB
+
         // Deploy mock vaults
         vaultA = new MockERC4626();
         vaultB = new MockERC4626();
-        
+
         // Set initial share prices
         vaultA.setMockSharePrice(1.5e18); // 1.5 tokens per share
-        vaultB.setMockSharePrice(2e18);   // 2 tokens per share
+        vaultB.setMockSharePrice(2e18); // 2 tokens per share
 
-        // Mint some shares to user
-        vm.startPrank(user);
-        vaultA.approve(address(vaultA), 1000e18);
-        vaultB.approve(address(vaultB), 1000e18);
-        vm.stopPrank();
-
-        // Deploy oracle
-        vm.prank(admin);
-        oracle = new SharePriceOracle(
-            CHAIN_ID,
-            admin,
-            address(ethUsdFeed)
-        );
+        // Deploy oracle as admin
+        vm.startPrank(admin);
+        oracle = new SharePriceOracle(CHAIN_ID, admin, address(ethUsdFeed));
 
         // Setup roles and price feeds
-        vm.startPrank(admin);
         oracle.grantRole(endpoint, oracle.ENDPOINT_ROLE());
         oracle.setPriceFeed(
             CHAIN_ID,
@@ -94,17 +83,36 @@ contract SharePriceOracleTest is Test {
         address[] memory vaults = new address[](2);
         vaults[0] = address(vaultA);
         vaults[1] = address(vaultB);
-        
+
         address rewardsDelegate = makeAddr("delegate");
-        VaultReport[] memory reports = oracle.getSharePrices(vaults, rewardsDelegate);
-        
+        VaultReport[] memory reports = oracle.getSharePrices(
+            vaults,
+            rewardsDelegate
+        );
+
         assertEq(reports.length, 2, "Wrong number of reports");
-        assertEq(reports[0].vaultAddress, address(vaultA), "Wrong vault address A");
-        assertEq(reports[1].vaultAddress, address(vaultB), "Wrong vault address B");
+        assertEq(
+            reports[0].vaultAddress,
+            address(vaultA),
+            "Wrong vault address A"
+        );
+        assertEq(
+            reports[1].vaultAddress,
+            address(vaultB),
+            "Wrong vault address B"
+        );
         assertEq(reports[0].sharePrice, 1.5e18, "Wrong share price A");
         assertEq(reports[1].sharePrice, 2e18, "Wrong share price B");
-        assertEq(reports[0].rewardsDelegate, rewardsDelegate, "Wrong rewards delegate A");
-        assertEq(reports[1].rewardsDelegate, rewardsDelegate, "Wrong rewards delegate B");
+        assertEq(
+            reports[0].rewardsDelegate,
+            rewardsDelegate,
+            "Wrong rewards delegate A"
+        );
+        assertEq(
+            reports[1].rewardsDelegate,
+            rewardsDelegate,
+            "Wrong rewards delegate B"
+        );
     }
 
     function test_UpdateSharePrices() public {
@@ -129,7 +137,7 @@ contract SharePriceOracleTest is Test {
             1.5e18,
             delegate
         );
-        
+
         oracle.updateSharePrices(REMOTE_CHAIN_ID, reports);
 
         // Also set up price feed for remote chain
@@ -164,8 +172,8 @@ contract SharePriceOracleTest is Test {
     function test_PriceConversion() public {
         // Set up prices for conversion test
         vaultA.setMockSharePrice(1e18); // 1 tokenA per share
-        tokenAFeed.setPrice(100e8);     // $100 per tokenA
-        tokenBFeed.setPrice(50e8);      // $50 per tokenB
+        tokenAFeed.setPrice(100e8); // $100 per tokenA
+        tokenBFeed.setPrice(50e8); // $50 per tokenB
 
         address[] memory vaults = new address[](1);
         vaults[0] = address(vaultA);
@@ -184,11 +192,18 @@ contract SharePriceOracleTest is Test {
     }
 
     function test_ETHDenominatedFeeds() public {
-        // Setup ETH denominated feed
+        // Setup initial conditions
+        vaultA.setMockSharePrice(1e18); // 1:1 ratio for simplicity
+
+        // Setup ETH denominated feed with correct decimals
         MockPriceFeed ethDenomFeed = new MockPriceFeed();
-        ethDenomFeed.setPrice(0.05e18); // 0.05 ETH per token
-        
-        vm.prank(admin);
+        // 0.05 ETH per token with 18 decimals (same as ETH)
+        ethDenomFeed.setPrice(50000000000000000); // 0.05 ETH
+
+        console.log("ETH/USD Price:", ethUsdFeed.latestAnswer());
+        console.log("Token ETH Price:", ethDenomFeed.latestAnswer());
+
+        vm.startPrank(admin);
         oracle.setPriceFeed(
             CHAIN_ID,
             vaultA.asset(),
@@ -197,22 +212,33 @@ contract SharePriceOracleTest is Test {
                 denomination: SharePriceOracle.PriceDenomination.ETH
             })
         );
+        vm.stopPrank();
 
-        // Get price in USD terms
-        (uint256 priceInUsd,) = oracle.getLatestSharePrice(
+        // Get price in tokenB terms
+        (uint256 price, uint64 timestamp) = oracle.getLatestSharePrice(
             CHAIN_ID,
             address(vaultA),
             vaultB.asset()
         );
 
+        console.log("Conversion Result:", price);
+        console.log("Timestamp:", timestamp);
+
+        // Expected calculation:
+        // 1 vault share = 1 tokenA (from share price)
+        // 1 tokenA = 0.05 ETH
         // 0.05 ETH * $2000/ETH = $100
         // $100 / $50 per tokenB = 2 tokenB
-        assertApproxEqRel(priceInUsd, 2e18, 0.01e18); // 1% tolerance
+        assertApproxEqRel(price, 2e18, 0.01e18); // 1% tolerance
     }
 
-    function test_RevertWhen_InvalidPriceFeed() public {
+    function test_RevertWhen_InvalidPriceFeed_banana() public {
+        bytes memory expectedError = abi.encodeWithSignature("InvalidFeed()");
+
         vm.startPrank(admin);
-        vm.expectRevert(ISharePriceOracle.InvalidFeed.selector);
+        vm.expectRevert(expectedError);
+
+        console.log("Testing setPriceFeed with zero address feed");
         oracle.setPriceFeed(
             CHAIN_ID,
             vaultA.asset(),
@@ -228,7 +254,7 @@ contract SharePriceOracleTest is Test {
         // Deploy additional mock vault with different asset
         MockERC4626 vaultC = new MockERC4626();
         MockPriceFeed tokenCFeed = new MockPriceFeed();
-        
+
         // Setup additional price feed
         tokenCFeed.setPrice(75e8); // $75 USD/TokenC
         vaultC.setMockSharePrice(3e18); // 3 tokens per share
@@ -251,7 +277,10 @@ contract SharePriceOracleTest is Test {
         vaults[2] = address(vaultC);
 
         address rewardsDelegate = makeAddr("delegate");
-        VaultReport[] memory reports = oracle.getSharePrices(vaults, rewardsDelegate);
+        VaultReport[] memory reports = oracle.getSharePrices(
+            vaults,
+            rewardsDelegate
+        );
 
         assertEq(reports.length, 3, "Wrong number of reports");
         assertEq(reports[0].sharePrice, 1.5e18, "Wrong share price A");
@@ -265,7 +294,9 @@ contract SharePriceOracleTest is Test {
 
         VaultReport memory report = VaultReport({
             sharePrice: 1.5e18,
-            lastUpdate: uint64(block.timestamp - oracle.SHARE_PRICE_STALENESS_TOLERANCE() - 1),
+            lastUpdate: uint64(
+                block.timestamp - oracle.SHARE_PRICE_STALENESS_TOLERANCE() - 1
+            ),
             chainId: REMOTE_CHAIN_ID,
             rewardsDelegate: makeAddr("delegate"),
             vaultAddress: address(vaultA),
@@ -274,7 +305,7 @@ contract SharePriceOracleTest is Test {
         });
 
         // The price should be considered stale
-        (uint256 price,) = oracle.getLatestSharePrice(
+        (uint256 price, ) = oracle.getLatestSharePrice(
             REMOTE_CHAIN_ID,
             report.vaultAddress,
             vaultB.asset()

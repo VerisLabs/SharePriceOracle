@@ -124,6 +124,8 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     ) external onlyAdmin {
         if (_chainId == 0) revert InvalidChainId(_chainId);
         if (_asset == address(0)) revert ZeroAddress();
+        if (_priceFeed.feed == address(0)) revert InvalidFeed();
+        
         ChainlinkResponse memory response = _priceFeed.feed.getPrice();
         if (response.price == 0) revert InvalidFeed();
 
