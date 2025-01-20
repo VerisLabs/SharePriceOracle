@@ -5,7 +5,18 @@ import {VaultReport} from "../interfaces/ISharePriceOracle.sol";
 import {IERC4626} from "../interfaces/IERC4626.sol";
 import {IERC20Metadata} from "../interfaces/IERC20Metadata.sol";
 
+/// @title VaultLib
+/// @notice Library for interacting with ERC4626 vaults and retrieving share prices
+/// @dev Handles graceful failures for non-compliant or failing vaults
 library VaultLib {
+
+    /// @notice Retrieves the current share price and metadata for an ERC4626 vault
+    /// @dev Uses try-catch blocks to handle potential failures in vault interactions
+    /// @param _vaultAddress Address of the ERC4626 vault
+    /// @param _rewardsDelegate Address to delegate rewards to (if applicable)
+    /// @param chainId The chain ID where the vault is deployed
+    /// @return VaultReport A struct containing vault share price and metadata
+    /// @custom:security Returns a valid report with 0 share price if any operation fails
     function getVaultSharePrice(
         address _vaultAddress,
         address _rewardsDelegate,

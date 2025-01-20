@@ -194,7 +194,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
      * @return sharePrice Current share price in terms of _dstAsset
      * @return timestamp Timestamp of the price data
      */
-    function _getSameChainSharePrice(
+    function _getDstSharePrice(
         address _vaultAddress,
         address _dstAsset
     ) internal view returns (uint256 sharePrice, uint64 timestamp) {
@@ -246,7 +246,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
      * @return sharePrice Current share price in terms of _dstAsset
      * @return timestamp Timestamp of the price data
      */
-    function _getCrossChainSharePrice(
+    function _getSrcSharePrice(
         uint32 _srcChainId,
         address _vaultAddress,
         address _dstAsset
@@ -274,6 +274,14 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
             );
     }
 
+    /**
+     * @notice Gets the decimals for two assets
+     * @param srcAsset Source asset address
+     * @param dstAsset Destination asset address
+     * @return srcDecimals Decimals of the source asset
+     * @return dstDecimals Decimals of the destination asset
+     * @return success True if both decimals were successfully retrieved
+     */
     function _getAssetDecimals(
         address srcAsset,
         address dstAsset
@@ -293,6 +301,15 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
         }
     }
 
+    /**
+     * @notice Converts an amount from one asset to another using their respective prices
+     * @param amount Amount to convert
+     * @param _srcChainId Source chain ID
+     * @param _srcAsset Source asset address
+     * @param _dstAsset Destination asset address
+     * @return price The converted price in terms of the destination asset
+     * @return timestamp The earlier timestamp between source and destination prices
+     */
     function _convertAssetPrice(
         uint256 amount,
         uint32 _srcChainId,
@@ -372,7 +389,8 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     }
 
     /**
-     * @notice Gets latest share price from source chain vault in requested asset terms
+     * @notice Gets latest share price from the desired vault in requested asset terms
+     * THIS WILL NOT REVERT, IF FAIL RETURNS (0, 0)
      * @param _srcChainId Source chain ID
      * @param _vaultAddress Vault address
      * @param _dstAsset Asset to get the price in
@@ -385,9 +403,9 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
         address _dstAsset
     ) external view override returns (uint256 sharePrice, uint64 timestamp) {
         if (_srcChainId == chainId) {
-            return _getSameChainSharePrice(_vaultAddress, _dstAsset);
+            return _getDstSharePrice(_vaultAddress, _dstAsset);
         }
-        return _getCrossChainSharePrice(_srcChainId, _vaultAddress, _dstAsset);
+        return _getSrcSharePrice(_srcChainId, _vaultAddress, _dstAsset);
     }
 
     /**

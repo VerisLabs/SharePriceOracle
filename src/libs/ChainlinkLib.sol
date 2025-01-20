@@ -4,7 +4,16 @@ pragma solidity 0.8.19;
 import {ChainlinkResponse} from "../interfaces/ISharePriceOracle.sol";
 import {AggregatorV3Interface} from "../interfaces/AggregatorV3Interface.sol";
 
+/// @title ChainlinkLib
+/// @notice Library for interacting with Chainlink price feeds
+/// @dev Provides safe price retrieval with comprehensive validation
 library ChainlinkLib {
+
+    /// @notice Retrieves the latest price data from a Chainlink price feed
+    /// @dev Includes full validation of roundId, timestamp, and price value
+    /// @param feed Address of the Chainlink price feed
+    /// @return response ChainlinkResponse struct containing price data and metadata
+    /// @custom:security Returns zeroed response if any validation fails
     function getPrice(
         address feed
     ) internal view returns (ChainlinkResponse memory response) {

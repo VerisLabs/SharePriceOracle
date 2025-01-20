@@ -3,6 +3,9 @@ pragma solidity 0.8.19;
 
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 
+/// @title PriceConversionLib
+/// @notice Library for converting prices between different assets using Chainlink price feeds
+/// @dev Uses FixedPointMathLib for safe mathematical operations
 library PriceConversionLib {
     using FixedPointMathLib for uint256;
 
@@ -16,6 +19,11 @@ library PriceConversionLib {
         uint256 dstTimestamp;
     }
 
+    /// @notice Converts an amount from one asset to another using their respective prices
+    /// @dev Uses full precision multiplication and division to prevent overflow and maintain precision
+    /// @param conv PriceConversion struct containing conversion parameters
+    /// @return price The converted price in terms of the destination asset
+    /// @return timestamp The earlier timestamp between source and destination prices
     function convertAssetPrice(
         PriceConversion memory conv
     ) internal pure returns (uint256 price, uint64 timestamp) {
@@ -27,8 +35,8 @@ library PriceConversionLib {
         );
 
         timestamp = uint64(
-            conv.srcTimestamp < conv.dstTimestamp 
-                ? conv.srcTimestamp 
+            conv.srcTimestamp < conv.dstTimestamp
+                ? conv.srcTimestamp
                 : conv.dstTimestamp
         );
     }
