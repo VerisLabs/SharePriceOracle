@@ -391,6 +391,9 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     /**
      * @notice Gets latest share price from the desired vault in requested asset terms
      * THIS WILL NOT REVERT, IF FAIL RETURNS (0, 0)
+     * THE OLDEST FEED TIMESTAMP WILL BE RETURNED
+     * I DUNNO VALIDATE FEED TIMESTAMP, THIS SHOULD BE
+     * FOR THE CALLER TO DO
      * @param _srcChainId Source chain ID
      * @param _vaultAddress Vault address
      * @param _dstAsset Asset to get the price in
