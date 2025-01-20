@@ -1,194 +1,128 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import { MockERC20 } from "./MockERC20.sol";
-import { FixedPointMathLib } from "@solady/utils/FixedPointMathLib.sol";
+import {IERC4626} from "../../src/interfaces/IERC4626.sol";
+import {IERC20} from "../../src/interfaces/IERC20.sol";
+import {IERC20Metadata} from "../../src/interfaces/IERC20Metadata.sol";
+import {MockERC20} from "./MockERC20.sol";
 
-/// @notice Mock ERC4626 implementation
-contract MockERC4626 is MockERC20 {
-    using FixedPointMathLib for uint256;
+contract MockERC4626 is IERC4626 {
+    address private immutable _asset;
+    uint256 private _mockSharePrice;
+    
+    // ERC20 storage
+    mapping(address => uint256) private _balances;
+    mapping(address => mapping(address => uint256)) private _allowances;
+    uint256 private _totalSupply;
+    string private constant _name = "Mock Vault";
+    string private constant _symbol = "mVLT";
+    uint8 private constant _decimals = 18;
 
-    /*//////////////////////////////////////////////////////////////
-                                EVENTS
-    //////////////////////////////////////////////////////////////*/
-
-    event Deposit(address indexed caller, address indexed owner, uint256 assets, uint256 shares);
-    event Withdraw(
-        address indexed caller, address indexed receiver, address indexed owner, uint256 assets, uint256 shares
-    );
-
-    /*//////////////////////////////////////////////////////////////
-                               IMMUTABLES
-    //////////////////////////////////////////////////////////////*/
-
-    MockERC20 public immutable asset;
-
-    /*//////////////////////////////////////////////////////////////
-                                STORAGE
-    //////////////////////////////////////////////////////////////*/
-
-    // For testing: allow manual setting of share price
-    uint256 public sharePrice;
-    bool public mockPriceEnabled;
-
-    /*//////////////////////////////////////////////////////////////
-                               CONSTRUCTOR
-    //////////////////////////////////////////////////////////////*/
-
-    constructor(
-        address asset_,
-        string memory name_,
-        string memory symbol_
-    )
-        MockERC20(name_, symbol_, MockERC20(asset_).decimals())
-    {
-        asset = MockERC20(asset_);
-        sharePrice = 10 ** decimals;
+    constructor() {
+        _asset = address(new MockERC20());
+        _mockSharePrice = 1e18; // 1:1 ratio by default
     }
 
-    /*//////////////////////////////////////////////////////////////
-                        DEPOSIT/WITHDRAWAL LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    function deposit(uint256 assets, address receiver) public virtual returns (uint256 shares) {
-        shares = previewDeposit(assets);
-
-        asset.transferFrom(msg.sender, address(this), assets);
-        _mint(receiver, shares);
-
-        emit Deposit(msg.sender, receiver, assets, shares);
+    function setMockSharePrice(uint256 sharePrice) external {
+        _mockSharePrice = sharePrice;
     }
 
-    function mint(uint256 shares, address receiver) public virtual returns (uint256 assets) {
-        assets = previewMint(shares);
-
-        asset.transferFrom(msg.sender, address(this), assets);
-        _mint(receiver, shares);
-
-        emit Deposit(msg.sender, receiver, assets, shares);
+    // Asset functions
+    function asset() external view returns (address) {
+        return _asset;
     }
 
-    function withdraw(uint256 assets, address receiver, address owner) public virtual returns (uint256 shares) {
-        shares = previewWithdraw(assets);
+    // Conversion functions
+    function convertToShares(uint256 assets) external view returns (uint256) {
+        return assets * 1e18 / _mockSharePrice;
+    }
 
-        if (msg.sender != owner) {
-            uint256 allowed = allowance[owner][msg.sender];
-            if (allowed != type(uint256).max) {
-                allowance[owner][msg.sender] = allowed - shares;
-            }
+    function convertToAssets(uint256 shares) external view returns (uint256) {
+        return shares * _mockSharePrice / 1e18;
+    }
+
+    // ERC20 functions
+    function totalSupply() external view returns (uint256) {
+        return _totalSupply;
+    }
+
+    function balanceOf(address account) external view returns (uint256) {
+        return _balances[account];
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        require(to != address(0), "Transfer to zero address");
+        address owner = msg.sender;
+        _transfer(owner, to, amount);
+        return true;
+    }
+
+    function allowance(address owner, address spender) external view returns (uint256) {
+        return _allowances[owner][spender];
+    }
+
+    function approve(address spender, uint256 amount) external returns (bool) {
+        _approve(msg.sender, spender, amount);
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        _spendAllowance(from, msg.sender, amount);
+        _transfer(from, to, amount);
+        return true;
+    }
+
+    // ERC20Metadata functions
+    function name() external pure returns (string memory) {
+        return _name;
+    }
+
+    function symbol() external pure returns (string memory) {
+        return _symbol;
+    }
+
+    function decimals() external pure returns (uint8) {
+        return _decimals;
+    }
+
+    // Internal ERC20 functions
+    function _transfer(address from, address to, uint256 amount) internal {
+        require(from != address(0), "Transfer from zero address");
+        require(to != address(0), "Transfer to zero address");
+        uint256 fromBalance = _balances[from];
+        require(fromBalance >= amount, "Transfer amount exceeds balance");
+        _balances[from] = fromBalance - amount;
+        _balances[to] += amount;
+        emit Transfer(from, to, amount);
+    }
+
+    function _approve(address owner, address spender, uint256 amount) internal {
+        require(owner != address(0), "Approve from zero address");
+        require(spender != address(0), "Approve to zero address");
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+
+    function _spendAllowance(address owner, address spender, uint256 amount) internal {
+        uint256 currentAllowance = _allowances[owner][spender];
+        if (currentAllowance != type(uint256).max) {
+            require(currentAllowance >= amount, "Insufficient allowance");
+            _approve(owner, spender, currentAllowance - amount);
         }
-
-        _burn(owner, shares);
-        asset.transfer(receiver, assets);
-
-        emit Withdraw(msg.sender, receiver, owner, assets, shares);
     }
 
-    function redeem(uint256 shares, address receiver, address owner) public virtual returns (uint256 assets) {
-        if (msg.sender != owner) {
-            uint256 allowed = allowance[owner][msg.sender];
-            if (allowed != type(uint256).max) {
-                allowance[owner][msg.sender] = allowed - shares;
-            }
-        }
-
-        assets = previewRedeem(shares);
-        _burn(owner, shares);
-        asset.transfer(receiver, assets);
-
-        emit Withdraw(msg.sender, receiver, owner, assets, shares);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            ACCOUNTING LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    function totalAssets() public view virtual returns (uint256) {
-        return asset.balanceOf(address(this));
-    }
-
-    function convertToShares(uint256 assets) public view virtual returns (uint256) {
-        uint256 supply = totalSupply;
-        if (supply == 0) return assets;
-
-        if (mockPriceEnabled) {
-            return assets.mulDiv(10 ** decimals, sharePrice);
-        }
-
-        return assets.mulDiv(supply, totalAssets());
-    }
-
-    function convertToAssets(uint256 shares) public view virtual returns (uint256) {
-        uint256 supply = totalSupply;
-        if (supply == 0) return sharePrice;
-
-        if (mockPriceEnabled) {
-            return shares.mulDiv(sharePrice, 10 ** decimals);
-        }
-
-        return shares.mulDiv(totalAssets(), supply);
-    }
-
-    function previewDeposit(uint256 assets) public view virtual returns (uint256) {
-        return convertToShares(assets);
-    }
-
-    function previewMint(uint256 shares) public view virtual returns (uint256) {
-        uint256 supply = totalSupply;
-        if (supply == 0) return shares;
-
-        if (mockPriceEnabled) {
-            return shares.mulDivUp(sharePrice, 10 ** decimals);
-        }
-
-        return shares.mulDivUp(totalAssets(), supply);
-    }
-
-    function previewWithdraw(uint256 assets) public view virtual returns (uint256) {
-        uint256 supply = totalSupply;
-        if (supply == 0) return 0;
-
-        if (mockPriceEnabled) {
-            return assets.mulDivUp(10 ** decimals, sharePrice);
-        }
-
-        return assets.mulDivUp(supply, totalAssets());
-    }
-
-    function previewRedeem(uint256 shares) public view virtual returns (uint256) {
-        return convertToAssets(shares);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                     DEPOSIT/WITHDRAWAL LIMIT LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    function maxDeposit(address) public pure virtual returns (uint256) {
-        return type(uint256).max;
-    }
-
-    function maxMint(address) public pure virtual returns (uint256) {
-        return type(uint256).max;
-    }
-
-    function maxWithdraw(address owner) public view virtual returns (uint256) {
-        return convertToAssets(balanceOf[owner]);
-    }
-
-    function maxRedeem(address owner) public view virtual returns (uint256) {
-        return balanceOf[owner];
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                          TESTING FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    function setMockSharePrice(uint256 newPrice) external {
-        sharePrice = newPrice;
-        mockPriceEnabled = true;
-    }
-
-    function disableMockPrice() external {
-        mockPriceEnabled = false;
-    }
+    // Not implemented ERC4626 functions - these will revert when called
+    function totalAssets() external pure returns (uint256) { revert("Not implemented"); }
+    function previewDeposit(uint256) external pure returns (uint256) { revert("Not implemented"); }
+    function previewMint(uint256) external pure returns (uint256) { revert("Not implemented"); }
+    function previewWithdraw(uint256) external pure returns (uint256) { revert("Not implemented"); }
+    function previewRedeem(uint256) external pure returns (uint256) { revert("Not implemented"); }
+    function maxDeposit(address) external pure returns (uint256) { revert("Not implemented"); }
+    function maxMint(address) external pure returns (uint256) { revert("Not implemented"); }
+    function maxWithdraw(address) external pure returns (uint256) { revert("Not implemented"); }
+    function maxRedeem(address) external pure returns (uint256) { revert("Not implemented"); }
+    function deposit(uint256, address) external pure returns (uint256) { revert("Not implemented"); }
+    function mint(uint256, address) external pure returns (uint256) { revert("Not implemented"); }
+    function withdraw(uint256, address, address) external pure returns (uint256) { revert("Not implemented"); }
+    function redeem(uint256, address, address) external pure returns (uint256) { revert("Not implemented"); }
 }

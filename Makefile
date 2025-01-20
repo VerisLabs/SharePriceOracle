@@ -1,6 +1,6 @@
 -include .env
 
-.PHONY: all test clean deploy-all configure-all
+.PHONY: all test clean deploy-all configure-all send-from-all
 
 # Helper commands
 clean:
@@ -12,7 +12,7 @@ build:
 test:
 	forge test
 
-# Deployment commands
+# Mainnet deployment commands
 deploy-base:
 	forge script script/Deploy.s.sol:DeployScript \
 		--rpc-url ${BASE_RPC_URL} \
@@ -44,21 +44,21 @@ deploy-all: deploy-base deploy-optimism deploy-arbitrum
 
 # LayerZero configuration commands
 configure-base:
-	forge script script/ConfigLzEndpoint.s.sol:ConfigLzEndpoint \
+	forge script script/LzConfigure.s.sol:LzConfigure \
 		--rpc-url ${BASE_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
 		-vvv
 
 configure-optimism:
-	forge script script/ConfigLzEndpoint.s.sol:ConfigLzEndpoint \
+	forge script script/LzConfigure.s.sol:LzConfigure \
 		--rpc-url ${OPTIMISM_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
 		-vvv
 
 configure-arbitrum:
-	forge script script/ConfigLzEndpoint.s.sol:ConfigLzEndpoint \
+	forge script script/LzConfigure.s.sol:LzConfigure \
 		--rpc-url ${ARBITRUM_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
@@ -66,7 +66,29 @@ configure-arbitrum:
 
 configure-all: configure-base configure-optimism configure-arbitrum
 
-# Deploy and configure testnet commands
+# Send share price commands
+send-from-optimism-to-base: # Example: make send-from-optimism-to-base VAULT_ADDRESSES=0x123,0x456
+	forge script script/SendSharePrices.s.sol:SendSharePrices \
+		--rpc-url ${OPTIMISM_RPC_URL} \
+		--private-key ${PRIVATE_KEY} \
+		--broadcast \
+		-vvv
+
+send-from-base-to-optimism:
+	forge script script/SendSharePrices.s.sol:SendSharePrices \
+		--rpc-url ${BASE_RPC_URL} \
+		--private-key ${PRIVATE_KEY} \
+		--broadcast \
+		-vvv
+
+send-from-arbitrum-to-base:
+	forge script script/SendSharePrices.s.sol:SendSharePrices \
+		--rpc-url ${ARBITRUM_RPC_URL} \
+		--private-key ${PRIVATE_KEY} \
+		--broadcast \
+		-vvv
+
+# Testnet deployment commands
 deploy-base-testnet:
 	forge script script/Deploy.s.sol:DeployScript \
 		--rpc-url ${BASE_GOERLI_RPC_URL} \
@@ -96,28 +118,33 @@ deploy-arbitrum-testnet:
 
 deploy-all-testnet: deploy-base-testnet deploy-optimism-testnet deploy-arbitrum-testnet
 
-# Simulate commands (for testing deployments and configurations)
+# Simulation commands (for testing)
 simulate-deploy:
 	forge script script/Deploy.s.sol:DeployScript -vvv
 
 simulate-configure:
-	forge script script/ConfigLzEndpoint.s.sol:ConfigLzEndpoint -vvv
+	forge script script/LzConfigure.s.sol:LzConfigure -vvv
 
-# Send commands
-send-from-optimism:
-	forge script script/SendSharePrices.s.sol:SendSharePrices \
-		--rpc-url ${OPTIMISM_RPC_URL} \
-		--broadcast \
-		-vvv
+simulate-send:
+	forge script script/SendSharePrices.s.sol:SendSharePrices -vvv
 
-send-from-base:
-	forge script script/SendSharePrices.s.sol:SendSharePrices \
-		--rpc-url ${BASE_RPC_URL} \
-		--broadcast \
-		-vvv
+# Full deployment, configuration and test sequence
+setup-all: deploy-all configure-all
 
-send-from-arbitrum:
-	forge script script/SendSharePrices.s.sol:SendSharePrices \
-		--rpc-url ${ARBITRUM_RPC_URL} \
-		--broadcast \
-		-vvv
+setup-all-testnet: deploy-all-testnet configure-all
+
+# Help target
+help:
+	@echo "Available targets:"
+	@echo "  clean               - Clean build artifacts"
+	@echo "  build              - Build the project"
+	@echo "  test               - Run tests"
+	@echo "  deploy-all         - Deploy to all mainnet chains"
+	@echo "  configure-all      - Configure LayerZero on all chains"
+	@echo "  setup-all          - Deploy and configure on all chains"
+	@echo "  setup-all-testnet  - Deploy and configure on all testnets"
+	@echo ""
+	@echo "Send share prices between chains:"
+	@echo "  send-from-optimism-to-base VAULT_ADDRESSES=0x123,0x456"
+	@echo "  send-from-base-to-optimism VAULT_ADDRESSES=0x123,0x456"
+	@echo "  send-from-arbitrum-to-base VAULT_ADDRESSES=0x123,0x456"

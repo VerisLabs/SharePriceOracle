@@ -1,112 +1,91 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-/// @notice Mock ERC20 optimized implementation
-contract MockERC20 {
-    /*//////////////////////////////////////////////////////////////
-                                ERRORS
-    //////////////////////////////////////////////////////////////*/
+import {IERC20} from "../../src/interfaces/IERC20.sol";
+import {IERC20Metadata} from "../../src/interfaces/IERC20Metadata.sol";
 
-    error InsufficientBalance();
-    error InsufficientAllowance();
+contract MockERC20 is IERC20, IERC20Metadata {
+    mapping(address => uint256) private _balances;
+    mapping(address => mapping(address => uint256)) private _allowances;
+    uint256 private _totalSupply;
 
-    /*//////////////////////////////////////////////////////////////
-                                EVENTS
-    //////////////////////////////////////////////////////////////*/
+    string private constant _name = "Mock Token";
+    string private constant _symbol = "MOCK";
+    uint8 private constant _decimals = 18;
 
-    event Transfer(address indexed from, address indexed to, uint256 amount);
-    event Approval(address indexed owner, address indexed spender, uint256 amount);
-
-    /*//////////////////////////////////////////////////////////////
-                                STORAGE
-    //////////////////////////////////////////////////////////////*/
-
-    string public name;
-    string public symbol;
-    uint8 public immutable decimals;
-
-    uint256 public totalSupply;
-    mapping(address => uint256) public balanceOf;
-    mapping(address => mapping(address => uint256)) public allowance;
-
-    /*//////////////////////////////////////////////////////////////
-                              CONSTRUCTOR
-    //////////////////////////////////////////////////////////////*/
-
-    constructor(string memory name_, string memory symbol_, uint8 decimals_) {
-        name = name_;
-        symbol = symbol_;
-        decimals = decimals_;
+    function name() external pure returns (string memory) {
+        return _name;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                              ERC20 LOGIC
-    //////////////////////////////////////////////////////////////*/
+    function symbol() external pure returns (string memory) {
+        return _symbol;
+    }
 
-    function approve(address spender, uint256 amount) public virtual returns (bool) {
-        allowance[msg.sender][spender] = amount;
-        emit Approval(msg.sender, spender, amount);
+    function decimals() external pure returns (uint8) {
+        return _decimals;
+    }
+
+    function totalSupply() external view returns (uint256) {
+        return _totalSupply;
+    }
+
+    function balanceOf(address account) external view returns (uint256) {
+        return _balances[account];
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        _transfer(msg.sender, to, amount);
         return true;
     }
 
-    function transfer(address to, uint256 amount) public virtual returns (bool) {
-        if (amount > balanceOf[msg.sender]) revert InsufficientBalance();
+    function allowance(address owner, address spender) external view returns (uint256) {
+        return _allowances[owner][spender];
+    }
 
-        balanceOf[msg.sender] -= amount;
-        unchecked {
-            balanceOf[to] += amount;
-        }
-
-        emit Transfer(msg.sender, to, amount);
+    function approve(address spender, uint256 amount) external returns (bool) {
+        _approve(msg.sender, spender, amount);
         return true;
     }
 
-    function transferFrom(address from, address to, uint256 amount) public virtual returns (bool) {
-        uint256 allowed = allowance[from][msg.sender];
-        if (allowed != type(uint256).max) {
-            if (amount > allowed) revert InsufficientAllowance();
-            allowance[from][msg.sender] = allowed - amount;
-        }
-
-        if (amount > balanceOf[from]) revert InsufficientBalance();
-
-        balanceOf[from] -= amount;
-        unchecked {
-            balanceOf[to] += amount;
-        }
-
-        emit Transfer(from, to, amount);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        _spendAllowance(from, msg.sender, amount);
+        _transfer(from, to, amount);
         return true;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            MINT/BURN LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    function _mint(address to, uint256 amount) internal virtual {
-        totalSupply += amount;
-        unchecked {
-            balanceOf[to] += amount;
-        }
-        emit Transfer(address(0), to, amount);
-    }
-
-    function _burn(address from, uint256 amount) internal virtual {
-        if (amount > balanceOf[from]) revert InsufficientBalance();
-
-        balanceOf[from] -= amount;
-        unchecked {
-            totalSupply -= amount;
-        }
-        emit Transfer(from, address(0), amount);
-    }
-
-    // For testing
-    function mint(address to, uint256 amount) public virtual {
+    function mint(address to, uint256 amount) external {
         _mint(to, amount);
     }
 
-    function burn(uint256 amount) public virtual {
-        _burn(msg.sender, amount);
+    function _transfer(address from, address to, uint256 amount) internal {
+        require(from != address(0), "ERC20: transfer from the zero address");
+        require(to != address(0), "ERC20: transfer to the zero address");
+        uint256 fromBalance = _balances[from];
+        require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+        _balances[from] = fromBalance - amount;
+        _balances[to] += amount;
+        emit Transfer(from, to, amount);
+    }
+
+    function _mint(address account, uint256 amount) internal {
+        require(account != address(0), "ERC20: mint to the zero address");
+        _totalSupply += amount;
+        _balances[account] += amount;
+        emit Transfer(address(0), account, amount);
+    }
+
+    function _approve(address owner, address spender, uint256 amount) internal {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+
+    function _spendAllowance(address owner, address spender, uint256 amount) internal {
+        uint256 currentAllowance = _allowances[owner][spender];
+        if (currentAllowance != type(uint256).max) {
+            require(currentAllowance >= amount, "ERC20: insufficient allowance");
+            _approve(owner, spender, currentAllowance - amount);
+        }
     }
 }
