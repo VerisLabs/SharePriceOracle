@@ -352,6 +352,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
                 );
                 src.decimals = ethUsd.decimals; 
             }
+
             if (dstFeed.denomination == PriceDenomination.ETH) {
                 dst.price = dst.price.mulDiv(10 ** 18, ethUsd.price);
                 dst.decimals = 18;
@@ -436,8 +437,8 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     /**
      * @notice Gets latest share price from the desired vault in requested asset terms
      * THIS WILL NOT REVERT, IF FAIL RETURNS (0, 0)
-     * THE OLDEST FEED TIMESTAMP WILL BE RETURNED
-     * I DUNNO VALIDATE FEED TIMESTAMP, THIS SHOULD BE
+     * THE EARLIEST PRICE FEED TIMESTAMP WILL BE RETURNED
+     * I DON'T VALIDATE PRICE FEED TIMESTAMP, THIS SHOULD BE
      * FOR THE CALLER TO DO
      * @param _srcChainId Source chain ID
      * @param _vaultAddress Vault address

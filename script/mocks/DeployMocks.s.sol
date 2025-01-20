@@ -2,8 +2,8 @@
 pragma solidity 0.8.19;
 
 import "forge-std/Script.sol";
-import "../test/mocks/MockERC20.sol";
-import "../test/mocks/MockERC4626.sol";
+import "../../test/mocks/MockERC20.sol";
+import "../../test/mocks/MockERC4626.sol";
 
 contract DeployMocksScript is Script {
     function run() public {
