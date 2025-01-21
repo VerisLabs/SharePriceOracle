@@ -60,20 +60,6 @@ interface ISharePriceOracle {
     event PriceFeedSet(uint32 indexed chainId, address indexed asset, address priceFeed);
 
     /*//////////////////////////////////////////////////////////////
-                                ERRORS
-    //////////////////////////////////////////////////////////////*/
-
-    error InvalidAdminAddress();
-    error ZeroAddress();
-    error InvalidRole();
-    error InvalidChainId(uint32 receivedChainId);
-    error InvalidReporter();
-    error PriceFeedNotFound();
-    error InvalidFeed();
-    error InvalidPrice();
-    error ExceedsMaxReports();
-
-    /*//////////////////////////////////////////////////////////////
                             VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 

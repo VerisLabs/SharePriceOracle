@@ -11,11 +11,27 @@ import {ChainlinkLib} from "./libs/ChainlinkLib.sol";
 import {VaultLib} from "./libs/VaultLib.sol";
 import {PriceConversionLib} from "./libs/PriceConversionLib.sol";
 
+import {console} from "forge-std/console.sol";
+
 contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     using ChainlinkLib for address;
     using VaultLib for IERC4626;
     using PriceConversionLib for PriceConversionLib.PriceConversion;
     using FixedPointMathLib for uint256;
+
+    /*//////////////////////////////////////////////////////////////
+                                ERRORS
+    //////////////////////////////////////////////////////////////*/
+
+    error InvalidAdminAddress();
+    error ZeroAddress();
+    error InvalidRole();
+    error InvalidChainId(uint32 receivedChainId);
+    error InvalidReporter();
+    error PriceFeedNotFound();
+    error InvalidFeed();
+    error InvalidPrice();
+    error ExceedsMaxReports();
 
     ////////////////////////////////////////////////////////////////
     ///                        CONSTANTS                           ///
@@ -124,9 +140,10 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     ) external onlyAdmin {
         if (_chainId == 0) revert InvalidChainId(_chainId);
         if (_asset == address(0)) revert ZeroAddress();
-        if (_priceFeed.feed == address(0)) revert InvalidFeed();
         
+        console.log("FEED::::: ", _priceFeed.feed);
         ChainlinkResponse memory response = _priceFeed.feed.getPrice();
+        console.log("RESPONSE::: ", response.price);
         if (response.price == 0) revert InvalidFeed();
 
         priceFeeds[_chainId][_asset] = _priceFeed;

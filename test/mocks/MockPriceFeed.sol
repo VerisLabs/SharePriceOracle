@@ -17,9 +17,15 @@ contract MockPriceFeed is AggregatorV3Interface {
 
     function setPrice(int256 price) external {
         _price = price;
-        _roundId++;
-        _timestamp = block.timestamp;
-        _answeredInRound = _roundId;
+        if (price == 0) {
+            _roundId = 0; 
+            _timestamp = 0; 
+            _answeredInRound = 0;
+        } else {
+            _roundId++;
+            _timestamp = block.timestamp;
+            _answeredInRound = _roundId;
+        }
     }
 
     function decimals() external pure returns (uint8) {
@@ -34,7 +40,9 @@ contract MockPriceFeed is AggregatorV3Interface {
         return 1;
     }
 
-    function getRoundData(uint80)
+    function getRoundData(
+        uint80
+    )
         external
         view
         returns (
