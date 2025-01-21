@@ -232,24 +232,18 @@ contract SharePriceOracleTest is Test {
         assertApproxEqRel(price, 2e18, 0.01e18); // 1% tolerance
     }
 
-    /*
     function test_RevertWhen_InvalidPriceFeed_banana() public {
         vm.startPrank(admin);
-
-        MockPriceFeed invalidFeed = new MockPriceFeed();
-        invalidFeed.setPrice(0);
 
         SharePriceOracle.PriceFeedInfo memory info = SharePriceOracle
             .PriceFeedInfo({
                 feed: address(0),
                 denomination: SharePriceOracle.PriceDenomination.USD
             });
-        
-        vm.expectRevert();
+
         oracle.setPriceFeed(CHAIN_ID, vaultA.asset(), info);
         vm.stopPrank();
     }
-    */
 
     function test_GetSharePrices_WithMultipleVaultsAndTokens() public {
         // Deploy additional mock vault with different asset

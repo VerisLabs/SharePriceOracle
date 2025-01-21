@@ -11,8 +11,6 @@ import {ChainlinkLib} from "./libs/ChainlinkLib.sol";
 import {VaultLib} from "./libs/VaultLib.sol";
 import {PriceConversionLib} from "./libs/PriceConversionLib.sol";
 
-import {console} from "forge-std/console.sol";
-
 contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     using ChainlinkLib for address;
     using VaultLib for IERC4626;
@@ -141,9 +139,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
         if (_chainId == 0) revert InvalidChainId(_chainId);
         if (_asset == address(0)) revert ZeroAddress();
         
-        console.log("FEED::::: ", _priceFeed.feed);
         ChainlinkResponse memory response = _priceFeed.feed.getPrice();
-        console.log("RESPONSE::: ", response.price);
         if (response.price == 0) revert InvalidFeed();
 
         priceFeeds[_chainId][_asset] = _priceFeed;
