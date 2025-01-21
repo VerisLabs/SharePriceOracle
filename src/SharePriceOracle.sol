@@ -138,7 +138,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     ) external onlyAdmin {
         if (_chainId == 0) revert InvalidChainId(_chainId);
         if (_asset == address(0)) revert ZeroAddress();
-        
+
         ChainlinkResponse memory response = _priceFeed.feed.getPrice();
         if (response.price == 0) revert InvalidFeed();
 
@@ -365,7 +365,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
                     ethUsd.price,
                     10 ** ethUsd.decimals
                 );
-                src.decimals = ethUsd.decimals; 
+                src.decimals = ethUsd.decimals;
             }
 
             if (dstFeed.denomination == PriceDenomination.ETH) {
