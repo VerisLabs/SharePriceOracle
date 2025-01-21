@@ -14,27 +14,45 @@ contract DeployScript is Script {
         address admin
     ) internal {
         string memory deploymentPath = string.concat(
-            "deployments/", 
+            "deployments/",
             config.name,
             "_",
             vm.toString(config.chainId),
             ".json"
         );
 
-        // Create JSON object incrementally to avoid stack too deep
-        vm.writeJson(vm.toString(oracle), deploymentPath, ".oracle");
-        vm.writeJson(vm.toString(endpoint), deploymentPath, ".endpoint");
-        vm.writeJson(vm.toString(admin), deploymentPath, ".admin");
-        vm.writeJson(vm.toString(config.chainId), deploymentPath, ".chainId");
-        vm.writeJson(vm.toString(config.lzEndpointId), deploymentPath, ".lzEndpointId");
-        vm.writeJson(vm.toString(config.lzEndpoint), deploymentPath, ".lzEndpoint");
-        vm.writeJson(config.name, deploymentPath, ".network");
+        string memory jsonContent = string.concat(
+            "{",
+            '"oracle": "',
+            vm.toString(oracle),
+            '",',
+            '"endpoint": "',
+            vm.toString(endpoint),
+            '",',
+            '"admin": "',
+            vm.toString(admin),
+            '",',
+            '"chainId": ',
+            vm.toString(config.chainId),
+            ",",
+            '"lzEndpointId": ',
+            vm.toString(config.lzEndpointId),
+            ",",
+            '"lzEndpoint": "',
+            vm.toString(config.lzEndpoint),
+            '",',
+            '"network": "',
+            config.name,
+            '"',
+            "}"
+        );
+
+        // Write the entire JSON at once
+        vm.writeFile(deploymentPath, jsonContent);
+        console.log("Deployment saved to:", deploymentPath);
     }
 
     function run() external {
-        // Load configuration
-        ChainConfig.Config memory config = ChainConfig.getConfig(block.chainid);
-        
         // Load private key from env
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address admin = vm.envOr("ADMIN_ADDRESS", address(0));
@@ -44,6 +62,9 @@ contract DeployScript is Script {
 
         // Start broadcast
         vm.startBroadcast(deployerPrivateKey);
+
+        // Load configuration
+        ChainConfig.Config memory config = ChainConfig.getConfig(block.chainid);
 
         // Deploy SharePriceOracle
         SharePriceOracle oracle = new SharePriceOracle(

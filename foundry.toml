@@ -8,6 +8,7 @@ solc_version = "0.8.19"
 # viaIR = true
 # optimizer = true
 # optimizer_runs = 200
+fs_permissions = [{ access = "read-write", path = "./deployments" }]
 coverage_exclude = [
     "test/**/*",
     "script/**/*",

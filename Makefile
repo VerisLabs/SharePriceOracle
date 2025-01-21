@@ -1,4 +1,5 @@
 -include .env
+export
 
 .PHONY: all test clean deploy-all configure-all send-from-all
 
@@ -14,7 +15,7 @@ test:
 
 # Mainnet deployment commands
 deploy-base:
-	forge script script/Deploy.s.sol:DeployScript \
+	@forge script script/Deploy.s.sol:DeployScript \
 		--rpc-url ${BASE_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
@@ -23,7 +24,7 @@ deploy-base:
 		-vvv
 
 deploy-optimism:
-	forge script script/Deploy.s.sol:DeployScript \
+	@forge script script/Deploy.s.sol:DeployScript \
 		--rpc-url ${OPTIMISM_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
@@ -32,7 +33,7 @@ deploy-optimism:
 		-vvv
 
 deploy-arbitrum:
-	forge script script/Deploy.s.sol:DeployScript \
+	@forge script script/Deploy.s.sol:DeployScript \
 		--rpc-url ${ARBITRUM_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
@@ -40,25 +41,41 @@ deploy-arbitrum:
 		--etherscan-api-key ${ARBISCAN_API_KEY} \
 		-vvv
 
-deploy-all: deploy-base deploy-optimism deploy-arbitrum
+deploy-polygon:
+	@forge script script/Deploy.s.sol:DeployScript \
+		--rpc-url ${POLYGON_RPC_URL} \
+		--private-key ${PRIVATE_KEY} \
+		--broadcast \
+		--verify \
+		--etherscan-api-key ${POLYGONSCAN_API_KEY} \
+		-vvv
+
+deploy-all: deploy-base deploy-optimism deploy-arbitrum deploy-polygon
 
 # LayerZero configuration commands
 configure-base:
-	forge script script/LzConfigure.s.sol:LzConfigure \
+	@forge script script/ConfigLzEndpoint.s.sol:ConfigLzEndpoint \
 		--rpc-url ${BASE_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
 		-vvv
 
 configure-optimism:
-	forge script script/LzConfigure.s.sol:LzConfigure \
+	@forge script script/ConfigLzEndpoint.s.sol:ConfigLzEndpoint \
 		--rpc-url ${OPTIMISM_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
 		-vvv
 
 configure-arbitrum:
-	forge script script/LzConfigure.s.sol:LzConfigure \
+	@forge script script/ConfigLzEndpoint.s.sol:ConfigLzEndpoint \
+		--rpc-url ${ARBITRUM_RPC_URL} \
+		--private-key ${PRIVATE_KEY} \
+		--broadcast \
+		-vvv
+
+configure-polygon:
+	@forge script script/ConfigLzEndpoint.s.sol:ConfigLzEndpoint \
 		--rpc-url ${ARBITRUM_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
@@ -68,21 +85,21 @@ configure-all: configure-base configure-optimism configure-arbitrum
 
 # Send share price commands
 send-from-optimism-to-base: # Example: make send-from-optimism-to-base VAULT_ADDRESSES=0x123,0x456
-	forge script script/SendSharePrices.s.sol:SendSharePrices \
+	@forge script script/SendSharePrices.s.sol:SendSharePrices \
 		--rpc-url ${OPTIMISM_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
 		-vvv
 
 send-from-base-to-optimism:
-	forge script script/SendSharePrices.s.sol:SendSharePrices \
+	@forge script script/SendSharePrices.s.sol:SendSharePrices \
 		--rpc-url ${BASE_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
 		-vvv
 
 send-from-arbitrum-to-base:
-	forge script script/SendSharePrices.s.sol:SendSharePrices \
+	@forge script script/SendSharePrices.s.sol:SendSharePrices \
 		--rpc-url ${ARBITRUM_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
@@ -90,7 +107,7 @@ send-from-arbitrum-to-base:
 
 # Testnet deployment commands
 deploy-base-testnet:
-	forge script script/Deploy.s.sol:DeployScript \
+	@forge script script/Deploy.s.sol:DeployScript \
 		--rpc-url ${BASE_GOERLI_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
@@ -99,7 +116,7 @@ deploy-base-testnet:
 		-vvv
 
 deploy-optimism-testnet:
-	forge script script/Deploy.s.sol:DeployScript \
+	@forge script script/Deploy.s.sol:DeployScript \
 		--rpc-url ${OPTIMISM_GOERLI_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
@@ -108,7 +125,7 @@ deploy-optimism-testnet:
 		-vvv
 
 deploy-arbitrum-testnet:
-	forge script script/Deploy.s.sol:DeployScript \
+	@forge script script/Deploy.s.sol:DeployScript \
 		--rpc-url ${ARBITRUM_GOERLI_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
@@ -120,13 +137,13 @@ deploy-all-testnet: deploy-base-testnet deploy-optimism-testnet deploy-arbitrum-
 
 # Simulation commands (for testing)
 simulate-deploy:
-	forge script script/Deploy.s.sol:DeployScript -vvv
+	@forge script script/Deploy.s.sol:DeployScript -vvv
 
 simulate-configure:
-	forge script script/LzConfigure.s.sol:LzConfigure -vvv
+	@forge script script/ConfigLzEndpoint.s.sol:ConfigLzEndpoint -vvv
 
 simulate-send:
-	forge script script/SendSharePrices.s.sol:SendSharePrices -vvv
+	@forge script script/SendSharePrices.s.sol:SendSharePrices -vvv
 
 # Full deployment, configuration and test sequence
 setup-all: deploy-all configure-all
