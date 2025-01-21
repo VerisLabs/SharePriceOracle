@@ -13,60 +13,142 @@ library ChainConfig {
     error UnsupportedChain(uint256 chainId);
 
     function getConfig(uint256 chainId) internal pure returns (Config memory) {
-        // Mainnet L2s
-        if (chainId == 8453) { // Base
-            return Config({
-                chainId: 8453,
-                lzEndpointId: 184,
-                ethUsdFeed: 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70,
-                lzEndpoint: 0xb6319cC6c8c27A8F5dAF0dD3DF91EA35C4720dd7,
-                name: "Base"
-            });
-        } else if (chainId == 10) { // Optimism
-            return Config({
-                chainId: 10,
-                lzEndpointId: 111,
-                ethUsdFeed: 0x13e3Ee699D1909E989722E753853AE30b17e08c5,
-                lzEndpoint: 0x3c2269811836af69497E5F486A85D7316753cf62,
-                name: "Optimism"
-            });
-        } else if (chainId == 42161) { // Arbitrum
-            return Config({
-                chainId: 42161,
-                lzEndpointId: 110,
-                ethUsdFeed: 0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612,
-                lzEndpoint: 0x3c2269811836af69497E5F486A85D7316753cf62,
-                name: "Arbitrum"
-            });
+        if (chainId == 42161) {
+            // Arbitrum
+            return
+                Config({
+                    chainId: 42161,
+                    lzEndpointId: 30110,
+                    ethUsdFeed: 0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612,
+                    lzEndpoint: 0x1a44076050125825900e736c501f859c50fE728c,
+                    name: "Arbitrum"
+                });
+        } else if (chainId == 43114) {
+            // Avalanche
+            return
+                Config({
+                    chainId: 43114,
+                    lzEndpointId: 30106,
+                    ethUsdFeed: 0x976B3D034E162d8bD72D6b9C989d545b839003b0,
+                    lzEndpoint: 0x1a44076050125825900e736c501f859c50fE728c,
+                    name: "Avalanche"
+                });
+        } else if (chainId == 8453) {
+            // Base
+            return
+                Config({
+                    chainId: 8453,
+                    lzEndpointId: 30184,
+                    ethUsdFeed: 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70,
+                    lzEndpoint: 0x1a44076050125825900e736c501f859c50fE728c,
+                    name: "Base"
+                });
+        } else if (chainId == 56) {
+            // BNB
+            return
+                Config({
+                    chainId: 56,
+                    lzEndpointId: 30102,
+                    ethUsdFeed: 0x9ef1B8c0E4F7dc8bF5719Ea496883DC6401d5b2e,
+                    lzEndpoint: 0x1a44076050125825900e736c501f859c50fE728c,
+                    name: "BNB"
+                });
+        } else if (chainId == 1) {
+            // Ethereum
+            return
+                Config({
+                    chainId: 1,
+                    lzEndpointId: 30101,
+                    ethUsdFeed: 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419,
+                    lzEndpoint: 0x1a44076050125825900e736c501f859c50fE728c,
+                    name: "Ethereum"
+                });
+        } else if (chainId == 250) {
+            // Fantom
+            return
+                Config({
+                    chainId: 250,
+                    lzEndpointId: 30112,
+                    ethUsdFeed: 0x11DdD3d147E5b83D01cee7070027092397d63658,
+                    lzEndpoint: 0x1a44076050125825900e736c501f859c50fE728c,
+                    name: "Fantom"
+                });
+        } else if (chainId == 59144) {
+            // Linea
+            return
+                Config({
+                    chainId: 59144,
+                    lzEndpointId: 30183,
+                    ethUsdFeed: 0x3c6Cd9Cc7c7a4c2Cf5a82734CD249D7D593354dA,
+                    lzEndpoint: 0x1a44076050125825900e736c501f859c50fE728c,
+                    name: "Linea"
+                });
+        } else if (chainId == 10) {
+            // Optimism
+            return
+                Config({
+                    chainId: 10,
+                    lzEndpointId: 30111,
+                    ethUsdFeed: 0x13e3Ee699D1909E989722E753853AE30b17e08c5,
+                    lzEndpoint: 0x1a44076050125825900e736c501f859c50fE728c,
+                    name: "Optimism"
+                });
+        } else if (chainId == 137) {
+            // Polygon
+            return
+                Config({
+                    chainId: 137,
+                    lzEndpointId: 30109,
+                    ethUsdFeed: 0xF9680D99D6C9589e2a93a78A04A279e509205945,
+                    lzEndpoint: 0x1a44076050125825900e736c501f859c50fE728c,
+                    name: "Polygon"
+                });
         }
-
+        /*
+        else if (chainId == 81457) {
+            // Blast
+            return
+                Config({
+                    chainId: 81457,
+                    lzEndpointId: 30243,
+                    ethUsdFeed: ,
+                    lzEndpoint: 0x1a44076050125825900e736c501f859c50fE728c,
+                    name: "Blast"
+                });
+        } 
         // Testnets
-        else if (chainId == 84531) { // Base Goerli
-            return Config({
-                chainId: 84531,
-                lzEndpointId: 184,
-                ethUsdFeed: 0xcD2A119bD1F7DF95d706DE6F2057fDD45A0503E2,
-                lzEndpoint: 0x6aB5Ae6822647046626e83ee6dB8187151E1d5ab,
-                name: "Base Goerli"
-            });
-        } else if (chainId == 420) { // Optimism Goerli
-            return Config({
-                chainId: 420,
-                lzEndpointId: 111,
-                ethUsdFeed: 0x57241A37733983F97C4Ab06448F244A1E0Ca0ba8,
-                lzEndpoint: 0xA14DBac33f5b5a2EDF459196E4EA42a680ABfeB5,
-                name: "Optimism Goerli"
-            });
-        } else if (chainId == 421613) { // Arbitrum Goerli
-            return Config({
-                chainId: 421613,
-                lzEndpointId: 110,
-                ethUsdFeed: 0x62CAe0FA2da220f43a51F86Db2EDb36DcA9A5A08,
-                lzEndpoint: 0x6aB5Ae6822647046626e83ee6dB8187151E1d5ab,
-                name: "Arbitrum Goerli"
-            });
+        else if (chainId == 84532) {
+            // Base Sepolia
+            return
+                Config({
+                    chainId: 84532,
+                    lzEndpointId: 40245,
+                    ethUsdFeed: ,
+                    lzEndpoint: 0x6EDCE65403992e310A62460808c4b910D972f10f,
+                    name: "Base Sepolia"
+                });
+        } else if (chainId == 11155420) {
+            // Optimism Sepolia 
+            return
+                Config({
+                    chainId: 11155420,
+                    lzEndpointId: 40232,
+                    ethUsdFeed: ,
+                    lzEndpoint: 0x6EDCE65403992e310A62460808c4b910D972f10f,
+                    name: "Optimism Sepolia"
+                });
+        } else if (chainId == 421614) {
+            // Arbitrum Goerli
+            return
+                Config({
+                    chainId: 421614,
+                    lzEndpointId: 40231,
+                    ethUsdFeed: ,
+                    lzEndpoint: 0x6EDCE65403992e310A62460808c4b910D972f10f,
+                    name: "Arbitrum Sepolia"
+                });
         }
-
+        */
         revert UnsupportedChain(chainId);
     }
 }
