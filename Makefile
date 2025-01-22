@@ -76,7 +76,7 @@ configure-arbitrum:
 
 configure-polygon:
 	@forge script script/ConfigLzEndpoint.s.sol:ConfigLzEndpoint \
-		--rpc-url ${ARBITRUM_RPC_URL} \
+		--rpc-url ${POLYGON_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
 		-vvv

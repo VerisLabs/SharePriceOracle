@@ -8,17 +8,15 @@ solc_version = "0.8.19"
 # viaIR = true
 # optimizer = true
 # optimizer_runs = 200
-fs_permissions = [{ access = "read-write", path = "./deployments" }]
-coverage_exclude = [
-    "test/**/*",
-    "script/**/*",
-    "**/Mock*.sol",
-    "lib/**/*"
+fs_permissions = [
+    { access = "read-write", path = "./deployments" },
+    { access = "read", path = "./script/config" },
 ]
+coverage_exclude = ["test/**/*", "script/**/*", "**/Mock*.sol", "lib/**/*"]
 coverage = [
     "src/SharePriceOracle/SharePriceOracle.sol",
     "src/libs/MsgCodec.sol",
-    "src/lzEndpoint/LzEndpoint.sol"
+    "src/lzEndpoint/LzEndpoint.sol",
 ]
 
 [fmt]
@@ -33,7 +31,7 @@ wrap_comments = true
 
 [rpc_endpoints]
 amoy = "https://polygon-amoy.g.alchemy.com/v2/j5pYXkgWVoiy7Ehn2wnerPxGegQCbAlG"
-sepolia= "https://eth-sepolia.g.alchemy.com/v2/fsum8AGsbu1XW3ToTQ9i-pSJDr5gGTJX"
+sepolia = "https://eth-sepolia.g.alchemy.com/v2/fsum8AGsbu1XW3ToTQ9i-pSJDr5gGTJX"
 arbitrum = "https://rpc.ankr.com/arbitrum_sepolia"
 
 

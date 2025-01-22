@@ -11,6 +11,43 @@ library ChainConfig {
     }
 
     error UnsupportedChain(uint256 chainId);
+    error UnsupportedEndpoint(uint32 lzEndpointId);
+
+    function getConfigByLzId(
+        uint32 lzEndpointId
+    ) internal pure returns (Config memory) {
+        if (lzEndpointId == 30110) {
+            return getConfig(42161); // Arbitrum
+        } else if (lzEndpointId == 30106) {
+            return getConfig(43114); // Avalanche
+        } else if (lzEndpointId == 30184) {
+            return getConfig(8453); // Base
+        } else if (lzEndpointId == 30102) {
+            return getConfig(56); // BNB
+        } else if (lzEndpointId == 30101) {
+            return getConfig(1); // Ethereum
+        } else if (lzEndpointId == 30112) {
+            return getConfig(250); // Fantom
+        } else if (lzEndpointId == 30183) {
+            return getConfig(59144); // Linea
+        } else if (lzEndpointId == 30111) {
+            return getConfig(10); // Optimism
+        } else if (lzEndpointId == 30109) {
+            return getConfig(137); // Polygon
+        }
+        /*
+        else if (lzEndpointId == 30243) {
+            return getConfig(81457); // Blast
+        } else if (lzEndpointId == 40245) {
+            return getConfig(84532); // Base Sepolia
+        } else if (lzEndpointId == 40232) {
+            return getConfig(11155420); // Optimism Sepolia
+        } else if (lzEndpointId == 40231) {
+            return getConfig(421614); // Arbitrum Sepolia
+        }
+        */
+        revert UnsupportedEndpoint(lzEndpointId);
+    }
 
     function getConfig(uint256 chainId) internal pure returns (Config memory) {
         if (chainId == 42161) {
