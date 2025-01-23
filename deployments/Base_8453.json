@@ -1,9 +1,9 @@
 {
-  "oracle": "0xc69C62970c7432895C51443B008bC459923EBd2b",
-  "endpoint": "0x1e18Ce4e525FD0CD4a88948f9885EdA4caDD8332",
-  "admin": "0x94aBa23b9Bbfe7bb62A9eB8b1215D72b5f6F33a1",
-  "chainId": 8453,
-  "lzEndpointId": 30184,
-  "lzEndpoint": "0x1a44076050125825900e736c501f859c50fE728c",
-  "network": "Base"
+    "oracle": "0x9cC8b36c0f02a22E243c51894856766B71bF00EF",
+    "endpoint": "0xA3c8461375527BDa3180265A80BE2E4090471b7A",
+    "admin": "0x94aBa23b9Bbfe7bb62A9eB8b1215D72b5f6F33a1",
+    "chainId": 8453,
+    "lzEndpointId": 30184,
+    "lzEndpoint": "0x1a44076050125825900e736c501f859c50fE728c",
+    "network": "Base"
 }

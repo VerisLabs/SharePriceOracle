@@ -4,13 +4,14 @@ pragma solidity 0.8.19;
 import "forge-std/Script.sol";
 import "../src/SharePriceOracle.sol";
 import "./libs/ChainConfig.sol";
+import {PriceDenomination} from "../src/interfaces/ISharePriceOracle.sol";
 
 contract SetPriceFeedsScript is Script {
     struct FeedData {
         uint32 chainId;
         address token;
         address feed;
-        SharePriceOracle.PriceDenomination denomination;
+        PriceDenomination denomination;
     }
 
     uint256 constant BATCH_SIZE = 10;
@@ -40,8 +41,8 @@ contract SetPriceFeedsScript is Script {
                 token: tokenAddress,
                 feed: feed,
                 denomination: keccak256(bytes(denom)) == keccak256(bytes("ETH")) ? 
-                    SharePriceOracle.PriceDenomination.ETH : 
-                    SharePriceOracle.PriceDenomination.USD
+                    PriceDenomination.ETH : 
+                    PriceDenomination.USD
             });
             feedCount++;
         }
@@ -53,7 +54,7 @@ contract SetPriceFeedsScript is Script {
             oracle.setPriceFeed(
                 data.chainId,
                 data.token,
-                SharePriceOracle.PriceFeedInfo({
+                PriceFeedInfo({
                     feed: data.feed,
                     denomination: data.denomination
                 })

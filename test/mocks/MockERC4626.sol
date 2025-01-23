@@ -7,38 +7,40 @@ import {IERC20Metadata} from "../../src/interfaces/IERC20Metadata.sol";
 import {MockERC20} from "./MockERC20.sol";
 
 contract MockERC4626 is IERC4626 {
-    address private immutable _asset;
-    uint256 private _mockSharePrice;
-    
+    uint8 private immutable _decimals;
+    uint256 private _sharePrice;
+
+    constructor(uint8 decimals_) {
+        _decimals = decimals_;
+        _sharePrice = 10 ** decimals_;
+    }
+
+    function decimals() external view returns (uint8) {
+        return _decimals;
+    }
+
+    function asset() external view returns (address) {
+        return address(this);
+    }
+
+    function setMockSharePrice(uint256 sharePrice_) external {
+        _sharePrice = sharePrice_;
+    }
+
+    function convertToAssets(uint256 shares) external view returns (uint256) {
+        return shares * _sharePrice / (10 ** _decimals);
+    }
+
     // ERC20 storage
     mapping(address => uint256) private _balances;
     mapping(address => mapping(address => uint256)) private _allowances;
     uint256 private _totalSupply;
     string private constant _name = "Mock Vault";
     string private constant _symbol = "mVLT";
-    uint8 private constant _decimals = 18;
-
-    constructor() {
-        _asset = address(new MockERC20());
-        _mockSharePrice = 1e18; // 1:1 ratio by default
-    }
-
-    function setMockSharePrice(uint256 sharePrice) external {
-        _mockSharePrice = sharePrice;
-    }
-
-    // Asset functions
-    function asset() external view returns (address) {
-        return _asset;
-    }
 
     // Conversion functions
     function convertToShares(uint256 assets) external view returns (uint256) {
-        return assets * 1e18 / _mockSharePrice;
-    }
-
-    function convertToAssets(uint256 shares) external view returns (uint256) {
-        return shares * _mockSharePrice / 1e18;
+        return assets * 1e18 / _sharePrice;
     }
 
     // ERC20 functions
@@ -79,10 +81,6 @@ contract MockERC4626 is IERC4626 {
 
     function symbol() external pure returns (string memory) {
         return _symbol;
-    }
-
-    function decimals() external pure returns (uint8) {
-        return _decimals;
     }
 
     // Internal ERC20 functions

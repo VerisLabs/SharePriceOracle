@@ -4,15 +4,17 @@ pragma solidity 0.8.19;
 import {AggregatorV3Interface} from "../../src/interfaces/AggregatorV3Interface.sol";
 
 contract MockPriceFeed is AggregatorV3Interface {
-    uint8 private constant _decimals = 18; // Changed to 18 decimals for ETH feeds
+    uint8 private _decimals; 
     uint80 private _roundId = 1;
     int256 private _price;
     uint256 private _timestamp;
     uint80 private _answeredInRound;
 
-    constructor() {
+    constructor(uint8 decimals_) {
         _timestamp = block.timestamp;
         _answeredInRound = _roundId;
+        _decimals = decimals_;
+        _price = 1e18;
     }
 
     function setPrice(int256 price) external {
@@ -28,7 +30,7 @@ contract MockPriceFeed is AggregatorV3Interface {
         }
     }
 
-    function decimals() external pure returns (uint8) {
+    function decimals() external view returns (uint8) {
         return _decimals;
     }
 

@@ -1,9 +1,1 @@
-{
-  "oracle": "0xf312d61B44Bcef5167E5c818d0E5e8E47A7c5580",
-  "endpoint": "0xc0DFEe82104c468719395246b22BAcc72803946F",
-  "admin": "0x94aBa23b9Bbfe7bb62A9eB8b1215D72b5f6F33a1",
-  "chainId": 10,
-  "lzEndpointId": 30111,
-  "lzEndpoint": "0x1a44076050125825900e736c501f859c50fE728c",
-  "network": "Optimism"
-}
+{"oracle": "0x75A11FC92B29F8309aA445518015AFC04e4A5bb0","endpoint": "0x17fa6216aF1dFCeEDfC1A633d1f4d10307ad075f","admin": "0x94aBa23b9Bbfe7bb62A9eB8b1215D72b5f6F33a1","chainId": 10,"lzEndpointId": 30111,"lzEndpoint": "0x1a44076050125825900e736c501f859c50fE728c","network": "Optimism"}

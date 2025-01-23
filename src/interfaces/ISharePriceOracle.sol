@@ -39,6 +39,16 @@ struct ChainlinkResponse {
     uint80 answeredInRound;
 }
 
+enum PriceDenomination {
+    USD,
+    ETH
+}
+
+struct PriceFeedInfo {
+    address feed;
+    PriceDenomination denomination;
+}
+
 /**
  * @title ISharePriceOracle
  * @notice Interface for cross-chain ERC4626 vault share price oracle
@@ -57,7 +67,11 @@ interface ISharePriceOracle {
     event LzEndpointUpdated(address oldEndpoint, address newEndpoint);
     event RoleGranted(address account, uint256 role);
     event RoleRevoked(address account, uint256 role);
-    event PriceFeedSet(uint32 indexed chainId, address indexed asset, address priceFeed);
+    event PriceFeedSet(
+        uint32 indexed chainId,
+        address indexed asset,
+        address priceFeed
+    );
 
     /*//////////////////////////////////////////////////////////////
                             VIEW FUNCTIONS

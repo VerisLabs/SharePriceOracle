@@ -2,45 +2,117 @@
 pragma solidity 0.8.19;
 
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
+import {IERC20Metadata} from "../interfaces/IERC20Metadata.sol";
+import {ChainlinkResponse, PriceDenomination, PriceFeedInfo, VaultReport} from "../interfaces/ISharePriceOracle.sol";
+import {ChainlinkLib} from "./ChainlinkLib.sol";
+
+import {console} from "forge-std/console.sol";
 
 /// @title PriceConversionLib
 /// @notice Library for converting prices between different assets using Chainlink price feeds
 /// @dev Uses FixedPointMathLib for safe mathematical operations
 library PriceConversionLib {
     using FixedPointMathLib for uint256;
+    using ChainlinkLib for address;
 
-    struct PriceConversion {
+    struct ConversionParams {
         uint256 amount;
-        uint256 srcPrice;
-        uint256 dstPrice;
-        uint8 srcDecimals;
-        uint8 dstDecimals;
-        uint256 srcTimestamp;
-        uint256 dstTimestamp;
+        uint32 srcChainId;
+        uint32 chainId;
+        address srcAsset;
+        address dstAsset;
+        address ethUsdFeed;
+        PriceFeedInfo srcFeed;
+        PriceFeedInfo dstFeed;
+        VaultReport srcReport;
     }
 
-    /// @notice Converts an amount from one asset to another using their respective prices
-    /// @dev Uses full precision multiplication and division to prevent overflow and maintain precision
-    /// @param conv PriceConversion struct containing conversion parameters
-    /// @return price The converted price in terms of the destination asset
-    /// @return timestamp The earlier timestamp between source and destination prices
-    function convertAssetPrice(
-        PriceConversion memory conv
-    ) internal pure returns (uint256 price, uint64 timestamp) {
-        if (conv.srcPrice == 0 || conv.dstPrice == 0) return (0, 0);
-          
-        uint256 normalizedAmount = conv.amount;
+    function convertFullPrice(
+        ConversionParams memory params
+    ) internal view returns (uint256 price, uint64 timestamp) {
+        // Get price feed responses
+        ChainlinkResponse memory src = params.srcFeed.feed.getPrice();
+        ChainlinkResponse memory dst = params.dstFeed.feed.getPrice();
 
-        // Convert to USD using source price
-        uint256 amountInUsd = normalizedAmount.mulDiv(conv.srcPrice, 10 ** conv.srcDecimals);
-
-        // Convert USD amount to destination asset
-        price = amountInUsd.mulDiv(10 ** conv.dstDecimals, conv.dstPrice);
+        // Get the input amount from the vault's share price
+        uint256 scaledAmount = params.amount;
         
-        timestamp = uint64(
-            conv.srcTimestamp < conv.dstTimestamp
-                ? conv.srcTimestamp
-                : conv.dstTimestamp
-        );
+        // Normalize price feeds to 18 decimals
+        uint256 srcPrice = src.price;
+        if (src.decimals < 18) {
+            srcPrice = srcPrice * 10 ** (18 - src.decimals);
+        }
+        
+        uint256 dstPrice = dst.price;
+        if (dst.decimals < 18) {
+            dstPrice = dstPrice * 10 ** (18 - dst.decimals);
+        }
+
+        uint256 minTimestamp = src.timestamp < dst.timestamp ? src.timestamp : dst.timestamp;
+
+        // Handle USD/ETH denomination differences
+        if (params.srcFeed.denomination != params.dstFeed.denomination) {
+            ChainlinkResponse memory ethUsd = params.ethUsdFeed.getPrice();
+            uint256 ethUsdPrice = ethUsd.price;
+            
+            if (ethUsd.decimals < 18) {
+                ethUsdPrice = ethUsdPrice * 10 ** (18 - ethUsd.decimals);
+            }
+
+            if (params.srcFeed.denomination == PriceDenomination.ETH) {
+                // Convert ETH to USD: multiply by ETH/USD price
+                srcPrice = srcPrice.mulDiv(ethUsdPrice, 1e18);
+            } else if (params.dstFeed.denomination == PriceDenomination.ETH) {
+                // Convert USD to ETH: divide by ETH/USD price
+                srcPrice = srcPrice.mulDiv(1e18, ethUsdPrice);
+            }
+
+            minTimestamp = minTimestamp < ethUsd.timestamp ? minTimestamp : ethUsd.timestamp;
+        }
+
+        // First normalize input amount to 18 decimals
+        uint8 srcDecimals = IERC20Metadata(params.srcAsset).decimals();
+        if (srcDecimals < 18) {
+            scaledAmount = scaledAmount * 10 ** (18 - srcDecimals);
+        }
+
+        // Calculate final price with all values normalized to 18 decimals
+        price = scaledAmount.mulDiv(srcPrice, dstPrice);
+
+        // Scale to destination decimals - for ETH we want 18 decimals
+        uint8 dstDecimals = IERC20Metadata(params.dstAsset).decimals();
+        if (dstDecimals < 18) {
+            price = price / 10 ** (18 - dstDecimals);
+        } else if (dstDecimals > 18) {
+            price = price * 10 ** (dstDecimals - 18);
+        }
+
+        timestamp = uint64(minTimestamp);
+    }
+
+    function _normalizeDecimals(
+        uint256 srcPrice,
+        uint256 dstPrice,
+        uint8 srcDecimals,
+        uint8 dstDecimals,
+        uint256 powerOfTen
+    )
+        internal
+        pure
+        returns (uint256 normalizedSrcPrice, uint256 normalizedDstPrice)
+    {
+        normalizedSrcPrice = srcPrice;
+        normalizedDstPrice = dstPrice;
+
+        if (srcDecimals == dstDecimals)
+            return (normalizedSrcPrice, normalizedDstPrice);
+
+        if (srcDecimals > dstDecimals) {
+            normalizedSrcPrice = normalizedSrcPrice.mulDiv(1, powerOfTen);
+        } else {
+            normalizedDstPrice = normalizedDstPrice.mulDiv(1, powerOfTen);
+        }
+
+        return (normalizedSrcPrice, normalizedDstPrice);
     }
 }

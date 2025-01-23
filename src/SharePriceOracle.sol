@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {ISharePriceOracle, VaultReport, ChainlinkResponse} from "./interfaces/ISharePriceOracle.sol";
+import {ISharePriceOracle, PriceFeedInfo, PriceDenomination, VaultReport, ChainlinkResponse} from "./interfaces/ISharePriceOracle.sol";
 import {IERC4626} from "./interfaces/IERC4626.sol";
 import {IERC20Metadata} from "./interfaces/IERC20Metadata.sol";
 import {OwnableRoles} from "@solady/auth/OwnableRoles.sol";
@@ -14,14 +14,12 @@ import {PriceConversionLib} from "./libs/PriceConversionLib.sol";
 contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     using ChainlinkLib for address;
     using VaultLib for IERC4626;
-    using PriceConversionLib for PriceConversionLib.PriceConversion;
     using FixedPointMathLib for uint256;
 
     /*//////////////////////////////////////////////////////////////
                                 ERRORS
     //////////////////////////////////////////////////////////////*/
 
-    error InvalidAdminAddress();
     error ZeroAddress();
     error InvalidRole();
     error InvalidChainId(uint32 receivedChainId);
@@ -46,11 +44,6 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
 
     uint256 public constant MAX_REPORTS = 10;
 
-    enum PriceDenomination {
-        USD,
-        ETH
-    }
-
     ////////////////////////////////////////////////////////////////
     ///                      STATE VARIABLES                       ///
     ////////////////////////////////////////////////////////////////
@@ -65,11 +58,6 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     /// @notice Mapping from price key to array of vault reports
     /// @dev Key is keccak256(abi.encodePacked(srcChainId, vaultAddress))
     mapping(bytes32 => VaultReport) public sharePrices;
-
-    struct PriceFeedInfo {
-        address feed;
-        PriceDenomination denomination;
-    }
 
     /// @notice Mapping from Chainlink feed address to chain ID to asset address
     /// 1st level key: chain Id
@@ -102,7 +90,10 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
      * @param _admin Address of the initial admin
      */
     constructor(uint32 _chainId, address _admin, address _ethUsdFeed) {
-        if (_admin == address(0)) revert InvalidAdminAddress();
+        if (_admin == address(0)) revert ZeroAddress();
+        if (_ethUsdFeed == address(0)) revert ZeroAddress();
+        if (_chainId == 0) revert InvalidChainId(_chainId);
+
         chainId = _chainId;
         ETH_USD_FEED = _ethUsdFeed;
         _initializeOwner(_admin);
@@ -138,6 +129,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     ) external onlyAdmin {
         if (_chainId == 0) revert InvalidChainId(_chainId);
         if (_asset == address(0)) revert ZeroAddress();
+        if (_priceFeed.feed == address(0)) revert ZeroAddress();
 
         ChainlinkResponse memory response = _priceFeed.feed.getPrice();
         if (response.price == 0) revert InvalidFeed();
@@ -321,75 +313,24 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     ) internal view returns (uint256 price, uint64 timestamp) {
         PriceFeedInfo memory srcFeed = priceFeeds[_srcChainId][_srcAsset];
         PriceFeedInfo memory dstFeed = priceFeeds[chainId][_dstAsset];
-        if (srcFeed.feed == address(0) || dstFeed.feed == address(0))
-            return (0, 0);
 
-        ChainlinkResponse memory src = srcFeed.feed.getPrice();
-        ChainlinkResponse memory dst = dstFeed.feed.getPrice();
-        if (src.price == 0 || dst.price == 0) return (0, 0);
-
-        // If differ, normalize to USD
-        if (srcFeed.denomination != dstFeed.denomination) {
-            ChainlinkResponse memory ethUsd = ETH_USD_FEED.getPrice();
-            if (ethUsd.price == 0) return (0, 0);
-
-            if (srcFeed.denomination == PriceDenomination.ETH) {
-                src.price = src.price.mulDiv(
-                    ethUsd.price,
-                    10 ** ethUsd.decimals
-                );
-                src.decimals = ethUsd.decimals;
-            }
-
-            if (dstFeed.denomination == PriceDenomination.ETH) {
-                dst.price = dst.price.mulDiv(10 ** 18, ethUsd.price);
-                dst.decimals = 18;
-            }
-
-            timestamp = uint64(
-                FixedPointMathLib.min(
-                    FixedPointMathLib.min(src.timestamp, dst.timestamp),
-                    ethUsd.timestamp
-                )
-            );
-        } else {
-            timestamp = uint64(
-                FixedPointMathLib.min(src.timestamp, dst.timestamp)
-            );
-        }
-
-        uint8 srcDecimals;
+        VaultReport memory report;
         if (_srcChainId != chainId) {
-            VaultReport memory report = getLatestSharePriceReport(
-                _srcChainId,
-                _srcAsset
-            );
-            srcDecimals = uint8(report.assetDecimals);
-        } else {
-            try IERC20Metadata(_srcAsset).decimals() returns (uint8 dec) {
-                srcDecimals = dec;
-            } catch {
-                return (0, 0);
-            }
-        }
-
-        uint8 dstDecimals;
-        try IERC20Metadata(_dstAsset).decimals() returns (uint8 dec) {
-            dstDecimals = dec;
-        } catch {
-            return (0, 0);
+            report = getLatestSharePriceReport(_srcChainId, _srcAsset);
         }
 
         return
-            PriceConversionLib.convertAssetPrice(
-                PriceConversionLib.PriceConversion({
+            PriceConversionLib.convertFullPrice(
+                PriceConversionLib.ConversionParams({
                     amount: amount,
-                    srcPrice: src.price,
-                    dstPrice: dst.price,
-                    srcDecimals: srcDecimals,
-                    dstDecimals: dstDecimals,
-                    srcTimestamp: src.timestamp,
-                    dstTimestamp: dst.timestamp
+                    srcChainId: _srcChainId,
+                    chainId: chainId,
+                    srcAsset: _srcAsset,
+                    dstAsset: _dstAsset,
+                    ethUsdFeed: ETH_USD_FEED,
+                    srcFeed: srcFeed,
+                    dstFeed: dstFeed,
+                    srcReport: report
                 })
             );
     }
