@@ -305,33 +305,6 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     }
 
     /**
-     * @notice Gets the decimals for two assets
-     * @param srcAsset Source asset address
-     * @param dstAsset Destination asset address
-     * @return srcDecimals Decimals of the source asset
-     * @return dstDecimals Decimals of the destination asset
-     * @return success True if both decimals were successfully retrieved
-     */
-    function _getAssetDecimals(
-        address srcAsset,
-        address dstAsset
-    )
-        internal
-        view
-        returns (uint8 srcDecimals, uint8 dstDecimals, bool success)
-    {
-        try IERC20Metadata(dstAsset).decimals() returns (uint8 dstDec) {
-            try IERC20Metadata(srcAsset).decimals() returns (uint8 srcDec) {
-                return (srcDec, dstDec, true);
-            } catch {
-                return (0, 0, false);
-            }
-        } catch {
-            return (0, 0, false);
-        }
-    }
-
-    /**
      * @notice Converts an amount from one asset to another using their respective prices
      * @param amount Amount to convert
      * @param _srcChainId Source chain ID
@@ -385,12 +358,27 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
             );
         }
 
-        (
-            uint8 srcDecimals,
-            uint8 dstDecimals,
-            bool success
-        ) = _getAssetDecimals(_srcAsset, _dstAsset);
-        if (!success) return (0, 0);
+        uint8 srcDecimals;
+        if (_srcChainId != chainId) {
+            VaultReport memory report = getLatestSharePriceReport(
+                _srcChainId,
+                _srcAsset
+            );
+            srcDecimals = uint8(report.assetDecimals);
+        } else {
+            try IERC20Metadata(_srcAsset).decimals() returns (uint8 dec) {
+                srcDecimals = dec;
+            } catch {
+                return (0, 0);
+            }
+        }
+
+        uint8 dstDecimals;
+        try IERC20Metadata(_dstAsset).decimals() returns (uint8 dec) {
+            dstDecimals = dec;
+        } catch {
+            return (0, 0);
+        }
 
         return
             PriceConversionLib.convertAssetPrice(
