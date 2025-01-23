@@ -238,7 +238,8 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
                 report.sharePrice,
                 chainId,
                 report.asset,
-                _dstAsset
+                _dstAsset,
+                report
             );
     }
 
@@ -292,7 +293,8 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
                 report.sharePrice,
                 _srcChainId,
                 report.asset,
-                _dstAsset
+                _dstAsset,
+                report
             );
     }
 
@@ -302,6 +304,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
      * @param _srcChainId Source chain ID
      * @param _srcAsset Source asset address
      * @param _dstAsset Destination asset address
+     * @param _report VaultReport containing price and metadata
      * @return price The converted price in terms of the destination asset
      * @return timestamp The earlier timestamp between source and destination prices
      */
@@ -309,15 +312,11 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
         uint256 amount,
         uint32 _srcChainId,
         address _srcAsset,
-        address _dstAsset
+        address _dstAsset,
+        VaultReport memory _report
     ) internal view returns (uint256 price, uint64 timestamp) {
         PriceFeedInfo memory srcFeed = priceFeeds[_srcChainId][_srcAsset];
         PriceFeedInfo memory dstFeed = priceFeeds[chainId][_dstAsset];
-
-        VaultReport memory report;
-        if (_srcChainId != chainId) {
-            report = getLatestSharePriceReport(_srcChainId, _srcAsset);
-        }
 
         return
             PriceConversionLib.convertFullPrice(
@@ -330,7 +329,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
                     ethUsdFeed: ETH_USD_FEED,
                     srcFeed: srcFeed,
                     dstFeed: dstFeed,
-                    srcReport: report
+                    srcReport: _report
                 })
             );
     }

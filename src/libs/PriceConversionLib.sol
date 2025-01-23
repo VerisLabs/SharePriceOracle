@@ -5,6 +5,7 @@ import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 import {IERC20Metadata} from "../interfaces/IERC20Metadata.sol";
 import {ChainlinkResponse, PriceDenomination, PriceFeedInfo, VaultReport} from "../interfaces/ISharePriceOracle.sol";
 import {ChainlinkLib} from "./ChainlinkLib.sol";
+import {AggregatorV3Interface} from "../interfaces/AggregatorV3Interface.sol";
 
 import {console} from "forge-std/console.sol";
 
@@ -34,8 +35,16 @@ library PriceConversionLib {
         ChainlinkResponse memory src = params.srcFeed.feed.getPrice();
         ChainlinkResponse memory dst = params.dstFeed.feed.getPrice();
 
-        // Get the input amount from the vault's share price
+        // Get the input amount and handle cross-chain decimals
         uint256 scaledAmount = params.amount;
+        uint8 srcDecimals = params.srcChainId != params.chainId ? 
+            uint8(params.srcReport.assetDecimals) : 
+            IERC20Metadata(params.srcAsset).decimals();
+        
+        // Scale to 18 decimals if needed
+        if (srcDecimals < 18) {
+            scaledAmount = scaledAmount * 10 ** (18 - srcDecimals);
+        }
         
         // Normalize price feeds to 18 decimals
         uint256 srcPrice = src.price;
@@ -70,21 +79,13 @@ library PriceConversionLib {
             minTimestamp = minTimestamp < ethUsd.timestamp ? minTimestamp : ethUsd.timestamp;
         }
 
-        // First normalize input amount to 18 decimals
-        uint8 srcDecimals = IERC20Metadata(params.srcAsset).decimals();
-        if (srcDecimals < 18) {
-            scaledAmount = scaledAmount * 10 ** (18 - srcDecimals);
-        }
-
         // Calculate final price with all values normalized to 18 decimals
         price = scaledAmount.mulDiv(srcPrice, dstPrice);
 
-        // Scale to destination decimals - for ETH we want 18 decimals
+        // Scale to destination decimals
         uint8 dstDecimals = IERC20Metadata(params.dstAsset).decimals();
         if (dstDecimals < 18) {
             price = price / 10 ** (18 - dstDecimals);
-        } else if (dstDecimals > 18) {
-            price = price * 10 ** (dstDecimals - 18);
         }
 
         timestamp = uint64(minTimestamp);

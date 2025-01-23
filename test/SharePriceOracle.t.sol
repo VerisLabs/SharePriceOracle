@@ -680,4 +680,64 @@ contract SharePriceOracleTest is Test {
         );
         assertEq(price, 0, "Price should be zero due to staleness");
     }
+
+    function test_CrossChainDecimals() public {
+        // Setup a vault with 6 decimals (like USDC) on a remote chain (chain ID 2)
+        address remoteVault = makeAddr("remoteVault");
+        address remoteAsset = makeAddr("remoteAsset");
+        
+        // Setup price feeds for both assets
+        MockPriceFeed remoteFeed = new MockPriceFeed(8);
+        remoteFeed.setPrice(100000000); // $1.00 USD with 8 decimals
+        
+        vm.startPrank(admin);
+        // Set price feed for remote asset
+        oracle.setPriceFeed(
+            2, // Remote chain ID
+            remoteAsset,
+            PriceFeedInfo({
+                feed: address(remoteFeed),
+                denomination: PriceDenomination.USD
+            })
+        );
+
+        // Make sure vaultA's price feed is set to $100
+        tokenAFeed.setPrice(10000000000); // $100.00 USD with 8 decimals
+        vm.stopPrank();
+
+        // Create a vault report with 6 decimals (like USDC)
+        VaultReport[] memory reports = new VaultReport[](1);
+        reports[0] = VaultReport({
+            sharePrice: 1000000, // 1.0 in 6 decimals
+            lastUpdate: uint64(block.timestamp),
+            chainId: 2, // Remote chain ID
+            rewardsDelegate: makeAddr("delegate"),
+            vaultAddress: remoteVault,
+            asset: remoteAsset,
+            assetDecimals: 6 // USDC-like decimals
+        });
+
+        console.log("=== Report Details ===");
+        console.log("Chain ID:", reports[0].chainId);
+        console.log("Asset decimals:", reports[0].assetDecimals);
+        console.log("Share price:", reports[0].sharePrice);
+
+        // Submit the report as if it came from the remote chain
+        vm.prank(endpoint);
+        oracle.updateSharePrices(2, reports);
+
+        // Try to get the price in terms of vaultA's asset (18 decimals)
+        (uint256 price, uint64 timestamp) = oracle.getLatestSharePrice(
+            2, // Remote chain ID
+            remoteVault,
+            vaultA.asset()
+        );
+
+        // Expected calculation:
+        // 1.0 USDC (6 decimals) = $1.00
+        // $1.00 / $100.00 = 0.01 vaultA tokens
+        // 0.01 * 10^18 = 10000000000000000 (0.01 in 18 decimals)
+        assertEq(price, 0.01e18, "Wrong converted price");
+        assertEq(timestamp, block.timestamp, "Wrong timestamp");
+    }
 }
