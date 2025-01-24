@@ -2,11 +2,11 @@
   "base_price_feeds": {
     "WETH": {
       "feed": "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
-      "denomination": "ETH"
+      "denomination": "USD"
     },
     "ETH": {
       "feed": "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
-      "denomination": "ETH"
+      "denomination": "USD"
     },
     "USDC": {
       "feed": "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B",
