@@ -1,9 +1,1 @@
-{
-    "oracle": "0x11E27A231De7876Eb4D08E49A609EEB72a2c3C8E",
-    "endpoint": "0x37acA66D1219805aFa1c8151DdB583E59AB182Eb",
-    "admin": "0x94aBa23b9Bbfe7bb62A9eB8b1215D72b5f6F33a1",
-    "chainId": 137,
-    "lzEndpointId": 30109,
-    "lzEndpoint": "0x1a44076050125825900e736c501f859c50fE728c",
-    "network": "Polygon"
-}
+{"oracle": "0xC9D4C66E07Ec5a7Da1C06e53359571a5f0089354","endpoint": "0xA72d30b79f1922D383A95BeD81390c1077426ae1","admin": "0x429796dAc057E7C15724196367007F1e9Cff82F9","chainId": 137,"lzEndpointId": 30109,"lzEndpoint": "0x1a44076050125825900e736c501f859c50fE728c","network": "Polygon"}
