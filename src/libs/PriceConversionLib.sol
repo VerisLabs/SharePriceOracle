@@ -37,63 +37,69 @@ library PriceConversionLib {
     /// 4. Calculate final price considering all decimal adjustments
     function convertFullPrice(
         ConversionParams memory params
-    ) internal view returns (uint256 price, uint64 timestamp) {
+    ) internal view returns (uint256) {
         // Step 1: Get base prices from Chainlink
-        ChainlinkResponse memory src = params.srcFeed.feed.getPrice();
-        ChainlinkResponse memory dst = params.dstFeed.feed.getPrice();
-        if (src.price == 0 || dst.price == 0) return (0, 0);
+        ChainlinkResponse memory src = params.srcFeed.feed.getPrice(params.srcFeed.heartbeat);
+        ChainlinkResponse memory dst = params.dstFeed.feed.getPrice(params.dstFeed.heartbeat);
+        if (src.price == 0 || dst.price == 0) return 0;
 
-        // Step 2: Get asset decimals - handle cross-chain case differently
-        uint8 srcDecimals = params.srcChainId != params.chainId ? 
+        // Get asset decimals - handle cross-chain case differently
+        uint8 srcDecimals;
+        uint8 dstDecimals;
+        
+        try IERC20Metadata(params.dstAsset).decimals() returns (uint8 dec) {
+            dstDecimals = dec;
+        } catch {
+            return 0;
+        }
+
+        srcDecimals = params.srcChainId != params.chainId ? 
             uint8(params.srcReport.assetDecimals) : 
             IERC20Metadata(params.srcAsset).decimals();
-        uint8 dstDecimals = IERC20Metadata(params.dstAsset).decimals();
 
         unchecked {
             // Step 3: Normalize Chainlink prices to 18 decimals
-            // Example: If Chainlink returns 8 decimals, multiply by 10^(18-8) = 10^10
             uint256 srcAdjust = src.decimals < 18 ? SCALE / (10 ** src.decimals) : 1;
             uint256 dstAdjust = dst.decimals < 18 ? SCALE / (10 ** dst.decimals) : 1;
             uint256 srcPrice = src.price * srcAdjust;
             uint256 dstPrice = dst.price * dstAdjust;
-
-            // Track earliest timestamp for price freshness
-            timestamp = uint64(src.timestamp < dst.timestamp ? src.timestamp : dst.timestamp);
             
             // Step 4: Handle USD/ETH denomination difference
             if (params.srcFeed.denomination != params.dstFeed.denomination) {
-                ChainlinkResponse memory ethUsd = params.ethUsdFeed.getPrice();
-                if (ethUsd.price == 0) return (0, 0);
+                PriceFeedInfo memory ethUsdFeed = PriceFeedInfo({
+                    feed: params.ethUsdFeed,
+                    denomination: PriceDenomination.USD,
+                    heartbeat: 1 hours  // This will be overwritten by the actual config
+                });
+                ChainlinkResponse memory ethUsd = ethUsdFeed.feed.getPrice(ethUsdFeed.heartbeat);
+                if (ethUsd.price == 0) return 0;
                 
                 // Normalize ETH/USD price to 18 decimals
                 uint256 ethAdjust = ethUsd.decimals < 18 ? SCALE / (10 ** ethUsd.decimals) : 1;
                 uint256 ethPrice = ethUsd.price * ethAdjust;
                 
                 // Convert prices to same denomination
-                // If source is in ETH, multiply by ETH/USD price
-                // If destination is in ETH, multiply destination by ETH/USD price
                 if (params.srcFeed.denomination == PriceDenomination.ETH) {
                     srcPrice = srcPrice.mulDiv(ethPrice, SCALE);
                 } else {
                     dstPrice = dstPrice.mulDiv(ethPrice, SCALE);
                 }
-                
-                timestamp = uint64(timestamp < ethUsd.timestamp ? timestamp : ethUsd.timestamp);
             }
 
             // Step 5: Calculate final price
-            // 1. Adjust input amount to 18 decimals
             uint256 amountScaling = srcDecimals < 18 ? SCALE / (10 ** srcDecimals) : 1;
-            // 2. Calculate: (amount * srcPrice * scaling) / dstPrice
-            price = params.amount.mulDiv(srcPrice * amountScaling, dstPrice);
+            
+            // Handle division by zero
+            if (dstPrice == 0) return 0;
+            
+            uint256 price = params.amount.mulDiv(srcPrice * amountScaling, dstPrice);
             
             // Step 6: Scale result to destination decimals
-            // If destination has less than 18 decimals, divide by the difference
             if (dstDecimals < 18) {
                 price = price / (10 ** (18 - dstDecimals));
             }
-        }
 
-        return (price, timestamp);
+            return price;
+        }
     }
 }

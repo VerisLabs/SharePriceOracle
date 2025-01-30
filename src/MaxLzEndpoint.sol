@@ -47,7 +47,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
     event MessageProcessed(bytes32 indexed guid, bytes message);
     event PeerSet(uint32 indexed eid, bytes32 peer);
     event EndpointUpdated(address indexed oldEndpoint, address indexed newEndpoint);
-    event VaultAddressesSent(uint32 indexed dstEid, address[] vaults);
+    event SharePricesSent(uint32 indexed dstEid, address[] vaults);
     event SharePricesRequested(uint32 indexed dstEid, address[] vaults);
     event EnforcedOptionsSet(EnforcedOptionParam[] params);
     event VaultReportsSent(uint32 indexed dstEid, VaultReport[] reports);
@@ -124,10 +124,21 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
         emit EnforcedOptionsSet(params);
     }
 
+    /// @notice Allows owner to withdraw stuck ETH from the contract
+    /// @param amount Amount of ETH to withdraw
+    /// @param refundTo Address to receive the withdrawn ETH 
+    function refundETH(uint256 amount, address refundTo) external onlyOwner {
+        if (refundTo == address(0)) revert ZeroAddress();
+        if (amount == 0 || amount > address(this).balance) revert InvalidInput();
+        
+        (bool success, ) = refundTo.call{value: amount}("");
+        if (!success) revert InsufficientFunds();
+    }
+
     ////////////////////////////////////////////////////////////////
     ///                   EXTERNAL FUNCTIONS                      ///
     ////////////////////////////////////////////////////////////////
-
+    
     function sendSharePrices(
         uint32 dstEid,
         address[] calldata vaultAddresses,
@@ -145,7 +156,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
         if (msg.value < fee.nativeFee) revert InvalidMessageValue();
 
         _lzSend(dstEid, message, combinedOptions, fee, msg.sender);
-        emit VaultAddressesSent(dstEid, vaultAddresses);
+        emit SharePricesSent(dstEid, vaultAddresses);
     }
 
     function requestSharePrices(

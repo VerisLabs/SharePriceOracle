@@ -28,6 +28,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     error InvalidFeed();
     error InvalidPrice();
     error ExceedsMaxReports();
+    error InvalidHeartbeat();
 
     ////////////////////////////////////////////////////////////////
     ///                        CONSTANTS                           ///
@@ -55,7 +56,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     /// @notice LayerZero endpoint address
     address private lzEndpoint;
 
-    /// @notice Mapping from price key to array of vault reports
+    /// @notice Mapping from price key to struct vault report
     /// @dev Key is keccak256(abi.encodePacked(srcChainId, vaultAddress))
     mapping(bytes32 => VaultReport) public sharePrices;
 
@@ -86,15 +87,13 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     ////////////////////////////////////////////////////////////////
     /**
      * @notice Initializes the oracle with chain ID and admin address
-     * @param _chainId The chain ID this oracle is deployed on
      * @param _admin Address of the initial admin
      */
-    constructor(uint32 _chainId, address _admin, address _ethUsdFeed) {
+    constructor(address _admin, address _ethUsdFeed) {
         if (_admin == address(0)) revert ZeroAddress();
         if (_ethUsdFeed == address(0)) revert ZeroAddress();
-        if (_chainId == 0) revert InvalidChainId(_chainId);
 
-        chainId = _chainId;
+        chainId = uint32(block.chainid);
         ETH_USD_FEED = _ethUsdFeed;
         _initializeOwner(_admin);
         _grantRoles(_admin, ADMIN_ROLE);
@@ -110,6 +109,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     function setLzEndpoint(address _endpoint) external onlyAdmin {
         if (_endpoint == address(0)) revert ZeroAddress();
         address oldEndpoint = lzEndpoint;
+        _removeRoles(oldEndpoint, ENDPOINT_ROLE);
         lzEndpoint = _endpoint;
         _grantRoles(_endpoint, ENDPOINT_ROLE);
         emit LzEndpointUpdated(oldEndpoint, _endpoint);
@@ -118,9 +118,9 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
 
     /**
      * @notice Sets the price feed for a specific chain and asset
-     * @param _priceFeed Chainlink price feed address
      * @param _chainId Chain ID
      * @param _asset Asset address
+     * @param _priceFeed Price feed info including feed address, denomination and heartbeat
      */
     function setPriceFeed(
         uint32 _chainId,
@@ -130,8 +130,9 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
         if (_chainId == 0) revert InvalidChainId(_chainId);
         if (_asset == address(0)) revert ZeroAddress();
         if (_priceFeed.feed == address(0)) revert ZeroAddress();
+        if (_priceFeed.heartbeat == 0) revert InvalidHeartbeat();
 
-        ChainlinkResponse memory response = _priceFeed.feed.getPrice();
+        ChainlinkResponse memory response = _priceFeed.feed.getPrice(_priceFeed.heartbeat);
         if (response.price == 0) revert InvalidFeed();
 
         priceFeeds[_chainId][_asset] = _priceFeed;
@@ -233,14 +234,21 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
             return (report.sharePrice, report.lastUpdate);
         }
 
-        return
-            _convertAssetPrice(
-                report.sharePrice,
-                chainId,
-                report.asset,
-                _dstAsset,
-                report
-            );
+        // Convert price but ignore returned timestamp from conversion
+        (sharePrice, timestamp) = _convertAssetPrice(
+            report.sharePrice,
+            chainId,
+            report.asset,
+            _dstAsset,
+            report
+        );
+        
+        // If price is 0 (stale/invalid), return (0,0)
+        if (sharePrice == 0) {
+            return (0, 0);
+        }
+        
+        return (sharePrice, report.lastUpdate);
     }
 
     /**
@@ -288,14 +296,17 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
             }
         }
 
-        return
-            _convertAssetPrice(
-                report.sharePrice,
-                _srcChainId,
-                report.asset,
-                _dstAsset,
-                report
-            );
+        // Convert price but ignore returned timestamp from conversion
+        (sharePrice, ) = _convertAssetPrice(
+            report.sharePrice,
+            _srcChainId,
+            report.asset,
+            _dstAsset,
+            report
+        );
+        
+        // Return the oracle's last update time instead
+        return (sharePrice, report.lastUpdate);
     }
 
     /**
@@ -318,20 +329,32 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
         PriceFeedInfo memory srcFeed = priceFeeds[_srcChainId][_srcAsset];
         PriceFeedInfo memory dstFeed = priceFeeds[chainId][_dstAsset];
 
-        return
-            PriceConversionLib.convertFullPrice(
-                PriceConversionLib.ConversionParams({
-                    amount: amount,
-                    srcChainId: _srcChainId,
-                    chainId: chainId,
-                    srcAsset: _srcAsset,
-                    dstAsset: _dstAsset,
-                    ethUsdFeed: ETH_USD_FEED,
-                    srcFeed: srcFeed,
-                    dstFeed: dstFeed,
-                    srcReport: _report
-                })
-            );
+        if (srcFeed.feed == address(0) || dstFeed.feed == address(0)) {
+            return (0, 0);
+        }
+
+        // Get the price from PriceConversionLib
+        price = PriceConversionLib.convertFullPrice(
+            PriceConversionLib.ConversionParams({
+                amount: amount,
+                srcChainId: _srcChainId,
+                chainId: chainId,
+                srcAsset: _srcAsset,
+                dstAsset: _dstAsset,
+                ethUsdFeed: ETH_USD_FEED,
+                srcFeed: srcFeed,
+                dstFeed: dstFeed,
+                srcReport: _report
+            })
+        );
+
+        // If price conversion failed or returned 0, return (0,0)
+        if (price == 0) {
+            return (0, 0);
+        }
+
+        timestamp = _report.lastUpdate;
+        return (price, timestamp);
     }
 
     ////////////////////////////////////////////////////////////////
@@ -410,7 +433,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
         uint32 _srcChainId,
         address _vault
     ) public pure override returns (bytes32) {
-        return keccak256(abi.encodePacked(_srcChainId, _vault));
+        return keccak256(abi.encode(_srcChainId, _vault));
     }
 
     /**

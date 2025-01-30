@@ -68,7 +68,6 @@ contract DeployScript is Script {
 
         // Deploy SharePriceOracle
         SharePriceOracle oracle = new SharePriceOracle(
-            config.chainId,
             admin,
             config.ethUsdFeed
         );

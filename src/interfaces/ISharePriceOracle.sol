@@ -47,6 +47,7 @@ enum PriceDenomination {
 struct PriceFeedInfo {
     address feed;
     PriceDenomination denomination;
+    uint32 heartbeat;
 }
 
 /**

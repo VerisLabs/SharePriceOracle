@@ -12,6 +12,7 @@ contract SetPriceFeedsScript is Script {
         address token;
         address feed;
         PriceDenomination denomination;
+        uint32 heartbeat;
     }
 
     uint256 constant BATCH_SIZE = 10;
@@ -35,6 +36,7 @@ contract SetPriceFeedsScript is Script {
             string memory feedPath = string.concat(".base_price_feeds.", tokens[j]);
             address feed = vm.parseJsonAddress(configJson, string.concat(feedPath, ".feed"));
             string memory denom = vm.parseJsonString(configJson, string.concat(feedPath, ".denomination"));
+            uint32 heartbeat = uint32(vm.parseJsonUint(configJson, string.concat(feedPath, ".heartbeat")));
 
             chainFeeds[feedCount] = FeedData({
                 chainId: chainId,
@@ -42,7 +44,8 @@ contract SetPriceFeedsScript is Script {
                 feed: feed,
                 denomination: keccak256(bytes(denom)) == keccak256(bytes("ETH")) ? 
                     PriceDenomination.ETH : 
-                    PriceDenomination.USD
+                    PriceDenomination.USD,
+                heartbeat: heartbeat
             });
             feedCount++;
         }
@@ -56,7 +59,8 @@ contract SetPriceFeedsScript is Script {
                 data.token,
                 PriceFeedInfo({
                     feed: data.feed,
-                    denomination: data.denomination
+                    denomination: data.denomination,
+                    heartbeat: data.heartbeat
                 })
             );
             
@@ -65,7 +69,9 @@ contract SetPriceFeedsScript is Script {
                     "Set feed for chain ", 
                     vm.toString(data.chainId),
                     " token: ",
-                    vm.toString(data.token)
+                    vm.toString(data.token),
+                    " heartbeat: ",
+                    vm.toString(data.heartbeat)
                 )
             );
         }

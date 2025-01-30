@@ -30,6 +30,11 @@ contract SharePriceOracleTest is Test {
     uint32 public constant CHAIN_ID = 1;
     uint32 public constant REMOTE_CHAIN_ID = 2;
 
+    // Add heartbeat constants for testing
+    uint32 constant ETH_USD_HEARTBEAT = 1 hours;
+    uint32 constant STABLES_HEARTBEAT = 24 hours;
+    uint32 constant ETH_ETH_HEARTBEAT = 24 hours;
+
     // ========== EVENTS ==========
 
     event SharePriceUpdated(
@@ -67,7 +72,7 @@ contract SharePriceOracleTest is Test {
 
         // Deploy oracle as admin
         vm.startPrank(admin);
-        oracle = new SharePriceOracle(CHAIN_ID, admin, address(ethUsdFeed));
+        oracle = new SharePriceOracle(admin, address(ethUsdFeed));
 
         // Setup roles and price feeds
         oracle.grantRole(endpoint, oracle.ENDPOINT_ROLE());
@@ -76,7 +81,8 @@ contract SharePriceOracleTest is Test {
             vaultA.asset(),
             PriceFeedInfo({
                 feed: address(tokenAFeed),
-                denomination: PriceDenomination.USD
+                denomination: PriceDenomination.USD,
+                heartbeat: STABLES_HEARTBEAT
             })
         );
         oracle.setPriceFeed(
@@ -84,7 +90,8 @@ contract SharePriceOracleTest is Test {
             vaultB.asset(),
             PriceFeedInfo({
                 feed: address(tokenBFeed),
-                denomination: PriceDenomination.USD
+                denomination: PriceDenomination.USD,
+                heartbeat: STABLES_HEARTBEAT
             })
         );
         vm.stopPrank();
@@ -185,7 +192,8 @@ contract SharePriceOracleTest is Test {
             reports[0].asset,
             PriceFeedInfo({
                 feed: address(tokenAFeed),
-                denomination: PriceDenomination.USD
+                denomination: PriceDenomination.USD,
+                heartbeat: STABLES_HEARTBEAT
             })
         );
 
@@ -201,8 +209,7 @@ contract SharePriceOracleTest is Test {
 
     // ========== PRICE CONVERSION TESTS ==========
 
-    function test_PriceConversion_ETHtoUSDC_RealWorldExample_banana() public {
-        // Setup with same values
+    function test_PriceConversion_ETHtoUSDC_RealWorldExample() public {
         MockERC4626 ethVault = new MockERC4626(18);
         ethVault.setMockSharePrice(1057222067502682416); // 1.057 ETH
         ethUsdFeed.setPrice(334201032054); // $3342.01 USD/ETH
@@ -210,20 +217,14 @@ contract SharePriceOracleTest is Test {
         usdcFeed.setPrice(100005101); // $1.00005 USD/USDC
         MockERC4626 usdcVault = new MockERC4626(6);
 
-        // Log initial values
-        console.log("\nInput Values:");
-        console.log("ETH amount (wei):", "1057222067502682416");
-        console.log("ETH/USD price (8 decimals):", "334201032054");
-        console.log("USDC/USD price (8 decimals):", "100005101");
-
-        // Setup price feeds
         vm.startPrank(admin);
         oracle.setPriceFeed(
             137,
             ethVault.asset(),
             PriceFeedInfo({
                 feed: address(ethUsdFeed),
-                denomination: PriceDenomination.USD  // Note: This should possibly be ETH
+                denomination: PriceDenomination.USD,
+                heartbeat: ETH_USD_HEARTBEAT
             })
         );
         oracle.setPriceFeed(
@@ -231,7 +232,8 @@ contract SharePriceOracleTest is Test {
             usdcVault.asset(),
             PriceFeedInfo({
                 feed: address(usdcFeed),
-                denomination: PriceDenomination.USD
+                denomination: PriceDenomination.USD,
+                heartbeat: STABLES_HEARTBEAT
             })
         );
         vm.stopPrank();
@@ -295,33 +297,29 @@ contract SharePriceOracleTest is Test {
     }
 
     function test_PriceConversion_ETHtoETH() public {
-        // Setup source ETH vault
         MockERC4626 srcEthVault = new MockERC4626(18);
         srcEthVault.setMockSharePrice(1e18); // 1 ETH per share
-
-        // Setup destination ETH vault
         MockERC4626 dstEthVault = new MockERC4626(18);
-
-        // Setup ETH price feed
         MockPriceFeed ethFeed = new MockPriceFeed(18);
         ethFeed.setPrice(1e18); // 1 ETH = 1 ETH
 
-        // Setup price feeds
         vm.startPrank(admin);
         oracle.setPriceFeed(
-            137, // source chain
+            137,
             srcEthVault.asset(),
             PriceFeedInfo({
                 feed: address(ethFeed),
-                denomination: PriceDenomination.ETH
+                denomination: PriceDenomination.ETH,
+                heartbeat: ETH_ETH_HEARTBEAT
             })
         );
         oracle.setPriceFeed(
-            CHAIN_ID, // destination chain
+            CHAIN_ID,
             dstEthVault.asset(),
             PriceFeedInfo({
                 feed: address(ethFeed),
-                denomination: PriceDenomination.ETH
+                denomination: PriceDenomination.ETH,
+                heartbeat: ETH_ETH_HEARTBEAT
             })
         );
         vm.stopPrank();
@@ -403,7 +401,8 @@ contract SharePriceOracleTest is Test {
             daiVault.asset(),
             PriceFeedInfo({
                 feed: address(daiFeed),
-                denomination: PriceDenomination.USD
+                denomination: PriceDenomination.USD,
+                heartbeat: STABLES_HEARTBEAT
             })
         );
         oracle.setPriceFeed(
@@ -411,7 +410,8 @@ contract SharePriceOracleTest is Test {
             usdcVault.asset(),
             PriceFeedInfo({
                 feed: address(usdcFeed),
-                denomination: PriceDenomination.USD
+                denomination: PriceDenomination.USD,
+                heartbeat: STABLES_HEARTBEAT
             })
         );
         vm.stopPrank();
@@ -471,7 +471,8 @@ contract SharePriceOracleTest is Test {
             ethVault.asset(),
             PriceFeedInfo({
                 feed: address(ethFeed),
-                denomination: PriceDenomination.ETH
+                denomination: PriceDenomination.ETH,
+                heartbeat: STABLES_HEARTBEAT
             })
         );
         oracle.setPriceFeed(
@@ -479,7 +480,8 @@ contract SharePriceOracleTest is Test {
             usdcVault.asset(),
             PriceFeedInfo({
                 feed: address(usdcFeed),
-                denomination: PriceDenomination.USD
+                denomination: PriceDenomination.USD,
+                heartbeat: STABLES_HEARTBEAT
             })
         );
         vm.stopPrank();
@@ -540,7 +542,8 @@ contract SharePriceOracleTest is Test {
             daiVault.asset(),
             PriceFeedInfo({
                 feed: address(daiFeed),
-                denomination: PriceDenomination.USD
+                denomination: PriceDenomination.USD,
+                heartbeat: STABLES_HEARTBEAT
             })
         );
         oracle.setPriceFeed(
@@ -548,7 +551,8 @@ contract SharePriceOracleTest is Test {
             ethVault.asset(),
             PriceFeedInfo({
                 feed: address(ethFeed),
-                denomination: PriceDenomination.ETH
+                denomination: PriceDenomination.ETH,
+                heartbeat: STABLES_HEARTBEAT
             })
         );
         vm.stopPrank();
@@ -617,7 +621,8 @@ contract SharePriceOracleTest is Test {
             usdcVault.asset(),
             PriceFeedInfo({
                 feed: address(usdcFeed),
-                denomination: PriceDenomination.USD
+                denomination: PriceDenomination.USD,
+                heartbeat: STABLES_HEARTBEAT
             })
         );
         oracle.setPriceFeed(
@@ -625,7 +630,8 @@ contract SharePriceOracleTest is Test {
             ethVault.asset(),
             PriceFeedInfo({
                 feed: address(ethFeed),
-                denomination: PriceDenomination.ETH
+                denomination: PriceDenomination.ETH,
+                heartbeat: STABLES_HEARTBEAT
             })
         );
         vm.stopPrank();
@@ -714,7 +720,8 @@ contract SharePriceOracleTest is Test {
             usdcVault.asset(),
             PriceFeedInfo({
                 feed: address(usdcFeed),
-                denomination: PriceDenomination.USD
+                denomination: PriceDenomination.USD,
+                heartbeat: STABLES_HEARTBEAT
             })
         );
         oracle.setPriceFeed(
@@ -722,7 +729,8 @@ contract SharePriceOracleTest is Test {
             ethVault.asset(),
             PriceFeedInfo({
                 feed: address(ethFeed),
-                denomination: PriceDenomination.ETH
+                denomination: PriceDenomination.ETH,
+                heartbeat: STABLES_HEARTBEAT
             })
         );
         vm.stopPrank();
@@ -789,7 +797,8 @@ contract SharePriceOracleTest is Test {
             vaultA.asset(),
             PriceFeedInfo({
                 feed: address(ethDenomFeed),
-                denomination: PriceDenomination.ETH
+                denomination: PriceDenomination.ETH,
+                heartbeat: STABLES_HEARTBEAT
             })
         );
         vm.stopPrank();
@@ -831,7 +840,8 @@ contract SharePriceOracleTest is Test {
             remoteAsset,
             PriceFeedInfo({
                 feed: address(remoteFeed),
-                denomination: PriceDenomination.USD
+                denomination: PriceDenomination.USD,
+                heartbeat: STABLES_HEARTBEAT
             })
         );
 
@@ -1033,7 +1043,8 @@ contract SharePriceOracleTest is Test {
         vm.startPrank(admin);
         PriceFeedInfo memory info = PriceFeedInfo({
             feed: address(feed),
-            denomination: PriceDenomination.USD
+            denomination: PriceDenomination.USD,
+            heartbeat: STABLES_HEARTBEAT
         });
 
         try oracle.setPriceFeed(CHAIN_ID, vaultA.asset(), info) {
@@ -1042,5 +1053,50 @@ contract SharePriceOracleTest is Test {
             // Test passes if we catch the revert
         }
         vm.stopPrank();
+    }
+
+    // Add test for heartbeat validation
+    function test_revertWhen_zeroHeartbeat() public {
+        vm.startPrank(admin);
+        vm.expectRevert(SharePriceOracle.InvalidHeartbeat.selector);
+        oracle.setPriceFeed(
+            CHAIN_ID,
+            address(1),
+            PriceFeedInfo({
+                feed: address(tokenAFeed),
+                denomination: PriceDenomination.USD,
+                heartbeat: 0
+            })
+        );
+        vm.stopPrank();
+    }
+
+    // Add test for stale price based on heartbeat
+    function test_revertWhen_priceStaleBasedOnHeartbeat() public {
+        // Setup price feed with 1 hour heartbeat
+        vm.startPrank(admin);
+        oracle.setPriceFeed(
+            CHAIN_ID,
+            vaultA.asset(),
+            PriceFeedInfo({
+                feed: address(tokenAFeed),
+                denomination: PriceDenomination.USD,
+                heartbeat: 1 hours
+            })
+        );
+        vm.stopPrank();
+
+        // Warp time beyond heartbeat
+        vm.warp(block.timestamp + 1 hours + 1);
+
+        // Try to get price - should return 0
+        (uint256 price, uint64 timestamp) = oracle.getLatestSharePrice(
+            CHAIN_ID,
+            address(vaultA),
+            vaultB.asset()
+        );
+
+        assertEq(price, 0, "Price should be 0 for stale feed");
+        assertEq(timestamp, 0, "Timestamp should be 0 for stale feed");
     }
 }

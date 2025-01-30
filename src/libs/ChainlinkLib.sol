@@ -8,14 +8,15 @@ import {AggregatorV3Interface} from "../interfaces/AggregatorV3Interface.sol";
 /// @notice Library for interacting with Chainlink price feeds
 /// @dev Provides safe price retrieval with comprehensive validation
 library ChainlinkLib {
-
     /// @notice Retrieves the latest price data from a Chainlink price feed
     /// @dev Includes full validation of roundId, timestamp, and price value
     /// @param feed Address of the Chainlink price feed
+    /// @param heartbeat Heartbeat for the price feed
     /// @return response ChainlinkResponse struct containing price data and metadata
     /// @custom:security Returns zeroed response if any validation fails
     function getPrice(
-        address feed
+        address feed,
+        uint32 heartbeat
     ) internal view returns (ChainlinkResponse memory response) {
         try AggregatorV3Interface(feed).latestRoundData() returns (
             uint80 roundId,
@@ -33,6 +34,12 @@ library ChainlinkLib {
                 return ChainlinkResponse(0, 0, 0, 0, 0);
             }
 
+            // Check for stale price based on provided heartbeat
+            if (block.timestamp - updatedAt > heartbeat) {
+                return ChainlinkResponse(0, 0, 0, 0, 0);
+            }
+
+            // Get decimals
             uint8 decimals;
             try AggregatorV3Interface(feed).decimals() returns (uint8 dec) {
                 decimals = dec;

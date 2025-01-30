@@ -2,8 +2,8 @@
   "oracle": "0xA72d30b79f1922D383A95BeD81390c1077426ae1",
   "endpoint": "0xd79F340A062002aBe6288114B0057Cef45E59c72",
   "admin": "0x429796dAc057E7C15724196367007F1e9Cff82F9",
-  "chainId": 10,
-  "lzEndpointId": 30111,
+  "chainId": 42161,
+  "lzEndpointId": 30110,
   "lzEndpoint": "0x1a44076050125825900e736c501f859c50fE728c",
-  "network": "Optimism"
+  "network": "Arbitrum"
 }
