@@ -28,11 +28,11 @@ tab_width = 4
 wrap_comments = true
 
 [rpc_endpoints]
-mainnet = "${RPC_MAINNET}"
-polygon = "${RPC_POLYGON}"
-base = "${RPC_BASE}"
-arbitrum = "${RPC_ARBITRUM}"
-optimism = "${RPC_OPTIMISM}"
+mainnet = "${ETHEREUM_RPC_URL}"
+polygon = "${POLYGON_RPC_URL}"
+base = "${BASE_RPC_URL}"
+arbitrum = "${ARBITRUM_RPC_URL}"
+optimism = "${OPTIMISM_RPC_URL}"
 
 
 
