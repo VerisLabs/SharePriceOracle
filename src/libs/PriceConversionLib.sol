@@ -67,7 +67,7 @@ library PriceConversionLib {
                 PriceFeedInfo memory ethUsdFeed = PriceFeedInfo({
                     feed: params.ethUsdFeed,
                     denomination: PriceDenomination.USD,
-                    heartbeat: 1 hours // This will be overwritten by the actual config
+                    heartbeat: 20 minutes // This will be overwritten by the actual config
                  });
                 ChainlinkResponse memory ethUsd = ethUsdFeed.feed.getPrice(ethUsdFeed.heartbeat);
                 if (ethUsd.price == 0) return 0;
