@@ -25,14 +25,12 @@ contract SendSharePrices is Script {
     function getDeploymentInfo(
         string memory networkName,
         uint32 chainId
-    ) internal view returns (DeploymentInfo memory info) {
-        string memory path = string.concat(
-            "deployments/",
-            networkName,
-            "_",
-            vm.toString(chainId),
-            ".json"
-        );
+    )
+        internal
+        view
+        returns (DeploymentInfo memory info)
+    {
+        string memory path = string.concat("deployments/", networkName, "_", vm.toString(chainId), ".json");
 
         if (!vm.exists(path)) {
             revert ConfigNotFound(path);
@@ -50,43 +48,29 @@ contract SendSharePrices is Script {
         return info;
     }
 
-    function prepareLzOptions(
-        MaxLzEndpoint endpoint
-    ) internal view returns (bytes memory) {
+    function prepareLzOptions(MaxLzEndpoint endpoint) internal view returns (bytes memory) {
         bytes memory options = endpoint.newOptions();
-        return
-            endpoint.addExecutorLzReceiveOption(
-                options,
-                uint128(vm.envUint("LZ_GAS_LIMIT")),
-                uint128(vm.envUint("LZ_NATIVE_VALUE"))
-            );
+        return endpoint.addExecutorLzReceiveOption(
+            options, uint128(vm.envUint("LZ_GAS_LIMIT")), uint128(vm.envUint("LZ_NATIVE_VALUE"))
+        );
     }
 
-    function getVaultAddresses()
-        internal
-        view
-        returns (address[] memory vaults)
-    {
+    function getVaultAddresses() internal view returns (address[] memory vaults) {
         string[] memory vaultAddrs = vm.envString("VAULT_ADDRESSES", ",");
         vaults = new address[](vaultAddrs.length);
-        for (uint i = 0; i < vaultAddrs.length; i++) {
+        for (uint256 i = 0; i < vaultAddrs.length; i++) {
             vaults[i] = vm.parseAddress(vaultAddrs[i]);
         }
     }
 
     function run() external {
         // Get chain configs
-        ChainConfig.Config memory srcChain = ChainConfig.getConfig(
-            block.chainid
-        );
+        ChainConfig.Config memory srcChain = ChainConfig.getConfig(block.chainid);
         uint256 dstChainId = vm.envUint("DST_CHAIN_ID");
         ChainConfig.Config memory dstChain = ChainConfig.getConfig(dstChainId);
 
         // Load deployment info
-        DeploymentInfo memory srcInfo = getDeploymentInfo(
-            srcChain.name,
-            srcChain.chainId
-        );
+        DeploymentInfo memory srcInfo = getDeploymentInfo(srcChain.name, srcChain.chainId);
 
         // Start broadcast
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
@@ -101,19 +85,11 @@ contract SendSharePrices is Script {
         address rewardsDelegate = vm.envAddress("REWARDS_DELEGATE");
 
         // Get vault reports and encode message
-        VaultReport[] memory reports = oracle.getSharePrices(
-            vaults,
-            rewardsDelegate
-        );
+        VaultReport[] memory reports = oracle.getSharePrices(vaults, rewardsDelegate);
         bytes memory message = MsgCodec.encodeVaultReports(1, reports, options);
 
         // Calculate fees
-        uint256 fee = endpoint.estimateFees(
-            dstChain.lzEndpointId,
-            1,
-            message,
-            options
-        );
+        uint256 fee = endpoint.estimateFees(dstChain.lzEndpointId, 1, message, options);
         uint256 feeWithBuffer = fee + (fee * 10) / 100; // 10% buffer
 
         // Log transaction details
@@ -124,12 +100,7 @@ contract SendSharePrices is Script {
         console.log("Vaults:", vaults.length);
         console.log("Fee:", fee);
 
-        endpoint.sendSharePrices{value: feeWithBuffer}(
-            dstChain.lzEndpointId,
-            vaults,
-            options,
-            rewardsDelegate
-        );
+        endpoint.sendSharePrices{ value: feeWithBuffer }(dstChain.lzEndpointId, vaults, options, rewardsDelegate);
 
         console.log("Message sent");
 

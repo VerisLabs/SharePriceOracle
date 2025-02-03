@@ -14,7 +14,6 @@ import { Ownable } from "@solady/auth/Ownable.sol";
 import { MsgCodec } from "./libs/MsgCodec.sol";
 
 contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
-
     /// @notice Protocol version identifiers for LayerZero communication
     uint64 private constant SENDER_VERSION = 1;
     uint64 private constant RECEIVER_VERSION = 2;
@@ -81,7 +80,6 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
         bytes options; // LayerZero options
     }
 
-
     ////////////////////////////////////////////////////////////////
     ///                      CONSTRUCTOR                          ///
     ////////////////////////////////////////////////////////////////
@@ -91,7 +89,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
 
         oracle = ISharePriceOracle(oracle_);
         endpoint = ILayerZeroEndpointV2(lzEndpoint);
-        
+
         _initializeOwner(admin_);
     }
 
@@ -126,19 +124,19 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
 
     /// @notice Allows owner to withdraw stuck ETH from the contract
     /// @param amount Amount of ETH to withdraw
-    /// @param refundTo Address to receive the withdrawn ETH 
+    /// @param refundTo Address to receive the withdrawn ETH
     function refundETH(uint256 amount, address refundTo) external onlyOwner {
         if (refundTo == address(0)) revert ZeroAddress();
         if (amount == 0 || amount > address(this).balance) revert InvalidInput();
-        
-        (bool success, ) = refundTo.call{value: amount}("");
+
+        (bool success,) = refundTo.call{ value: amount }("");
         if (!success) revert InsufficientFunds();
     }
 
     ////////////////////////////////////////////////////////////////
     ///                   EXTERNAL FUNCTIONS                      ///
     ////////////////////////////////////////////////////////////////
-    
+
     function sendSharePrices(
         uint32 dstEid,
         address[] calldata vaultAddresses,
@@ -148,14 +146,14 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
         external
         payable
     {
-        VaultReport[] memory reports = oracle.getSharePrices(vaultAddresses,rewardsDelegate);
+        VaultReport[] memory reports = oracle.getSharePrices(vaultAddresses, rewardsDelegate);
         bytes memory message = MsgCodec.encodeVaultReports(AB_TYPE, reports, options);
         bytes memory combinedOptions = _getCombinedOptions(dstEid, AB_TYPE, options);
 
         MessagingFee memory fee = _quote(dstEid, message, combinedOptions);
         if (msg.value < fee.nativeFee) revert InvalidMessageValue();
 
-        _lzSend(dstEid, message, combinedOptions, fee, msg.sender);
+        _lzSend(dstEid, message, combinedOptions, fee, msg.sender, false);
         emit SharePricesSent(dstEid, vaultAddresses);
     }
 
@@ -169,13 +167,13 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
         external
         payable
     {
-        bytes memory message = MsgCodec.encodeVaultAddresses(ABA_TYPE, vaultAddresses,rewardsDelegate,returnOptions);
+        bytes memory message = MsgCodec.encodeVaultAddresses(ABA_TYPE, vaultAddresses, rewardsDelegate, returnOptions);
         bytes memory combinedOptions = _getCombinedOptions(dstEid, ABA_TYPE, options);
 
         MessagingFee memory fee = _quote(dstEid, message, combinedOptions);
         if (msg.value < fee.nativeFee) revert InvalidMessageValue();
 
-        _lzSend(dstEid, message, combinedOptions, fee, msg.sender);
+        _lzSend(dstEid, message, combinedOptions, fee, msg.sender, false);
         emit SharePricesRequested(dstEid, vaultAddresses);
     }
 
@@ -244,7 +242,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
         bytes32 guid,
         bytes calldata message,
         address,
-        bytes calldata 
+        bytes calldata
     )
         external
         payable
@@ -279,9 +277,10 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
 
     /// @notice Handles ABA pattern response messages
     function _handleABAResponse(Origin calldata origin, bytes calldata message) private {
-        (, address[] memory vaultAddresses,address rewardsDelegate ,uint256 start, uint256 length) = MsgCodec.decodeVaultAddresses(message);
+        (, address[] memory vaultAddresses, address rewardsDelegate, uint256 start, uint256 length) =
+            MsgCodec.decodeVaultAddresses(message);
 
-        VaultReport[] memory reports = oracle.getSharePrices(vaultAddresses,rewardsDelegate);
+        VaultReport[] memory reports = oracle.getSharePrices(vaultAddresses, rewardsDelegate);
 
         bytes memory returnOptions = message[start:start + length];
         bytes memory returnMessage = MsgCodec.encodeVaultReports(AB_TYPE, reports, returnOptions);
@@ -292,7 +291,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
 
         if (address(this).balance < fee.nativeFee) revert InsufficientFunds();
 
-        _lzSend(origin.srcEid, returnMessage, options, fee, address(this));
+        _lzSend(origin.srcEid, returnMessage, options, fee, address(this), true);
     }
 
     /// @notice Gets peer for endpoint or reverts
@@ -323,15 +322,16 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
         bytes memory _message,
         bytes memory _options,
         MessagingFee memory _fee,
-        address _refundAddress
+        address _refundAddress,
+        bool isResponse
     )
         internal
         returns (MessagingReceipt memory)
     {
-        if (_fee.nativeFee == 0) revert InvalidFee();
-        if (msg.value < _fee.nativeFee) revert InvalidMessageValue();
+        if (!isResponse && msg.value < _fee.nativeFee) revert InvalidMessageValue();
+        if (isResponse && address(this).balance < _fee.nativeFee) revert InsufficientFunds();
 
-        return endpoint.send{ value: msg.value }(
+        return endpoint.send{ value: _fee.nativeFee }(
             MessagingParams(_dstEid, _getPeerOrRevert(_dstEid), _message, _options, false), _refundAddress
         );
     }

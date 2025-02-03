@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {IERC4626} from "../../src/interfaces/IERC4626.sol";
-import {IERC20} from "../../src/interfaces/IERC20.sol";
-import {IERC20Metadata} from "../../src/interfaces/IERC20Metadata.sol";
-import {MockERC20} from "./MockERC20.sol";
+import { IERC4626 } from "../../src/interfaces/IERC4626.sol";
+import { IERC20 } from "../../src/interfaces/IERC20.sol";
+import { IERC20Metadata } from "../../src/interfaces/IERC20Metadata.sol";
+import { MockERC20 } from "./MockERC20.sol";
 
 contract MockERC4626 is IERC4626 {
     uint8 private immutable _decimals;
@@ -110,17 +110,55 @@ contract MockERC4626 is IERC4626 {
     }
 
     // Not implemented ERC4626 functions - these will revert when called
-    function totalAssets() external pure returns (uint256) { revert("Not implemented"); }
-    function previewDeposit(uint256) external pure returns (uint256) { revert("Not implemented"); }
-    function previewMint(uint256) external pure returns (uint256) { revert("Not implemented"); }
-    function previewWithdraw(uint256) external pure returns (uint256) { revert("Not implemented"); }
-    function previewRedeem(uint256) external pure returns (uint256) { revert("Not implemented"); }
-    function maxDeposit(address) external pure returns (uint256) { revert("Not implemented"); }
-    function maxMint(address) external pure returns (uint256) { revert("Not implemented"); }
-    function maxWithdraw(address) external pure returns (uint256) { revert("Not implemented"); }
-    function maxRedeem(address) external pure returns (uint256) { revert("Not implemented"); }
-    function deposit(uint256, address) external pure returns (uint256) { revert("Not implemented"); }
-    function mint(uint256, address) external pure returns (uint256) { revert("Not implemented"); }
-    function withdraw(uint256, address, address) external pure returns (uint256) { revert("Not implemented"); }
-    function redeem(uint256, address, address) external pure returns (uint256) { revert("Not implemented"); }
+    function totalAssets() external pure returns (uint256) {
+        revert("Not implemented");
+    }
+
+    function previewDeposit(uint256) external pure returns (uint256) {
+        revert("Not implemented");
+    }
+
+    function previewMint(uint256) external pure returns (uint256) {
+        revert("Not implemented");
+    }
+
+    function previewWithdraw(uint256) external pure returns (uint256) {
+        revert("Not implemented");
+    }
+
+    function previewRedeem(uint256) external pure returns (uint256) {
+        revert("Not implemented");
+    }
+
+    function maxDeposit(address) external pure returns (uint256) {
+        revert("Not implemented");
+    }
+
+    function maxMint(address) external pure returns (uint256) {
+        revert("Not implemented");
+    }
+
+    function maxWithdraw(address) external pure returns (uint256) {
+        revert("Not implemented");
+    }
+
+    function maxRedeem(address) external pure returns (uint256) {
+        revert("Not implemented");
+    }
+
+    function deposit(uint256, address) external pure returns (uint256) {
+        revert("Not implemented");
+    }
+
+    function mint(uint256, address) external pure returns (uint256) {
+        revert("Not implemented");
+    }
+
+    function withdraw(uint256, address, address) external pure returns (uint256) {
+        revert("Not implemented");
+    }
+
+    function redeem(uint256, address, address) external pure returns (uint256) {
+        revert("Not implemented");
+    }
 }

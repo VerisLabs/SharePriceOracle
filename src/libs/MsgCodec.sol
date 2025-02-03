@@ -10,7 +10,7 @@ library MsgCodec {
 
     // Proper ABI encoded sizes
     uint256 private constant VAULT_REPORT_SIZE = 32 * 7; // Each field padded to 32 bytes in ABI encoding
-    uint256 private constant HEADER_SIZE = 32 * 5; // msgType + array offset + length + rewardsDelegate
+    uint256 private constant HEADER_SIZE = 32 * 4; // msgType + array offset + length + rewardsDelegate
     uint256 private constant EXTRA_OPTION_SIZE = 3 * 32; // option + offset pointer + length
     uint256 private constant MIN_MESSAGE_SIZE = 32; // Minimum size for any encoded message
 
@@ -24,9 +24,8 @@ library MsgCodec {
         pure
         returns (bytes memory)
     {
-        uint256 extraOptionsLength = _extraReturnOptions.length;
         // Format: [msgType][addresses_array][options_length][options]
-        return abi.encode(_msgType, _message,rewardsDelegate ,_extraReturnOptions.length, _extraReturnOptions, extraOptionsLength);
+        return abi.encode(_msgType, _message, rewardsDelegate, _extraReturnOptions.length, _extraReturnOptions);
     }
 
     function encodeVaultReports(
@@ -42,22 +41,28 @@ library MsgCodec {
         for (uint256 i = 0; i < _reports.length; i++) {
             if (_reports[i].vaultAddress == address(0)) revert InvalidMessageLength();
         }
-        uint256 extraOptionsLength = _extraReturnOptions.length;
-        return abi.encode(_msgType, _reports, extraOptionsLength, _extraReturnOptions, extraOptionsLength);
+        return abi.encode(_msgType, _reports, _extraReturnOptions.length, _extraReturnOptions);
     }
 
     function decodeVaultAddresses(bytes calldata encodedMessage)
         public
         pure
-        returns (uint16 msgType, address[] memory message,address rewardsDelegate ,uint256 extraOptionsStart, uint256 extraOptionsLength)
+        returns (
+            uint16 msgType,
+            address[] memory message,
+            address rewardsDelegate,
+            uint256 extraOptionsStart,
+            uint256 extraOptionsLength
+        )
     {
         if (encodedMessage.length < HEADER_SIZE) revert InvalidMessageLength();
 
-        (msgType, message,rewardsDelegate ,extraOptionsLength) = abi.decode(encodedMessage, (uint16, address[],address ,uint256));
+        (msgType, message, rewardsDelegate, extraOptionsLength) =
+            abi.decode(encodedMessage, (uint16, address[], address, uint256));
 
         extraOptionsStart = HEADER_SIZE + EXTRA_OPTION_SIZE + (message.length * 32);
 
-        return (msgType, message,rewardsDelegate ,extraOptionsStart, extraOptionsLength);
+        return (msgType, message, rewardsDelegate, extraOptionsStart, extraOptionsLength);
     }
 
     function decodeVaultReports(bytes calldata encodedMessage)
@@ -70,7 +75,6 @@ library MsgCodec {
         (msgType, reports, extraOptionsLength) = abi.decode(encodedMessage, (uint16, VaultReport[], uint256));
 
         extraOptionsStart = HEADER_SIZE + EXTRA_OPTION_SIZE + (reports.length * VAULT_REPORT_SIZE);
-
 
         return (msgType, reports, extraOptionsStart, extraOptionsLength);
     }

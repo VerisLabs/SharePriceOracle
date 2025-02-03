@@ -12,14 +12,11 @@ contract DeployScript is Script {
         address oracle,
         address endpoint,
         address admin
-    ) internal {
-        string memory deploymentPath = string.concat(
-            "deployments/",
-            config.name,
-            "_",
-            vm.toString(config.chainId),
-            ".json"
-        );
+    )
+        internal
+    {
+        string memory deploymentPath =
+            string.concat("deployments/", config.name, "_", vm.toString(config.chainId), ".json");
 
         string memory jsonContent = string.concat(
             "{",
@@ -67,17 +64,10 @@ contract DeployScript is Script {
         ChainConfig.Config memory config = ChainConfig.getConfig(block.chainid);
 
         // Deploy SharePriceOracle
-        SharePriceOracle oracle = new SharePriceOracle(
-            admin,
-            config.ethUsdFeed
-        );
+        SharePriceOracle oracle = new SharePriceOracle(admin, config.ethUsdFeed);
 
         // Deploy MaxLzEndpoint
-        MaxLzEndpoint endpoint = new MaxLzEndpoint(
-            admin,
-            config.lzEndpoint,
-            address(oracle)
-        );
+        MaxLzEndpoint endpoint = new MaxLzEndpoint(admin, config.lzEndpoint, address(oracle));
 
         // Setup permissions if flag is set
         bool setupPermissions = vm.envOr("SETUP_PERMISSIONS", false);

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {IERC20} from "../../src/interfaces/IERC20.sol";
-import {IERC20Metadata} from "../../src/interfaces/IERC20Metadata.sol";
+import { IERC20 } from "../../src/interfaces/IERC20.sol";
+import { IERC20Metadata } from "../../src/interfaces/IERC20Metadata.sol";
 
 contract MockERC20 is IERC20, IERC20Metadata {
     mapping(address => uint256) private _balances;

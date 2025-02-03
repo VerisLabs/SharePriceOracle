@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {MessagingFee} from "./ILayerZeroEndpointV2.sol";
+import { MessagingFee } from "./ILayerZeroEndpointV2.sol";
 
 /**
  * @title VaultReport
@@ -59,20 +59,11 @@ interface ISharePriceOracle {
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    event SharePriceUpdated(
-        uint32 indexed srcChainId,
-        address indexed vault,
-        uint256 price,
-        address rewardsDelegate
-    );
+    event SharePriceUpdated(uint32 indexed srcChainId, address indexed vault, uint256 price, address rewardsDelegate);
     event LzEndpointUpdated(address oldEndpoint, address newEndpoint);
     event RoleGranted(address account, uint256 role);
     event RoleRevoked(address account, uint256 role);
-    event PriceFeedSet(
-        uint32 indexed chainId,
-        address indexed asset,
-        address priceFeed
-    );
+    event PriceFeedSet(uint32 indexed chainId, address indexed asset, address priceFeed);
 
     /*//////////////////////////////////////////////////////////////
                             VIEW FUNCTIONS
@@ -88,10 +79,7 @@ interface ISharePriceOracle {
     function ENDPOINT_ROLE() external view returns (uint256);
 
     /// @notice Check if an account has a specific role
-    function hasRole(
-        address account,
-        uint256 role
-    ) external view returns (bool);
+    function hasRole(address account, uint256 role) external view returns (bool);
 
     /// @notice Get all roles assigned to an account
     function getRoles(address account) external view returns (uint256);
@@ -100,36 +88,39 @@ interface ISharePriceOracle {
     function getSharePrices(
         address[] calldata vaultAddresses,
         address rewardsDelegate
-    ) external view returns (VaultReport[] memory);
+    )
+        external
+        view
+        returns (VaultReport[] memory);
 
     /// @notice Get latest share price for a specific vault
     function getLatestSharePriceReport(
         uint32 _srcChainId,
         address _vaultAddress
-    ) external view returns (VaultReport memory);
+    )
+        external
+        view
+        returns (VaultReport memory);
 
     /// @notice Get latest share price for a specific vault / asset pair
     function getLatestSharePrice(
         uint32 _srcChainId,
         address _vaultAddress,
         address _dstAsset
-    ) external view returns (uint256 price, uint64 timestamp);
+    )
+        external
+        view
+        returns (uint256 price, uint64 timestamp);
 
     /// @notice Generate a unique key for a vault's price data
-    function getPriceKey(
-        uint32 _srcChainId,
-        address _vault
-    ) external pure returns (bytes32);
+    function getPriceKey(uint32 _srcChainId, address _vault) external pure returns (bytes32);
 
     /*//////////////////////////////////////////////////////////////
                         EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Update share prices from another chain
-    function updateSharePrices(
-        uint32 _srcChainId,
-        VaultReport[] calldata _reports
-    ) external;
+    function updateSharePrices(uint32 _srcChainId, VaultReport[] calldata _reports) external;
 
     /// @notice Grant a role to an account
     function grantRole(address account, uint256 role) external;

@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import "forge-std/Script.sol";
 import "../src/SharePriceOracle.sol";
 import "./libs/ChainConfig.sol";
-import {PriceDenomination} from "../src/interfaces/ISharePriceOracle.sol";
+import { PriceDenomination } from "../src/interfaces/ISharePriceOracle.sol";
 
 contract SetPriceFeedsScript is Script {
     struct FeedData {
@@ -22,10 +22,14 @@ contract SetPriceFeedsScript is Script {
     function getFeedDataForChain(
         string memory chain,
         uint32 chainId
-    ) internal view returns (FeedData[] memory chainFeeds, uint256 feedCount) {
+    )
+        internal
+        view
+        returns (FeedData[] memory chainFeeds, uint256 feedCount)
+    {
         string memory tokensPath = string.concat(".chain_tokens.", chain, ".tokens");
         string[] memory tokens = vm.parseJsonKeys(configJson, tokensPath);
-        
+
         chainFeeds = new FeedData[](tokens.length);
         feedCount = 0;
 
@@ -42,9 +46,9 @@ contract SetPriceFeedsScript is Script {
                 chainId: chainId,
                 token: tokenAddress,
                 feed: feed,
-                denomination: keccak256(bytes(denom)) == keccak256(bytes("ETH")) ? 
-                    PriceDenomination.ETH : 
-                    PriceDenomination.USD,
+                denomination: keccak256(bytes(denom)) == keccak256(bytes("ETH"))
+                    ? PriceDenomination.ETH
+                    : PriceDenomination.USD,
                 heartbeat: heartbeat
             });
             feedCount++;
@@ -57,16 +61,12 @@ contract SetPriceFeedsScript is Script {
             oracle.setPriceFeed(
                 data.chainId,
                 data.token,
-                PriceFeedInfo({
-                    feed: data.feed,
-                    denomination: data.denomination,
-                    heartbeat: data.heartbeat
-                })
+                PriceFeedInfo({ feed: data.feed, denomination: data.denomination, heartbeat: data.heartbeat })
             );
-            
+
             console.log(
                 string.concat(
-                    "Set feed for chain ", 
+                    "Set feed for chain ",
                     vm.toString(data.chainId),
                     " token: ",
                     vm.toString(data.token),
@@ -79,26 +79,21 @@ contract SetPriceFeedsScript is Script {
 
     function run() external {
         require(block.chainid == 8453, "Must be run on Base");
-        
+
         // Get deployment info
         ChainConfig.Config memory config = ChainConfig.getConfig(block.chainid);
-        string memory deploymentPath = string.concat(
-            "deployments/",
-            config.name,
-            "_",
-            vm.toString(config.chainId),
-            ".json"
-        );
+        string memory deploymentPath =
+            string.concat("deployments/", config.name, "_", vm.toString(config.chainId), ".json");
         string memory deployJson = vm.readFile(deploymentPath);
         address oracleAddress = vm.parseJsonAddress(deployJson, ".oracle");
-        
+
         // Load price feed config
         configJson = vm.readFile("script/config/priceFeedConfig.json");
         oracle = SharePriceOracle(oracleAddress);
-        
+
         // Get all chains
         string[] memory chains = vm.parseJsonKeys(configJson, ".chain_tokens");
-        
+
         // Process each chain
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
@@ -106,21 +101,21 @@ contract SetPriceFeedsScript is Script {
         for (uint256 i = 0; i < chains.length; i++) {
             string memory chainPath = string.concat(".chain_tokens.", chains[i]);
             uint32 chainId = uint32(vm.parseJsonUint(configJson, string.concat(chainPath, ".chainId")));
-            
+
             // Get feeds for this chain
             (FeedData[] memory chainFeeds, uint256 feedCount) = getFeedDataForChain(chains[i], chainId);
-            
+
             // Process in batches
             uint256 batches = (feedCount + BATCH_SIZE - 1) / BATCH_SIZE;
-            
+
             for (uint256 batchIdx = 0; batchIdx < batches; batchIdx++) {
                 uint256 start = batchIdx * BATCH_SIZE;
                 uint256 end = start + BATCH_SIZE > feedCount ? feedCount : start + BATCH_SIZE;
-                
+
                 console.log(
                     string.concat(
-                        "\nProcessing batch ", 
-                        vm.toString(batchIdx + 1), 
+                        "\nProcessing batch ",
+                        vm.toString(batchIdx + 1),
                         "/",
                         vm.toString(batches),
                         " for chain ",
@@ -129,7 +124,7 @@ contract SetPriceFeedsScript is Script {
                 );
 
                 processBatch(chainFeeds, start, end);
-                
+
                 // If not the last batch, stop broadcast and start a new one
                 if (batchIdx < batches - 1) {
                     vm.stopBroadcast();
