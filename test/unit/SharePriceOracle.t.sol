@@ -22,6 +22,7 @@ contract SharePriceOracleTest is Test {
     MockPriceFeed public ethUsdFeed;
     MockPriceFeed public tokenAFeed;
     MockPriceFeed public tokenBFeed;
+    MockPriceFeed public sequencer;
     MockERC4626 public vaultA;
     MockERC4626 public vaultB;
     address public admin;
@@ -49,6 +50,7 @@ contract SharePriceOracleTest is Test {
         ethUsdFeed = new MockPriceFeed(8);
         tokenAFeed = new MockPriceFeed(8);
         tokenBFeed = new MockPriceFeed(8);
+        sequencer = new MockPriceFeed(8);
 
         // Set initial prices
         ethUsdFeed.setPrice(2000e8); // $2000 USD/ETH
@@ -156,6 +158,63 @@ contract SharePriceOracleTest is Test {
     }
 
     // ========== PRICE CONVERSION TESTS ==========
+
+    function test_priceConversion_stablecoinToStablecoin_With_sequencer() public {
+        // Setup DAI vault with 18 decimals
+        MockERC4626 daiVault = new MockERC4626(18);
+        daiVault.setMockSharePrice(1e18); // 1:1 ratio for simplicity
+
+        // Setup DAI price feed (8 decimals)
+        MockPriceFeed daiFeed = new MockPriceFeed(8);
+        daiFeed.setPrice(100_000_000); // $1.00 USD
+
+        // Setup USDC mock with 6 decimals
+        MockERC4626 usdcVault = new MockERC4626(6);
+
+        // Setup USDC price feed (8 decimals)
+        MockPriceFeed usdcFeed = new MockPriceFeed(8);
+        usdcFeed.setPrice(100_000_000); // $1.00 USD
+
+        console.log("DAI USD Price:", daiFeed.latestAnswer());
+        console.log("DAI decimals:", daiVault.decimals());
+        console.log("USDC USD Price:", usdcFeed.latestAnswer());
+        console.log("USDC decimals:", usdcVault.decimals());
+
+        vm.startPrank(admin);
+        oracle.setSequencer(address(sequencer));
+        sequencer.setPrice(0);
+
+        oracle.setPriceFeed(
+            CHAIN_ID,
+            daiVault.asset(),
+            PriceFeedInfo({ feed: address(daiFeed), denomination: PriceDenomination.USD, heartbeat: 1 hours })
+        );
+        oracle.setPriceFeed(
+            CHAIN_ID,
+            usdcVault.asset(),
+            PriceFeedInfo({ feed: address(usdcFeed), denomination: PriceDenomination.USD, heartbeat: 1 hours })
+        );
+        vm.stopPrank();
+
+        // Get price in USDC terms
+        (uint256 price, uint64 timestamp) = oracle.getLatestSharePrice(CHAIN_ID, address(daiVault), usdcVault.asset());
+
+        console.log("Conversion Result:", price);
+        console.log("Timestamp:", timestamp);
+
+        // Expected calculation:
+        // 1 DAI share = 1 DAI (18 decimals)
+        // 1 DAI = $1.00 USD
+        // $1.00 / $1.00 per USDC = 1 USDC (6 decimals)
+        assertApproxEqRel(price, 1e6, 0.01e18); // 1% tolerance
+
+        // Try with a different share price
+        daiVault.setMockSharePrice(2e18); // 2 DAI per share
+        (price, timestamp) = oracle.getLatestSharePrice(CHAIN_ID, address(daiVault), usdcVault.asset());
+
+        // 2 DAI = 2 USDC
+        assertApproxEqRel(price, 2e6, 0.01e18); // 1% tolerance
+    }
 
     function test_PriceConversion_ETHtoUSDC_RealWorldExample_banana() public {
         uint256 currentTime = block.timestamp;
@@ -691,6 +750,14 @@ contract SharePriceOracleTest is Test {
     }
 
     // ========== ROLE MANAGEMENT TESTS ==========
+    function test_setSequencer() public {
+        assertEq(oracle.sequencer(), address(0), "Wrong sequencer");
+        address newSequencer = makeAddr("newSequencer");
+        vm.startPrank(admin);
+        oracle.setSequencer(newSequencer);
+        assertEq(oracle.sequencer(), newSequencer, "Wrong sequencer");
+        vm.stopPrank();
+    }
 
     function test_revokeRole() public {
         vm.startPrank(admin);
@@ -828,6 +895,26 @@ contract SharePriceOracleTest is Test {
     function test_revertWhen_invalidPriceFeed() public {
         MockPriceFeed feed = new MockPriceFeed(8);
         feed.setPrice(0);
+
+        vm.startPrank(admin);
+        PriceFeedInfo memory info =
+            PriceFeedInfo({ feed: address(feed), denomination: PriceDenomination.USD, heartbeat: 1 hours });
+
+        try oracle.setPriceFeed(CHAIN_ID, vaultA.asset(), info) {
+            fail();
+        } catch {
+            // Test passes if we catch the revert
+        }
+        vm.stopPrank();
+    }
+
+    function test_revertWhen_sequencerIsFalse() public {
+        MockPriceFeed feed = new MockPriceFeed(8);
+        
+        vm.startPrank(admin);
+        sequencer.setPrice(1);
+        oracle.setSequencer(address(sequencer));
+        vm.stopPrank();
 
         vm.startPrank(admin);
         PriceFeedInfo memory info =

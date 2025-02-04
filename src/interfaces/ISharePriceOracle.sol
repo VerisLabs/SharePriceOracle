@@ -64,6 +64,7 @@ interface ISharePriceOracle {
     event RoleGranted(address account, uint256 role);
     event RoleRevoked(address account, uint256 role);
     event PriceFeedSet(uint32 indexed chainId, address indexed asset, address priceFeed);
+    event SequencerUpdated(address oldSequencer, address newSequencer);
 
     /*//////////////////////////////////////////////////////////////
                             VIEW FUNCTIONS

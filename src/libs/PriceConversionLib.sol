@@ -24,6 +24,7 @@ library PriceConversionLib {
         address srcAsset; // Source asset address
         address dstAsset; // Destination asset address
         address ethUsdFeed; // ETH/USD price feed
+        address sequencer; // L2 sequencer address
         PriceFeedInfo srcFeed; // Source asset price feed
         PriceFeedInfo dstFeed; // Destination asset price feed
         VaultReport srcReport; // Source vault report
@@ -37,8 +38,8 @@ library PriceConversionLib {
     /// 4. Calculate final price considering all decimal adjustments
     function convertFullPrice(ConversionParams memory params) internal view returns (uint256) {
         // Step 1: Get base prices from Chainlink
-        ChainlinkResponse memory src = params.srcFeed.feed.getPrice(params.srcFeed.heartbeat);
-        ChainlinkResponse memory dst = params.dstFeed.feed.getPrice(params.dstFeed.heartbeat);
+        ChainlinkResponse memory src = params.srcFeed.feed.getPrice(params.sequencer, params.srcFeed.heartbeat);
+        ChainlinkResponse memory dst = params.dstFeed.feed.getPrice(params.sequencer, params.dstFeed.heartbeat);
         if (src.price == 0 || dst.price == 0) return 0;
 
         // Get asset decimals - handle cross-chain case differently
@@ -69,7 +70,7 @@ library PriceConversionLib {
                     denomination: PriceDenomination.USD,
                     heartbeat: 20 minutes // This will be overwritten by the actual config
                  });
-                ChainlinkResponse memory ethUsd = ethUsdFeed.feed.getPrice(ethUsdFeed.heartbeat);
+                ChainlinkResponse memory ethUsd = ethUsdFeed.feed.getPrice(params.sequencer, ethUsdFeed.heartbeat);
                 if (ethUsd.price == 0) return 0;
 
                 // Normalize ETH/USD price to 18 decimals
