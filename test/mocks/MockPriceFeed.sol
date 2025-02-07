@@ -18,7 +18,7 @@ contract MockPriceFeed is AggregatorV3Interface {
         _timestamp = block.timestamp;
         _updatedAt = block.timestamp;
         _answeredInRound = 1;
-        _price = 1e8; 
+        _price = 1e8;
     }
 
     function setPrice(int256 price) external {
