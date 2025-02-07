@@ -116,12 +116,12 @@
             "heartbeat": 1200
         },
         "BTCb": {
-            "feed": "0xCCADC697c55bbB68dc5bCdf8d3CBe83CdD4E071E",
+            "feed": "0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F",
             "denomination": "USD",
             "heartbeat": 1200
         },
         "BTCB": {
-            "feed": "0xCCADC697c55bbB68dc5bCdf8d3CBe83CdD4E071E",
+            "feed": "0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F",
             "denomination": "USD",
             "heartbeat": 1200
         }
