@@ -3,12 +3,12 @@
         "WETH": {
             "feed": "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
             "denomination": "USD",
-            "heartbeat": 3600
+            "heartbeat": 1200
         },
         "ETH": {
             "feed": "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
             "denomination": "USD",
-            "heartbeat": 3600
+            "heartbeat": 1200
         },
         "USDC": {
             "feed": "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B",
@@ -71,7 +71,7 @@
             "heartbeat": 86400
         },
         "rswETH": {
-            "feed": "0xFC1415403EbB0c693f9a7844b92aD2Ff24775C65",
+            "feed": "0x97b770B0200CCe161907a9cbe0C6B177679f8F7C",
             "denomination": "ETH",
             "heartbeat": 86400
         },
@@ -111,7 +111,7 @@
             "heartbeat": 86400
         },
         "BITCOIN": {
-            "feed": "0xCCADC697c55bbB68dc5bCdf8d3CBe83CdD4E071E",
+            "feed": "0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F",
             "denomination": "USD",
             "heartbeat": 1200
         },
