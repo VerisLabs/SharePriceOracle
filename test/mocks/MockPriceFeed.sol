@@ -22,7 +22,7 @@ contract MockPriceFeed is AggregatorV3Interface {
         _price = price;
         if (price == 0) {
             _roundId = 0;
-            _timestamp = 0;
+            _timestamp = block.timestamp;
             _updatedAt = 0;
             _answeredInRound = 0;
         } else {

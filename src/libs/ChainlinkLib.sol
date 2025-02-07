@@ -4,10 +4,15 @@ pragma solidity 0.8.19;
 import {ChainlinkResponse} from "../interfaces/ISharePriceOracle.sol";
 import {AggregatorV3Interface} from "../interfaces/AggregatorV3Interface.sol";
 
+import {console2} from "forge-std/console2.sol";
+
 /// @title ChainlinkLib
 /// @notice Library for interacting with Chainlink price feeds
 /// @dev Provides safe price retrieval with comprehensive validation
 library ChainlinkLib {
+    /// @notice Grace period for L2 sequencer validation
+    uint256 private constant GRACE_PERIOD_TIME = 3600;
+
     /// @notice Retrieves the latest price data from a Chainlink price feed
     /// @dev Includes full validation of roundId, timestamp, and price value
     /// @param feed Address of the Chainlink price feed
@@ -20,14 +25,18 @@ library ChainlinkLib {
         uint32 heartbeat
     ) internal view returns (ChainlinkResponse memory response) {
         if (sequencer != address(0)) {
-            try AggregatorV3Interface(feed).latestRoundData() returns (
+            try AggregatorV3Interface(sequencer).latestRoundData() returns (
                 uint80,
                 int256 answer,
-                uint256,
+                uint256 startedAt,
                 uint256,
                 uint80
             ) {
-                if (answer == 0) return ChainlinkResponse(0, 0, 0, 0, 0);
+                // Answer == 0: Sequencer is up
+                // Answer == 1: Sequencer is down
+                if (answer == 1) return ChainlinkResponse(0, 0, 0, 0, 0);
+                if (block.timestamp - startedAt <= GRACE_PERIOD_TIME)
+                    return ChainlinkResponse(0, 0, 0, 0, 0);
             } catch {
                 return ChainlinkResponse(0, 0, 0, 0, 0);
             }

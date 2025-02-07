@@ -181,8 +181,11 @@ contract SharePriceOracleTest is Test {
         console.log("USDC decimals:", usdcVault.decimals());
 
         vm.startPrank(admin);
+
         oracle.setSequencer(address(sequencer));
         sequencer.setPrice(0);
+        vm.warp(block.timestamp + 2 hours);
+        console2.log("Sequencer price:", block.timestamp);
 
         oracle.setPriceFeed(
             CHAIN_ID,
@@ -194,6 +197,7 @@ contract SharePriceOracleTest is Test {
             usdcVault.asset(),
             PriceFeedInfo({ feed: address(usdcFeed), denomination: PriceDenomination.USD, heartbeat: 1 hours })
         );
+        
         vm.stopPrank();
 
         // Get price in USDC terms
