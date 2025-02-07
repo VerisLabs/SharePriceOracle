@@ -114,16 +114,6 @@
             "feed": "0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F",
             "denomination": "USD",
             "heartbeat": 1200
-        },
-        "BTCb": {
-            "feed": "0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F",
-            "denomination": "USD",
-            "heartbeat": 1200
-        },
-        "BTCB": {
-            "feed": "0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F",
-            "denomination": "USD",
-            "heartbeat": 1200
         }
     },
     "chain_tokens": {
