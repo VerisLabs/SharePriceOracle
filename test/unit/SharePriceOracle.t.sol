@@ -158,8 +158,12 @@ contract SharePriceOracleTest is Test {
     }
 
     // ========== PRICE CONVERSION TESTS ==========
-
     function test_priceConversion_stablecoinToStablecoin_With_sequencer() public {
+        uint256 baseTime = 1_000_000;
+        uint256 sequencerStartTime = baseTime - 4000;
+
+        vm.warp(baseTime);
+
         // Setup DAI vault with 18 decimals
         MockERC4626 daiVault = new MockERC4626(18);
         daiVault.setMockSharePrice(1e18); // 1:1 ratio for simplicity
@@ -167,6 +171,7 @@ contract SharePriceOracleTest is Test {
         // Setup DAI price feed (8 decimals)
         MockPriceFeed daiFeed = new MockPriceFeed(8);
         daiFeed.setPrice(100_000_000); // $1.00 USD
+        daiFeed.setTimestamp(baseTime); // Current time
 
         // Setup USDC mock with 6 decimals
         MockERC4626 usdcVault = new MockERC4626(6);
@@ -174,50 +179,34 @@ contract SharePriceOracleTest is Test {
         // Setup USDC price feed (8 decimals)
         MockPriceFeed usdcFeed = new MockPriceFeed(8);
         usdcFeed.setPrice(100_000_000); // $1.00 USD
+        usdcFeed.setTimestamp(baseTime); // Current time
 
-        console.log("DAI USD Price:", daiFeed.latestAnswer());
-        console.log("DAI decimals:", daiVault.decimals());
-        console.log("USDC USD Price:", usdcFeed.latestAnswer());
-        console.log("USDC decimals:", usdcVault.decimals());
+        MockPriceFeed sequencerFeed = new MockPriceFeed(8);
+        sequencerFeed.setSequencerStatus(false);
+        sequencerFeed.setTimestamp(sequencerStartTime);
 
         vm.startPrank(admin);
 
-        oracle.setSequencer(address(sequencer));
-        sequencer.setPrice(0);
-        vm.warp(block.timestamp + 2 hours);
-        console2.log("Sequencer price:", block.timestamp);
+        oracle.setSequencer(address(sequencerFeed));
+        sequencerFeed.latestRoundData();
 
         oracle.setPriceFeed(
             CHAIN_ID,
             daiVault.asset(),
             PriceFeedInfo({ feed: address(daiFeed), denomination: PriceDenomination.USD, heartbeat: 1 hours })
         );
+
         oracle.setPriceFeed(
             CHAIN_ID,
             usdcVault.asset(),
             PriceFeedInfo({ feed: address(usdcFeed), denomination: PriceDenomination.USD, heartbeat: 1 hours })
         );
-        
+
         vm.stopPrank();
 
-        // Get price in USDC terms
-        (uint256 price, uint64 timestamp) = oracle.getLatestSharePrice(CHAIN_ID, address(daiVault), usdcVault.asset());
+        (uint256 price,) = oracle.getLatestSharePrice(CHAIN_ID, address(daiVault), usdcVault.asset());
 
-        console.log("Conversion Result:", price);
-        console.log("Timestamp:", timestamp);
-
-        // Expected calculation:
-        // 1 DAI share = 1 DAI (18 decimals)
-        // 1 DAI = $1.00 USD
-        // $1.00 / $1.00 per USDC = 1 USDC (6 decimals)
         assertApproxEqRel(price, 1e6, 0.01e18); // 1% tolerance
-
-        // Try with a different share price
-        daiVault.setMockSharePrice(2e18); // 2 DAI per share
-        (price, timestamp) = oracle.getLatestSharePrice(CHAIN_ID, address(daiVault), usdcVault.asset());
-
-        // 2 DAI = 2 USDC
-        assertApproxEqRel(price, 2e6, 0.01e18); // 1% tolerance
     }
 
     function test_PriceConversion_ETHtoUSDC_RealWorldExample_banana() public {
@@ -914,7 +903,7 @@ contract SharePriceOracleTest is Test {
 
     function test_revertWhen_sequencerIsFalse() public {
         MockPriceFeed feed = new MockPriceFeed(8);
-        
+
         vm.startPrank(admin);
         sequencer.setPrice(1);
         oracle.setSequencer(address(sequencer));

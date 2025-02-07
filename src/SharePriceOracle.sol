@@ -1,15 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {ISharePriceOracle, PriceFeedInfo, PriceDenomination, VaultReport, ChainlinkResponse} from "./interfaces/ISharePriceOracle.sol";
-import {IERC4626} from "./interfaces/IERC4626.sol";
-import {IERC20Metadata} from "./interfaces/IERC20Metadata.sol";
-import {OwnableRoles} from "@solady/auth/OwnableRoles.sol";
-import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
+import {
+    ISharePriceOracle,
+    PriceFeedInfo,
+    PriceDenomination,
+    VaultReport,
+    ChainlinkResponse
+} from "./interfaces/ISharePriceOracle.sol";
+import { IERC4626 } from "./interfaces/IERC4626.sol";
+import { IERC20Metadata } from "./interfaces/IERC20Metadata.sol";
+import { OwnableRoles } from "@solady/auth/OwnableRoles.sol";
+import { FixedPointMathLib } from "@solady/utils/FixedPointMathLib.sol";
 
-import {ChainlinkLib} from "./libs/ChainlinkLib.sol";
-import {VaultLib} from "./libs/VaultLib.sol";
-import {PriceConversionLib} from "./libs/PriceConversionLib.sol";
+import { ChainlinkLib } from "./libs/ChainlinkLib.sol";
+import { VaultLib } from "./libs/VaultLib.sol";
+import { PriceConversionLib } from "./libs/PriceConversionLib.sol";
 
 contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     using ChainlinkLib for address;
@@ -134,25 +140,18 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
 
     /**
      *
-     @notice Sets the price feed for a specific chain and asset
+     *  @notice Sets the price feed for a specific chain and asset
      * @param _chainId Chain ID
      * @param _asset Asset address
      * @param _priceFeed Price feed info including feed address, denomination and heartbeat
      */
-    function setPriceFeed(
-        uint32 _chainId,
-        address _asset,
-        PriceFeedInfo calldata _priceFeed
-    ) external onlyAdmin {
+    function setPriceFeed(uint32 _chainId, address _asset, PriceFeedInfo calldata _priceFeed) external onlyAdmin {
         if (_chainId == 0) revert InvalidChainId(_chainId);
         if (_asset == address(0)) revert ZeroAddress();
         if (_priceFeed.feed == address(0)) revert ZeroAddress();
         if (_priceFeed.heartbeat == 0) revert InvalidHeartbeat();
 
-        ChainlinkResponse memory response = _priceFeed.feed.getPrice(
-            sequencer,
-            _priceFeed.heartbeat
-        );
+        ChainlinkResponse memory response = _priceFeed.feed.getPrice(sequencer, _priceFeed.heartbeat);
         if (response.price == 0) revert InvalidFeed();
 
         priceFeeds[_chainId][_asset] = _priceFeed;
@@ -178,10 +177,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
      * @param account Address to revoke the role from
      * @param role Role identifier to revoke
      */
-    function revokeRole(
-        address account,
-        uint256 role
-    ) external override onlyAdmin {
+    function revokeRole(address account, uint256 role) external override onlyAdmin {
         if (account == address(0)) revert ZeroAddress();
         if (role == 0) revert InvalidRole();
 
@@ -197,10 +193,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
      * @param _srcChainId Source chain ID
      * @param reports Array of vault reports to update
      */
-    function updateSharePrices(
-        uint32 _srcChainId,
-        VaultReport[] calldata reports
-    ) external override onlyEndpoint {
+    function updateSharePrices(uint32 _srcChainId, VaultReport[] calldata reports) external override onlyEndpoint {
         if (_srcChainId == chainId) revert InvalidChainId(_srcChainId);
 
         uint256 len = reports.length;
@@ -216,12 +209,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
                 key = getPriceKey(_srcChainId, report.vaultAddress);
                 sharePrices[key] = report;
 
-                emit SharePriceUpdated(
-                    _srcChainId,
-                    report.vaultAddress,
-                    report.sharePrice,
-                    report.rewardsDelegate
-                );
+                emit SharePriceUpdated(_srcChainId, report.vaultAddress, report.sharePrice, report.rewardsDelegate);
             }
         }
     }
@@ -240,7 +228,11 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     function _getDstSharePrice(
         address _vaultAddress,
         address _dstAsset
-    ) internal view returns (uint256 sharePrice, uint64 timestamp) {
+    )
+        internal
+        view
+        returns (uint256 sharePrice, uint64 timestamp)
+    {
         VaultReport memory report = _getVaultSharePrice(
             _vaultAddress,
             address(0) // Not needed for this function
@@ -255,13 +247,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
         }
 
         // Convert price but ignore returned timestamp from conversion
-        (sharePrice, timestamp) = _convertAssetPrice(
-            report.sharePrice,
-            chainId,
-            report.asset,
-            _dstAsset,
-            report
-        );
+        (sharePrice, timestamp) = _convertAssetPrice(report.sharePrice, chainId, report.asset, _dstAsset, report);
 
         // If price is 0 (stale/invalid), return (0,0)
         if (sharePrice == 0) {
@@ -280,13 +266,12 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     function _getVaultSharePrice(
         address _vaultAddress,
         address _rewardsDelegate
-    ) internal view returns (VaultReport memory report) {
-        return
-            VaultLib.getVaultSharePrice(
-                _vaultAddress,
-                _rewardsDelegate,
-                chainId
-            );
+    )
+        internal
+        view
+        returns (VaultReport memory report)
+    {
+        return VaultLib.getVaultSharePrice(_vaultAddress, _rewardsDelegate, chainId);
     }
 
     /**
@@ -301,29 +286,21 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
         uint32 _srcChainId,
         address _vaultAddress,
         address _dstAsset
-    ) internal view returns (uint256 sharePrice, uint64 timestamp) {
-        VaultReport memory report = getLatestSharePriceReport(
-            _srcChainId,
-            _vaultAddress
-        );
+    )
+        internal
+        view
+        returns (uint256 sharePrice, uint64 timestamp)
+    {
+        VaultReport memory report = getLatestSharePriceReport(_srcChainId, _vaultAddress);
 
         unchecked {
-            if (
-                report.lastUpdate + SHARE_PRICE_STALENESS_TOLERANCE <
-                block.timestamp
-            ) {
+            if (report.lastUpdate + SHARE_PRICE_STALENESS_TOLERANCE < block.timestamp) {
                 return (0, 0);
             }
         }
 
         // Convert price but ignore returned timestamp from conversion
-        (sharePrice, ) = _convertAssetPrice(
-            report.sharePrice,
-            _srcChainId,
-            report.asset,
-            _dstAsset,
-            report
-        );
+        (sharePrice,) = _convertAssetPrice(report.sharePrice, _srcChainId, report.asset, _dstAsset, report);
 
         // Return the oracle's last update time instead
         return (sharePrice, report.lastUpdate);
@@ -345,7 +322,11 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
         address _srcAsset,
         address _dstAsset,
         VaultReport memory _report
-    ) internal view returns (uint256 price, uint64 timestamp) {
+    )
+        internal
+        view
+        returns (uint256 price, uint64 timestamp)
+    {
         PriceFeedInfo memory srcFeed = priceFeeds[_srcChainId][_srcAsset];
         PriceFeedInfo memory dstFeed = priceFeeds[chainId][_dstAsset];
 
@@ -390,7 +371,12 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     function getSharePrices(
         address[] calldata vaultAddresses,
         address rewardsDelegate
-    ) external view override returns (VaultReport[] memory) {
+    )
+        external
+        view
+        override
+        returns (VaultReport[] memory)
+    {
         uint256 len = vaultAddresses.length;
         if (len > MAX_REPORTS) revert ExceedsMaxReports();
 
@@ -398,10 +384,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
 
         unchecked {
             for (uint256 i; i < len; ++i) {
-                reports[i] = _getVaultSharePrice(
-                    vaultAddresses[i],
-                    rewardsDelegate
-                );
+                reports[i] = _getVaultSharePrice(vaultAddresses[i], rewardsDelegate);
             }
         }
         return reports;
@@ -416,7 +399,12 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     function getLatestSharePriceReport(
         uint32 _srcChainId,
         address _vaultAddress
-    ) public view override returns (VaultReport memory vaultReport) {
+    )
+        public
+        view
+        override
+        returns (VaultReport memory vaultReport)
+    {
         bytes32 key = getPriceKey(_srcChainId, _vaultAddress);
         return vaultReport = sharePrices[key];
     }
@@ -437,7 +425,12 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
         uint32 _srcChainId,
         address _vaultAddress,
         address _dstAsset
-    ) external view override returns (uint256 sharePrice, uint64 timestamp) {
+    )
+        external
+        view
+        override
+        returns (uint256 sharePrice, uint64 timestamp)
+    {
         if (_srcChainId == chainId) {
             return _getDstSharePrice(_vaultAddress, _dstAsset);
         }
@@ -450,10 +443,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
      * @param _vault Vault address
      * @return bytes32 The generated key
      */
-    function getPriceKey(
-        uint32 _srcChainId,
-        address _vault
-    ) public pure override returns (bytes32) {
+    function getPriceKey(uint32 _srcChainId, address _vault) public pure override returns (bytes32) {
         return keccak256(abi.encode(_srcChainId, _vault));
     }
 
@@ -463,10 +453,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
      * @param role Role to check for
      * @return bool True if account has the role
      */
-    function hasRole(
-        address account,
-        uint256 role
-    ) public view override returns (bool) {
+    function hasRole(address account, uint256 role) public view override returns (bool) {
         return hasAnyRole(account, role);
     }
 
@@ -475,9 +462,7 @@ contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
      * @param account Address to check
      * @return uint256 Bitmap of assigned roles
      */
-    function getRoles(
-        address account
-    ) external view override returns (uint256) {
+    function getRoles(address account) external view override returns (uint256) {
         return rolesOf(account);
     }
 }

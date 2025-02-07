@@ -23,7 +23,7 @@ contract BaseTest is Test {
     uint256 internal constant MAX_BPS = 10_000;
 
     function _createFork(string memory chain, uint256 forkBlock) internal returns (uint256) {
-        string memory rpc = vm.envString(string.concat(chain,"_RPC_URL" ));
+        string memory rpc = vm.envString(string.concat(chain, "_RPC_URL"));
         uint256 fork = vm.createSelectFork(rpc);
         vm.rollFork(forkBlock);
 
