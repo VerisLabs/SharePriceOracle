@@ -142,7 +142,6 @@ contract SharePriceOracleTest is Test {
 
         oracle.updateSharePrices(REMOTE_CHAIN_ID, reports);
 
-        // Also set up price feed for remote chain
         vm.stopPrank();
         vm.prank(admin);
         oracle.setPriceFeed(
@@ -151,7 +150,6 @@ contract SharePriceOracleTest is Test {
             PriceFeedInfo({ feed: address(tokenAFeed), denomination: PriceDenomination.USD, heartbeat: 1 hours })
         );
 
-        // Verify stored report
         (uint256 price, uint64 timestamp) = oracle.getLatestSharePrice(REMOTE_CHAIN_ID, address(vaultA), vaultB.asset());
         assertGt(price, 0, "Price should be non-zero");
         assertEq(timestamp, block.timestamp, "Wrong timestamp");
@@ -164,22 +162,21 @@ contract SharePriceOracleTest is Test {
 
         vm.warp(baseTime);
 
-        // Setup DAI vault with 18 decimals
         MockERC4626 daiVault = new MockERC4626(18);
-        daiVault.setMockSharePrice(1e18); // 1:1 ratio for simplicity
+        daiVault.setMockSharePrice(1e18); 
 
-        // Setup DAI price feed (8 decimals)
+
         MockPriceFeed daiFeed = new MockPriceFeed(8);
-        daiFeed.setPrice(100_000_000); // $1.00 USD
-        daiFeed.setTimestamp(baseTime); // Current time
+        daiFeed.setPrice(100_000_000); 
+        daiFeed.setTimestamp(baseTime); 
 
-        // Setup USDC mock with 6 decimals
+        
         MockERC4626 usdcVault = new MockERC4626(6);
 
-        // Setup USDC price feed (8 decimals)
+        
         MockPriceFeed usdcFeed = new MockPriceFeed(8);
-        usdcFeed.setPrice(100_000_000); // $1.00 USD
-        usdcFeed.setTimestamp(baseTime); // Current time
+        usdcFeed.setPrice(100_000_000); 
+        usdcFeed.setTimestamp(baseTime); 
 
         MockPriceFeed sequencerFeed = new MockPriceFeed(8);
         sequencerFeed.setSequencerStatus(false);
@@ -206,24 +203,24 @@ contract SharePriceOracleTest is Test {
 
         (uint256 price,) = oracle.getLatestSharePrice(CHAIN_ID, address(daiVault), usdcVault.asset());
 
-        assertApproxEqRel(price, 1e6, 0.01e18); // 1% tolerance
+        assertApproxEqRel(price, 1e6, 0.01e18); 
     }
 
     function test_PriceConversion_ETHtoUSDC_RealWorldExample_banana() public {
         uint256 currentTime = block.timestamp;
         vm.warp(currentTime);
 
-        // Setup with same values
+       
         MockERC4626 ethVault = new MockERC4626(18);
-        ethVault.setMockSharePrice(1_057_222_067_502_682_416); // 1.057 ETH
+        ethVault.setMockSharePrice(1_057_222_067_502_682_416); 
 
-        // Setup price feeds with proper timestamps
-        _setMockPrice(ethUsdFeed, 334_201_032_054, currentTime); // $3342.01 USD/ETH
+      
+        _setMockPrice(ethUsdFeed, 334_201_032_054, currentTime); 
         MockPriceFeed usdcFeed = new MockPriceFeed(8);
-        _setMockPrice(usdcFeed, 100_005_101, currentTime); // $1.00005 USD/USDC
+        _setMockPrice(usdcFeed, 100_005_101, currentTime); 
         MockERC4626 usdcVault = new MockERC4626(6);
 
-        // Setup price feeds
+        
         vm.startPrank(admin);
         oracle.setPriceFeed(
             137,
@@ -237,7 +234,7 @@ contract SharePriceOracleTest is Test {
         );
         vm.stopPrank();
 
-        // Setup vault report
+        
         VaultReport[] memory reports = new VaultReport[](1);
         reports[0] = VaultReport({
             sharePrice: 1_057_222_067_502_682_416,
@@ -252,29 +249,29 @@ contract SharePriceOracleTest is Test {
         vm.prank(endpoint);
         oracle.updateSharePrices(137, reports);
 
-        // Get actual contract result
+        
         (uint256 price,) = oracle.getLatestSharePrice(137, address(ethVault), usdcVault.asset());
 
         assertEq(price, 3_533_066_838, "Wrong USDC amount");
     }
 
     function test_PriceConversion_ETHtoETH() public {
-        // Set current block timestamp
+
         uint256 currentTime = block.timestamp;
         vm.warp(currentTime);
 
-        // Setup source ETH vault
+       
         MockERC4626 srcEthVault = new MockERC4626(18);
-        srcEthVault.setMockSharePrice(1e18); // 1 ETH per share
+        srcEthVault.setMockSharePrice(1e18); 
 
-        // Setup destination ETH vault
+     
         MockERC4626 dstEthVault = new MockERC4626(18);
 
-        // Setup ETH price feed with proper decimals and fresh timestamp
+        
         MockPriceFeed ethFeed = new MockPriceFeed(18);
-        _setMockPrice(ethFeed, 1e18, currentTime); // Set price and timestamp
+        _setMockPrice(ethFeed, 1e18, currentTime); 
 
-        // Setup price feeds
+        
         vm.startPrank(admin);
         oracle.setPriceFeed(
             137,
@@ -288,7 +285,7 @@ contract SharePriceOracleTest is Test {
         );
         vm.stopPrank();
 
-        // Setup vault report
+     
         VaultReport[] memory reports = new VaultReport[](1);
         reports[0] = VaultReport({
             sharePrice: 1e18,
@@ -311,42 +308,40 @@ contract SharePriceOracleTest is Test {
         assertEq(timestamp, currentTime, "Wrong timestamp");
     }
 
-    // /// @notice Tests basic token to token price conversion
+   
     function test_priceConversion_basicTokenToToken() public {
-        // Set up prices for conversion test
-        vaultA.setMockSharePrice(1e18); // 1 tokenA per share
-        tokenAFeed.setPrice(100e8); // $100 per tokenA
-        tokenBFeed.setPrice(50e8); // $50 per tokenB
+        
+        vaultA.setMockSharePrice(1e18); 
+        tokenAFeed.setPrice(100e8); 
+        tokenBFeed.setPrice(50e8); 
 
         address[] memory vaults = new address[](1);
         vaults[0] = address(vaultA);
 
-        // Get share price in tokenB terms
+
         (uint256 priceInTokenB, uint64 timestamp) =
             oracle.getLatestSharePrice(CHAIN_ID, address(vaultA), vaultB.asset());
 
-        // 1 share = 1 tokenA = $100
-        // In tokenB terms: $100 / $50 = 2 tokenB
         assertEq(priceInTokenB, 2e18, "Wrong converted price");
         assertEq(timestamp, block.timestamp, "Wrong timestamp");
     }
 
-    /// @notice Tests stablecoin to stablecoin conversion (DAI to USDC)
+   
     function test_priceConversion_stablecoinToStablecoin() public {
-        // Setup DAI vault with 18 decimals
+    
         MockERC4626 daiVault = new MockERC4626(18);
-        daiVault.setMockSharePrice(1e18); // 1:1 ratio for simplicity
+        daiVault.setMockSharePrice(1e18);
 
-        // Setup DAI price feed (8 decimals)
+
         MockPriceFeed daiFeed = new MockPriceFeed(8);
-        daiFeed.setPrice(100_000_000); // $1.00 USD
+        daiFeed.setPrice(100_000_000); 
 
-        // Setup USDC mock with 6 decimals
+     
         MockERC4626 usdcVault = new MockERC4626(6);
 
-        // Setup USDC price feed (8 decimals)
+      
         MockPriceFeed usdcFeed = new MockPriceFeed(8);
-        usdcFeed.setPrice(100_000_000); // $1.00 USD
+        usdcFeed.setPrice(100_000_000); 
 
         vm.startPrank(admin);
         oracle.setPriceFeed(
@@ -361,32 +356,32 @@ contract SharePriceOracleTest is Test {
         );
         vm.stopPrank();
 
-        // Get price in USDC terms
+        
         (uint256 price, uint64 timestamp) = oracle.getLatestSharePrice(CHAIN_ID, address(daiVault), usdcVault.asset());
-        assertApproxEqRel(price, 1e6, 0.01e18); // 1% tolerance
+        assertApproxEqRel(price, 1e6, 0.01e18); 
 
         daiVault.setMockSharePrice(2e18);
         (price, timestamp) = oracle.getLatestSharePrice(CHAIN_ID, address(daiVault), usdcVault.asset());
 
-        assertApproxEqRel(price, 2e6, 0.01e18); // 1% tolerance
+        assertApproxEqRel(price, 2e6, 0.01e18); 
     }
 
     /// @notice Tests ETH to stablecoin conversion
     function test_priceConversion_ethToStablecoin() public {
-        // Setup ETH vault with 18 decimals
+       
         MockERC4626 ethVault = new MockERC4626(18);
-        ethVault.setMockSharePrice(1e18); // 1:1 ratio for simplicity
+        ethVault.setMockSharePrice(1e18); 
 
-        // Setup ETH price feed (18 decimals)
+      
         MockPriceFeed ethFeed = new MockPriceFeed(18);
-        ethFeed.setPrice(1e18); // 1 ETH = 1 ETH
+        ethFeed.setPrice(1e18); 
 
-        // Setup USDC mock with 6 decimals
+
         MockERC4626 usdcVault = new MockERC4626(6);
 
-        // Setup USDC price feed (8 decimals)
+     
         MockPriceFeed usdcFeed = new MockPriceFeed(8);
-        usdcFeed.setPrice(100_000_000); // $1.00 USD
+        usdcFeed.setPrice(100_000_000);
 
         vm.startPrank(admin);
         oracle.setPriceFeed(
@@ -401,39 +396,31 @@ contract SharePriceOracleTest is Test {
         );
         vm.stopPrank();
 
-        // Get price in USDC terms
+       
         (uint256 price, uint64 timestamp) = oracle.getLatestSharePrice(CHAIN_ID, address(ethVault), usdcVault.asset());
 
-        // Expected calculation:
-        // 1 ETH share = 1 ETH
-        // 1 ETH = $2000 USD (from ethUsdFeed)
-        // $2000 / $1 per USDC = 2000 USDC (6 decimals)
-        assertApproxEqRel(price, 2000e6, 0.01e18); // 1% tolerance
+        assertApproxEqRel(price, 2000e6, 0.01e18);
 
-        // Try with 0.5 ETH share price
+  
         ethVault.setMockSharePrice(0.5e18);
         (price, timestamp) = oracle.getLatestSharePrice(CHAIN_ID, address(ethVault), usdcVault.asset());
 
-        // 0.5 ETH = 1000 USDC
-        assertApproxEqRel(price, 1000e6, 0.01e18); // 1% tolerance
+  
+        assertApproxEqRel(price, 1000e6, 0.01e18); 
     }
 
     /// @notice Tests stablecoin to ETH conversion
     function test_priceConversion_stablecoinToEth() public {
-        // Setup DAI vault with 18 decimals
         MockERC4626 daiVault = new MockERC4626(18);
-        daiVault.setMockSharePrice(2000e18); // 2000 DAI per share
+        daiVault.setMockSharePrice(2000e18); 
 
-        // Setup DAI price feed (8 decimals)
         MockPriceFeed daiFeed = new MockPriceFeed(8);
-        daiFeed.setPrice(100_000_000); // $1.00 USD
+        daiFeed.setPrice(100_000_000); 
 
-        // Setup ETH vault with 18 decimals
         MockERC4626 ethVault = new MockERC4626(18);
 
-        // Setup ETH price feed (18 decimals)
         MockPriceFeed ethFeed = new MockPriceFeed(18);
-        ethFeed.setPrice(1e18); // 1 ETH = 1 ETH
+        ethFeed.setPrice(1e18);
 
         vm.startPrank(admin);
         oracle.setPriceFeed(
@@ -448,41 +435,32 @@ contract SharePriceOracleTest is Test {
         );
         vm.stopPrank();
 
-        // Get price in ETH terms
         (uint256 price, uint64 timestamp) = oracle.getLatestSharePrice(CHAIN_ID, address(daiVault), ethVault.asset());
 
-        // Expected calculation:
-        // 2000 DAI share = $2000 USD
-        // $2000 USD / $2000 per ETH = 1 ETH (18 decimals)
-        assertApproxEqRel(price, 1e18, 0.01e18); // 1% tolerance
 
-        // Try with 4000 DAI share price
+        assertApproxEqRel(price, 1e18, 0.01e18); 
+
+  
         daiVault.setMockSharePrice(4000e18);
         (price, timestamp) = oracle.getLatestSharePrice(CHAIN_ID, address(daiVault), ethVault.asset());
 
-        // 4000 DAI = 2 ETH
-        assertApproxEqRel(price, 2e18, 0.01e18); // 1% tolerance
+        assertApproxEqRel(price, 2e18, 0.01e18); 
     }
 
     /// @notice Tests complex amount conversions with different decimals
     function test_priceConversion_complexAmounts() public {
-        // Setup USDC vault with 6 decimals
         MockERC4626 usdcVault = new MockERC4626(6);
-        usdcVault.setMockSharePrice(1_302_009_000_000); // 1,302,009 USDC per share (6 decimals)
+        usdcVault.setMockSharePrice(1_302_009_000_000); 
 
-        // Setup USDC price feed (8 decimals)
         MockPriceFeed usdcFeed = new MockPriceFeed(8);
-        usdcFeed.setPrice(100_000_000); // $1.00 USD
+        usdcFeed.setPrice(100_000_000); 
 
-        // Setup ETH vault with 18 decimals
         MockERC4626 ethVault = new MockERC4626(18);
 
-        // Setup ETH price feed (18 decimals)
         MockPriceFeed ethFeed = new MockPriceFeed(18);
-        ethFeed.setPrice(1e18); // 1 ETH = 1 ETH
+        ethFeed.setPrice(1e18); 
 
-        // Set ETH/USD to $3000
-        ethUsdFeed.setPrice(300_000_000_000); // $3000 with 8 decimals
+        ethUsdFeed.setPrice(300_000_000_000); 
 
         vm.startPrank(admin);
         oracle.setPriceFeed(
@@ -497,55 +475,39 @@ contract SharePriceOracleTest is Test {
         );
         vm.stopPrank();
 
-        // Get price in ETH terms
         (uint256 price, uint64 timestamp) = oracle.getLatestSharePrice(CHAIN_ID, address(usdcVault), ethVault.asset());
 
-        // Expected calculation:
-        // 1,302,009 USDC = $1,302,009 USD
-        // $1,302,009 USD / $3000 per ETH = 434.003 ETH
-        uint256 expectedEth = 434_003_000_000_000_000_000; // 434.003 ETH with 18 decimals
-        assertApproxEqRel(price, expectedEth, 0.01e18); // 1% tolerance
+        uint256 expectedEth = 434_003_000_000_000_000_000; 
+        assertApproxEqRel(price, expectedEth, 0.01e18); 
 
-        // Now let's try the reverse - converting from ETH to USDC
-        ethVault.setMockSharePrice(1e18); // 1 ETH per share
+        ethVault.setMockSharePrice(1e18); 
         (price, timestamp) = oracle.getLatestSharePrice(CHAIN_ID, address(ethVault), usdcVault.asset());
 
-        // Expected calculation:
-        // 1 ETH = $3000 USD
-        // $3000 USD = 3000 USDC
-        uint256 expectedUsdc = 3_000_000_000; // 3000 USDC with 6 decimals
-        assertApproxEqRel(price, expectedUsdc, 0.01e18); // 1% tolerance
 
-        // Let's also test with a fractional ETH amount
-        ethVault.setMockSharePrice(0.5e18); // 0.5 ETH per share
+        uint256 expectedUsdc = 3_000_000_000; 
+        assertApproxEqRel(price, expectedUsdc, 0.01e18); 
+
+        ethVault.setMockSharePrice(0.5e18); 
         (price, timestamp) = oracle.getLatestSharePrice(CHAIN_ID, address(ethVault), usdcVault.asset());
 
-        // Expected calculation:
-        // 0.5 ETH = $1500 USD
-        // $1500 USD = 1500 USDC
-        expectedUsdc = 1_500_000_000; // 1500 USDC with 6 decimals
-        assertApproxEqRel(price, expectedUsdc, 0.01e18); // 1% tolerance
+        expectedUsdc = 1_500_000_000; 
+        assertApproxEqRel(price, expectedUsdc, 0.01e18);
     }
 
     /// @notice Tests edge cases in price conversion
     function test_priceConversion_edgeCases() public {
-        // Setup USDC vault with 6 decimals
         MockERC4626 usdcVault = new MockERC4626(6);
-        usdcVault.setMockSharePrice(1); // 0.000001 USDC per share (smallest unit)
+        usdcVault.setMockSharePrice(1); 
 
-        // Setup USDC price feed (8 decimals)
         MockPriceFeed usdcFeed = new MockPriceFeed(8);
-        usdcFeed.setPrice(100_000_000); // $1.00 USD
+        usdcFeed.setPrice(100_000_000); 
 
-        // Setup ETH vault with 18 decimals
         MockERC4626 ethVault = new MockERC4626(18);
 
-        // Setup ETH price feed (18 decimals)
         MockPriceFeed ethFeed = new MockPriceFeed(18);
-        ethFeed.setPrice(1e18); // 1 ETH = 1 ETH
+        ethFeed.setPrice(1e18); 
 
-        // Set ETH/USD to $3000
-        ethUsdFeed.setPrice(300_000_000_000); // $3000 with 8 decimals
+        ethUsdFeed.setPrice(300_000_000_000); 
 
         vm.startPrank(admin);
         oracle.setPriceFeed(
@@ -560,35 +522,22 @@ contract SharePriceOracleTest is Test {
         );
         vm.stopPrank();
 
-        // Get price in ETH terms
         (uint256 price, uint64 timestamp) = oracle.getLatestSharePrice(CHAIN_ID, address(usdcVault), ethVault.asset());
 
-        // Expected calculation:
-        // 0.000001 USDC = $0.000001 USD
-        // $0.000001 USD / $3000 per ETH = 0.000000000333333333 ETH
-        // = 333333333 wei
-        assertApproxEqRel(price, 333_333_333, 0.01e18); // 1% tolerance
+        assertApproxEqRel(price, 333_333_333, 0.01e18); 
 
-        // Test with a larger amount to verify scaling works both ways
-        usdcVault.setMockSharePrice(1_000_000); // 1 USDC per share
+        usdcVault.setMockSharePrice(1_000_000);
         (price, timestamp) = oracle.getLatestSharePrice(CHAIN_ID, address(usdcVault), ethVault.asset());
 
-        // Expected calculation:
-        // 1 USDC = $1 USD
-        // $1 USD / $3000 per ETH = 0.000333333333333333 ETH
-        // = 333333333333333 wei
-        assertApproxEqRel(price, 333_333_333_333_333, 0.01e18); // 1% tolerance
+        assertApproxEqRel(price, 333_333_333_333_333, 0.01e18); 
     }
 
     /// @notice Tests ETH denominated feed conversions
     function test_priceConversion_ethDenominatedFeeds() public {
-        // Setup initial conditions
-        vaultA.setMockSharePrice(1e18); // 1:1 ratio for simplicity
+        vaultA.setMockSharePrice(1e18); 
 
-        // Setup ETH denominated feed with correct decimals
         MockPriceFeed ethDenomFeed = new MockPriceFeed(18);
-        // 0.05 ETH per token with 18 decimals (same as ETH)
-        ethDenomFeed.setPrice(50_000_000_000_000_000); // 0.05 ETH
+        ethDenomFeed.setPrice(50_000_000_000_000_000);
 
         vm.startPrank(admin);
         oracle.setPriceFeed(
@@ -598,15 +547,8 @@ contract SharePriceOracleTest is Test {
         );
         vm.stopPrank();
 
-        // Get price in tokenB terms
         (uint256 price,) = oracle.getLatestSharePrice(CHAIN_ID, address(vaultA), vaultB.asset());
-
-        // Expected calculation:
-        // 1 vault share = 1 tokenA (from share price)
-        // 1 tokenA = 0.05 ETH
-        // 0.05 ETH * $2000/ETH = $100
-        // $100 / $50 per tokenB = 2 tokenB
-        assertApproxEqRel(price, 2e18, 0.01e18); // 1% tolerance
+        assertApproxEqRel(price, 2e18, 0.01e18);
     }
 
     // ========== CROSS CHAIN TESTS ==========
@@ -616,14 +558,12 @@ contract SharePriceOracleTest is Test {
         uint256 currentTime = block.timestamp;
         vm.warp(currentTime);
 
-        // Setup a vault with 6 decimals (like USDC) on a remote chain
         address remoteVault = makeAddr("remoteVault");
         address remoteAsset = makeAddr("remoteAsset");
 
-        // Setup price feeds with proper timestamps
         MockPriceFeed remoteFeed = new MockPriceFeed(8);
-        _setMockPrice(remoteFeed, 100_000_000, currentTime); // $1.00 USD
-        _setMockPrice(tokenAFeed, 10_000_000_000, currentTime); // $100.00 USD
+        _setMockPrice(remoteFeed, 100_000_000, currentTime); 
+        _setMockPrice(tokenAFeed, 10_000_000_000, currentTime); 
 
         vm.startPrank(admin);
         oracle.setPriceFeed(
@@ -633,10 +573,9 @@ contract SharePriceOracleTest is Test {
         );
         vm.stopPrank();
 
-        // Create vault report
         VaultReport[] memory reports = new VaultReport[](1);
         reports[0] = VaultReport({
-            sharePrice: 1_000_000, // 1.0 in 6 decimals
+            sharePrice: 1_000_000,
             lastUpdate: uint64(currentTime),
             chainId: REMOTE_CHAIN_ID,
             rewardsDelegate: makeAddr("delegate"),
@@ -648,7 +587,6 @@ contract SharePriceOracleTest is Test {
         vm.prank(endpoint);
         oracle.updateSharePrices(REMOTE_CHAIN_ID, reports);
 
-        // Get price in terms of vaultA's asset
         (uint256 price, uint64 timestamp) = oracle.getLatestSharePrice(REMOTE_CHAIN_ID, remoteVault, vaultA.asset());
 
         assertEq(price, 0.01e18, "Wrong converted price");
@@ -694,7 +632,6 @@ contract SharePriceOracleTest is Test {
         assertTrue(oracle.hasRole(newEndpoint, oracle.ENDPOINT_ROLE()));
         vm.stopPrank();
 
-        // Test the new endpoint can update share prices
         VaultReport[] memory reports = new VaultReport[](1);
         reports[0] = VaultReport({
             sharePrice: 1e18,
@@ -736,7 +673,7 @@ contract SharePriceOracleTest is Test {
 
     function test_revertWhen_invalidChainId_updateSharePrices() public {
         VaultReport[] memory reports = new VaultReport[](1);
-        reports[0].chainId = 999; // Different from REMOTE_CHAIN_ID
+        reports[0].chainId = 999; 
 
         vm.prank(endpoint);
         vm.expectRevert(abi.encodeWithSelector(SharePriceOracle.InvalidChainId.selector, reports[0].chainId));
@@ -746,7 +683,7 @@ contract SharePriceOracleTest is Test {
     function test_revertWhen_invalidPrice_updateSharePrices() public {
         VaultReport[] memory reports = new VaultReport[](1);
         reports[0] = VaultReport({
-            sharePrice: 0, // Invalid price
+            sharePrice: 0, 
             lastUpdate: uint64(block.timestamp),
             chainId: REMOTE_CHAIN_ID,
             rewardsDelegate: address(0),
@@ -780,7 +717,6 @@ contract SharePriceOracleTest is Test {
     }
 
     function test_revertWhen_stalePrices() public {
-        // Make prices stale
         vm.warp(block.timestamp + oracle.SHARE_PRICE_STALENESS_TOLERANCE() + 1);
 
         VaultReport memory report = VaultReport({
@@ -793,7 +729,6 @@ contract SharePriceOracleTest is Test {
             assetDecimals: 18
         });
 
-        // The price should be considered stale
         (uint256 price,) = oracle.getLatestSharePrice(REMOTE_CHAIN_ID, report.vaultAddress, vaultB.asset());
         assertEq(price, 0, "Price should be zero due to staleness");
     }
