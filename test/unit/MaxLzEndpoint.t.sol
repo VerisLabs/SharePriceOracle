@@ -89,13 +89,15 @@ contract MaxLzEndpointTest is BaseTest {
         assertTrue(newEndpoint.owner() == admin);
     }
 
-    function testFail_constructor_zeroAdmin() public {
+    function test_revertWhen_ConstructorWithZeroAdmin() public {
         switchTo("BASE");
+        vm.expectRevert();
         new MaxLzEndpoint(address(0), base_LZ_end, address(oracle));
     }
 
-    function testFail_constructor_zeroOracle() public {
+    function test_revertWhen_ConstructorWithZeroOracle() public {
         switchTo("BASE");
+        vm.expectRevert();
         new MaxLzEndpoint(admin, base_LZ_end, address(0));
     }
 
@@ -112,19 +114,21 @@ contract MaxLzEndpointTest is BaseTest {
         vm.stopPrank();
     }
 
-    function testFail_setPeer_notOwner() public {
+    function test_revertWhen_SetPeerCalledByNonOwner() public {
         switchTo("BASE");
         vm.prank(user);
+        vm.expectRevert();
         endpoint.setPeer(30_109, bytes32(0));
     }
 
-    function testFail_setPeer_invalidPeer() public {
+    function test_revertWhen_SetPeerWithInvalidPeer() public {
         switchTo("BASE");
         vm.prank(admin);
+        vm.expectRevert();
         endpoint.setPeer(30_109, bytes32(0));
     }
 
-    function testFail_sendSharePrices_insufficientFee() public {
+    function test_revertWhen_SendSharePricesWithInsufficientFee() public {
         switchTo("BASE");
         vm.startPrank(user);
 
@@ -133,6 +137,7 @@ contract MaxLzEndpointTest is BaseTest {
 
         bytes memory options = endpoint.addExecutorLzReceiveOption(endpoint.newOptions(), 200_000, 0);
 
+        vm.expectRevert();
         endpoint.sendSharePrices{ value: 0 }(30_109, vaults, options, user);
         vm.stopPrank();
     }
@@ -156,7 +161,7 @@ contract MaxLzEndpointTest is BaseTest {
         vm.stopPrank();
     }
 
-    function testFail_requestSharePrices_insufficientFee() public {
+    function test_revertWhen_RequestSharePricesWithInsufficientFee() public {
         switchTo("POLYGON");
         vm.startPrank(user);
 
@@ -166,6 +171,7 @@ contract MaxLzEndpointTest is BaseTest {
         bytes memory options = endpoint_pol.addExecutorLzReceiveOption(endpoint.newOptions(), 200_000, 0);
         bytes memory returnOptions = endpoint_pol.addExecutorLzReceiveOption(endpoint.newOptions(), 200_000, 0);
 
+        vm.expectRevert();
         endpoint_pol.requestSharePrices{ value: 0 }(30_109, vaults, options, returnOptions, user);
         vm.stopPrank();
     }
@@ -271,92 +277,110 @@ contract MaxLzEndpointTest is BaseTest {
         vm.stopPrank();
     }
 
-    function testFail_lzReceive_invalidEndpoint() public {
+    function test_revertWhen_LzReceiveWithInvalidEndpoint() public {
         switchTo("BASE");
         vm.prank(user);
 
         Origin memory origin = Origin(30_109, bytes32(uint256(uint160(address(endpoint_pol)))), 0);
         bytes32 guid = keccak256(abi.encodePacked(block.timestamp, msg.sender));
 
+        vm.expectRevert();
         endpoint.lzReceive(origin, guid, "", address(0), bytes(""));
     }
 
-    function testFail_lzReceive_invalidPeer() public {
+    function test_revertWhen_LzReceiveWithInvalidPeer() public {
         switchTo("BASE");
         vm.prank(base_LZ_end);
 
         Origin memory origin = Origin(30_109, bytes32(0), 0);
         bytes32 guid = keccak256(abi.encodePacked(block.timestamp, msg.sender));
 
+        vm.expectRevert();
         endpoint.lzReceive(origin, guid, "", address(0), bytes(""));
     }
 
-    function testFail_lzReceive_duplicateMessage() public {
+    function test_revertWhen_LzReceiveWithDuplicateMessage() public {
         switchTo("BASE");
         vm.startPrank(base_LZ_end);
 
+        address[] memory vaults = new address[](1);
+        vaults[0] = address(vault);
+        bytes memory options = endpoint.addExecutorLzReceiveOption(endpoint.newOptions(), 200_000, 0);
+
+        bytes memory message = MsgCodec.encodeVaultAddresses(2, vaults, user, options);
+
         Origin memory origin = Origin(30_109, bytes32(uint256(uint160(address(endpoint_pol)))), 0);
         bytes32 guid = keccak256(abi.encodePacked(block.timestamp, msg.sender));
-        bytes memory message = "";
+
+        deal(address(endpoint), 1000 ether);
+        deal(base_LZ_end, 1000 ether);
+        deal(polygon_LZ_end, 1000 ether);
 
         endpoint.lzReceive(origin, guid, message, address(0), bytes(""));
+
+        vm.expectRevert();
         endpoint.lzReceive(origin, guid, message, address(0), bytes(""));
 
         vm.stopPrank();
     }
 
-    function testFail_setLzEndpoint_notOwner() public {
+    function test_revertWhen_SetLzEndpointByNonOwner() public {
         switchTo("BASE");
         vm.prank(user);
+        vm.expectRevert();
         endpoint.setLzEndpoint(makeAddr("newEndpoint"));
     }
 
-    function testFail_setLzEndpoint_zeroAddress() public {
+    function test_revertWhen_SetLzEndpointWithZeroAddress() public {
         switchTo("BASE");
         vm.prank(admin);
+        vm.expectRevert();
         endpoint.setLzEndpoint(address(0));
     }
 
-    function testFail_setLzEndpoint_endpointExists() public {
+    function test_revertWhen_SetLzEndpointWhenEndpointExists() public {
         switchTo("BASE");
         vm.startPrank(admin);
 
-        address newEndpoint = makeAddr("newEndpoint");
-        endpoint.setLzEndpoint(newEndpoint);
+        vm.expectRevert();
+        endpoint.setLzEndpoint(makeAddr("newEndpoint"));
 
-        endpoint.setLzEndpoint(makeAddr("anotherEndpoint"));
         vm.stopPrank();
     }
 
-    function testFail_withdrawETH_notOwner() public {
+    function test_revertWhen_WithdrawETHByNonOwner() public {
         switchTo("BASE");
         vm.deal(address(endpoint), 1 ether);
 
         vm.prank(user);
+        vm.expectRevert();
         endpoint.refundETH(1 ether, user);
     }
 
-    function testFail_withdrawETH_zeroAddress() public {
+    function test_revertWhen_WithdrawETHToZeroAddress() public {
         switchTo("BASE");
         vm.deal(address(endpoint), 1 ether);
 
         vm.prank(admin);
+        vm.expectRevert();
         endpoint.refundETH(1 ether, address(0));
     }
 
-    function testFail_withdrawETH_zeroAmount() public {
+    function test_revertWhen_WithdrawETHZeroAmount() public {
         switchTo("BASE");
         vm.deal(address(endpoint), 1 ether);
 
         vm.prank(admin);
+        vm.expectRevert();
         endpoint.refundETH(0, user);
     }
 
-    function testFail_withdrawETH_insufficientBalance() public {
+    function test_revertWhen_WithdrawETHInsufficientBalance() public {
         switchTo("BASE");
         vm.deal(address(endpoint), 1 ether);
 
         vm.prank(admin);
+        vm.expectRevert();
         endpoint.refundETH(2 ether, user);
     }
 }
