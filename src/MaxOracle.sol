@@ -408,9 +408,17 @@ contract MaxOracle is OwnableRoles {
         address _vaultAddress,
         address _dstAsset
     ) external returns (uint256 sharePrice, uint64 timestamp) {
+        // Always try to get current price first
+        try this.calculateSharePrice(_vaultAddress, _dstAsset) 
+        returns (uint256 currentPrice, uint64 currentTime) {
+            if (currentPrice > 0 && _validatePrice(currentPrice, currentTime)) {
+                _storeSharePrice(_vaultAddress, currentPrice, currentTime);
+                return (currentPrice, currentTime);
+            }
+        } catch {}
+
+        // Fallback to cross-chain price for remote vaults
         uint32 vaultChain = vaultChainIds[_vaultAddress];
-        
-        // For cross-chain vaults, try cross-chain price first
         if (vaultChain != 0 && vaultChain != chainId) {
             (sharePrice, timestamp) = _getCrossChainPrice(_vaultAddress, _dstAsset, vaultChain);
             if (sharePrice > 0 && !_isStale(timestamp)) {
@@ -418,14 +426,13 @@ contract MaxOracle is OwnableRoles {
             }
         }
 
-        // Try stored prices next
+        // Try stored prices as last resort
         StoredSharePrice memory stored = storedSharePrices[_vaultAddress];
         if (stored.sharePrice > 0) {
             if (stored.asset == _dstAsset && !_isStale(stored.timestamp)) {
                 return (stored.sharePrice, uint64(stored.timestamp));
             }
             
-            // Try converting stored price if assets differ
             if (!_isStale(stored.timestamp)) {
                 try this.convertStoredPrice(
                     stored.sharePrice, 
@@ -437,19 +444,8 @@ contract MaxOracle is OwnableRoles {
                     }
                 } catch {}
             }
-        }
 
-        // Try current calculation with adapters
-        try this.calculateSharePrice(_vaultAddress, _dstAsset) returns (uint256 price, uint64 time) {
-            if (price > 0 && _validatePrice(price, time)) {
-                _storeSharePrice(_vaultAddress, price, time);
-                return (price, time);
-            }
-        } catch {}
-
-        // If we have a stored price, use it even if stale rather than returning 1:1
-        if (stored.sharePrice > 0) {
-            // Try converting one last time if assets differ
+            // Use stale stored price rather than 1:1 if we have it
             if (stored.asset != _dstAsset) {
                 try this.convertStoredPrice(
                     stored.sharePrice, 
