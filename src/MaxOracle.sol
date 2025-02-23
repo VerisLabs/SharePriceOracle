@@ -33,6 +33,11 @@ contract MaxOracle is OwnableRoles {
     error NoAdaptersConfigured();
     error InvalidPriceData();
     error ExceedsMaxReports();
+    error InvalidAssetType();
+    error PriceStale();
+    error PriceOverflow();
+    error PriceTooLow();
+    error PriceImpactTooHigh();
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
@@ -64,6 +69,10 @@ contract MaxOracle is OwnableRoles {
     uint256 public constant PRICE_STALENESS_THRESHOLD = 24 hours;
     /// @notice Precision for price calculations (1e18)
     uint256 public constant PRECISION = 1e18;
+    /// @notice Minimum valid price threshold
+    uint256 public constant MIN_PRICE_THRESHOLD = 1e6;  // 0.000001 in 18 decimals
+    /// @notice Maximum price impact allowed for conversions (1% = 10000)
+    uint256 public constant MAX_PRICE_IMPACT = 10000;  // 1%
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
@@ -79,16 +88,16 @@ contract MaxOracle is OwnableRoles {
     address public immutable WBTC;
     address public immutable WETH;
 
-    /// @notice Asset types for optimized conversion
-    enum AssetType {
-        OTHER,
-        STABLE,
-        BTC,
-        ETH
+    /// @notice Asset categories for optimized conversion
+    enum AssetCategory {
+        UNKNOWN,
+        BTC_LIKE,    // WBTC, BTCb, TBTC, etc.
+        ETH_LIKE,    // ETH, stETH, rsETH, etc.
+        STABLE       // USDC, USDT, DAI, etc.
     }
 
-    /// @notice Mapping of assets to their type
-    mapping(address => AssetType) public assetTypes;
+    /// @notice Mapping of assets to their category
+    mapping(address => AssetCategory) public assetCategories;
 
     /// @notice Mapping of oracle adapters to their priorities
     /// @dev Lower number means higher priority
@@ -113,6 +122,9 @@ contract MaxOracle is OwnableRoles {
 
     /// @notice Mapping of vault address to its last stored share price data
     mapping(address => StoredSharePrice) public storedSharePrices;
+
+    /// @notice Cache for asset decimals
+    mapping(address => uint8) private cachedAssetDecimals;
 
     /// @notice Struct to store historical price data
     struct StoredPrice {
@@ -167,10 +179,10 @@ contract MaxOracle is OwnableRoles {
         WBTC = _wbtc;
         WETH = _weth;
 
-        // Set up base asset types
-        assetTypes[_usdc] = AssetType.STABLE;
-        assetTypes[_wbtc] = AssetType.BTC;
-        assetTypes[_weth] = AssetType.ETH;
+        // Set up base asset categories
+        assetCategories[_usdc] = AssetCategory.STABLE;
+        assetCategories[_wbtc] = AssetCategory.BTC_LIKE;
+        assetCategories[_weth] = AssetCategory.ETH_LIKE;
 
         _initializeOwner(_admin);
         _grantRoles(_admin, ADMIN_ROLE);
@@ -253,13 +265,14 @@ contract MaxOracle is OwnableRoles {
     }
 
     /**
-     * @notice Sets the asset type for optimized conversion
+     * @notice Sets the category for an asset
      * @param asset The asset address
-     * @param assetType The type of the asset
+     * @param category The asset category
      */
-    function setAssetType(address asset, AssetType assetType) external onlyAdmin {
+    function setAssetCategory(address asset, AssetCategory category) external onlyAdmin {
         if (asset == address(0)) revert ZeroAddress();
-        assetTypes[asset] = assetType;
+        if (category == AssetCategory.UNKNOWN) revert InvalidAssetType();
+        assetCategories[asset] = category;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -320,6 +333,71 @@ contract MaxOracle is OwnableRoles {
     }
 
     /**
+     * @notice Checks if a timestamp is considered stale
+     * @param timestamp The timestamp to check
+     * @return True if the timestamp is stale
+     */
+    function _isStale(uint256 timestamp) internal view returns (bool) {
+        return block.timestamp - timestamp > PRICE_STALENESS_THRESHOLD;
+    }
+
+    /**
+     * @notice Stores a share price with metadata
+     * @param _vaultAddress The vault address
+     * @param _price The share price to store
+     * @param _timestamp The timestamp of the price
+     */
+    function _storeSharePrice(
+        address _vaultAddress, 
+        uint256 _price, 
+        uint64 _timestamp
+    ) internal {
+        IERC4626 vault = IERC4626(_vaultAddress);
+        address asset = vault.asset();
+        
+        storedSharePrices[_vaultAddress] = StoredSharePrice({
+            sharePrice: _price,
+            timestamp: _timestamp,
+            asset: asset,
+            decimals: IERC20Metadata(asset).decimals()
+        });
+    }
+
+    /**
+     * @notice Gets the cross-chain price for a vault
+     * @param _vaultAddress The vault address
+     * @param _dstAsset The destination asset
+     * @param _srcChain The source chain ID
+     * @return price The converted price
+     * @return timestamp The price timestamp as uint64
+     */
+    function _getCrossChainPrice(
+        address _vaultAddress,
+        address _dstAsset,
+        uint32 _srcChain
+    ) internal view returns (uint256 price, uint64 timestamp) {
+        bytes32 key = getPriceKey(_srcChain, _vaultAddress);
+        VaultReport memory report = sharePrices[key];
+        
+        if (report.sharePrice > 0) {
+            if (report.asset == _dstAsset) {
+                return (report.sharePrice, uint64(report.lastUpdate));
+            }
+            
+            try this.convertStoredPrice(
+                report.sharePrice,
+                report.asset,
+                _dstAsset
+            ) returns (uint256 convertedPrice, uint64 convertedTime) {
+                if (_validatePrice(convertedPrice, convertedTime)) {
+                    return (convertedPrice, convertedTime);
+                }
+            } catch {}
+        }
+        return (0, 0);
+    }
+
+    /**
      * @notice Gets the latest share price for a vault
      * @param _vaultAddress Address of the vault
      * @param _dstAsset Asset to get the price in
@@ -332,54 +410,47 @@ contract MaxOracle is OwnableRoles {
     ) external returns (uint256 sharePrice, uint64 timestamp) {
         uint32 vaultChain = vaultChainIds[_vaultAddress];
         
-        // If it's a cross-chain vault, handle differently
+        // For cross-chain vaults, try cross-chain price first
         if (vaultChain != 0 && vaultChain != chainId) {
-            bytes32 key = getPriceKey(vaultChain, _vaultAddress);
-            VaultReport memory report = sharePrices[key];
-            
-            if (report.sharePrice > 0) {
-                if (report.asset == _dstAsset) {
-                    return (report.sharePrice, report.lastUpdate);
-                }
-                
-                // Try to convert the report price
-                try this.convertStoredPrice(
-                    report.sharePrice,
-                    report.asset,
-                    _dstAsset
-                ) returns (uint256 convertedPrice, uint64 convertedTime) {
-                    return (convertedPrice, convertedTime);
-                } catch {
-                    // Fall through to final fallbacks if conversion fails
-                }
+            (sharePrice, timestamp) = _getCrossChainPrice(_vaultAddress, _dstAsset, vaultChain);
+            if (sharePrice > 0 && !_isStale(timestamp)) {
+                return (sharePrice, uint64(timestamp));
             }
         }
 
-        // For local vaults or if cross-chain price not available
-        // First try: Current calculation with adapters
-        try this.calculateSharePrice(_vaultAddress, _dstAsset) returns (uint256 price, uint64 time) {
-            // Store the successful price calculation
-            IERC4626 vault = IERC4626(_vaultAddress);
-            address asset = vault.asset();
+        // Try stored prices next
+        StoredSharePrice memory stored = storedSharePrices[_vaultAddress];
+        if (stored.sharePrice > 0) {
+            if (stored.asset == _dstAsset && !_isStale(stored.timestamp)) {
+                return (stored.sharePrice, uint64(stored.timestamp));
+            }
             
-            storedSharePrices[_vaultAddress] = StoredSharePrice({
-                sharePrice: price,
-                timestamp: time,
-                asset: asset,
-                decimals: IERC20Metadata(asset).decimals()
-            });
+            // Try converting stored price if assets differ
+            if (!_isStale(stored.timestamp)) {
+                try this.convertStoredPrice(
+                    stored.sharePrice, 
+                    stored.asset, 
+                    _dstAsset
+                ) returns (uint256 convertedPrice, uint64 convertedTime) {
+                    if (_validatePrice(convertedPrice, convertedTime)) {
+                        return (convertedPrice, convertedTime);
+                    }
+                } catch {}
+            }
+        }
 
-            return (price, time);
-        } catch {
-            // Second try: Check stored share prices
-            StoredSharePrice memory stored = storedSharePrices[_vaultAddress];
-            
-            if (stored.sharePrice > 0) {
-                if (stored.asset == _dstAsset) {
-                    return (stored.sharePrice, uint64(stored.timestamp));
-                }
-                
-                // Try to convert the stored price
+        // Try current calculation with adapters
+        try this.calculateSharePrice(_vaultAddress, _dstAsset) returns (uint256 price, uint64 time) {
+            if (price > 0 && _validatePrice(price, time)) {
+                _storeSharePrice(_vaultAddress, price, time);
+                return (price, time);
+            }
+        } catch {}
+
+        // If we have a stored price, use it even if stale rather than returning 1:1
+        if (stored.sharePrice > 0) {
+            // Try converting one last time if assets differ
+            if (stored.asset != _dstAsset) {
                 try this.convertStoredPrice(
                     stored.sharePrice, 
                     stored.asset, 
@@ -388,40 +459,20 @@ contract MaxOracle is OwnableRoles {
                     return (convertedPrice, convertedTime);
                 } catch {}
             }
-
-            // Third try: Check cross-chain prices from sharePrices mapping
-            bytes32 key = getPriceKey(chainId, _vaultAddress);
-            VaultReport memory report = sharePrices[key];
-            
-            if (report.sharePrice > 0) {
-                if (report.asset == _dstAsset) {
-                    return (report.sharePrice, report.lastUpdate);
-                }
-                
-                // Try to convert the report price
-                try this.convertStoredPrice(
-                    report.sharePrice,
-                    report.asset,
-                    _dstAsset
-                ) returns (uint256 convertedPrice, uint64 convertedTime) {
-                    return (convertedPrice, convertedTime);
-                } catch {}
-            }
-
-            // Final fallback: Use raw share price from vault
-            // This at least maintains the share/asset ratio even if we can't price it
-            IERC4626 vault = IERC4626(_vaultAddress);
-            address asset = vault.asset();
-            
-            if (asset == _dstAsset) {
-                uint256 rawPrice = vault.convertToAssets(PRECISION);
-                return (rawPrice > 0 ? rawPrice : PRECISION, uint64(block.timestamp));
-            }
-
-            // Absolute last resort: Return 1:1 ratio
-            // This is better than reverting or returning 0, which could enable attacks
-            return (PRECISION, uint64(block.timestamp));
+            return (stored.sharePrice, uint64(stored.timestamp));
         }
+
+        // Final fallback: Use raw vault ratio if assets match
+        IERC4626 vault = IERC4626(_vaultAddress);
+        address asset = vault.asset();
+        
+        if (asset == _dstAsset) {
+            uint256 rawPrice = vault.convertToAssets(PRECISION);
+            return (rawPrice > 0 ? rawPrice : PRECISION, uint64(block.timestamp));
+        }
+
+        // Absolute last resort: Return 1:1 ratio
+        return (PRECISION, uint64(block.timestamp));
     }
 
     /**
@@ -433,60 +484,6 @@ contract MaxOracle is OwnableRoles {
         address _dstAsset
     ) external view returns (uint256 sharePrice, uint64 timestamp) {
         return _getDstSharePrice(_vaultAddress, _dstAsset);
-    }
-
-    /**
-     * @notice Converts a stored price to a different denomination
-     * @dev This is separated to allow for cleaner error handling
-     */
-    function convertStoredPrice(
-        uint256 _storedPrice,
-        address _storedAsset,
-        address _dstAsset
-    ) external view returns (uint256 price, uint64 timestamp) {
-        // Special handling for stablecoin to stablecoin conversion
-        if (isStablecoin[_storedAsset] && isStablecoin[_dstAsset]) {
-            // Just adjust decimals between stablecoins
-            uint8 srcDecimals = IERC20Metadata(_storedAsset).decimals();
-            uint8 dstDecimals = IERC20Metadata(_dstAsset).decimals();
-            
-            if (srcDecimals > dstDecimals) {
-                price = _storedPrice / (10 ** (srcDecimals - dstDecimals));
-            } else if (srcDecimals < dstDecimals) {
-                price = _storedPrice * (10 ** (dstDecimals - srcDecimals));
-            } else {
-                price = _storedPrice;
-            }
-            return (price, uint64(block.timestamp));
-        }
-
-        // Regular price conversion for non-stablecoin pairs
-        (uint256 storedAssetPrice, uint256 storedAssetTimestamp, bool storedAssetInUSD) = getLatestPrice(_storedAsset, true);
-        if (storedAssetPrice == 0) revert NoValidPrice();
-
-        (uint256 dstPrice, uint256 dstTimestamp, bool dstInUSD) = getLatestPrice(_dstAsset, true);
-        if (dstPrice == 0) revert NoValidPrice();
-
-        // Both prices should be in the same denomination (USD)
-        if (storedAssetInUSD != dstInUSD) {
-            // If one is in ETH and other in USD, convert both to USD
-            if (!storedAssetInUSD) {
-                (uint256 ethUsdPrice, uint256 ethUsdTimestamp,) = getLatestPrice(ETH_USD_FEED, true);
-                if (ethUsdPrice == 0) revert NoValidPrice();
-                storedAssetPrice = (storedAssetPrice * ethUsdPrice) / PRECISION;
-                storedAssetTimestamp = ethUsdTimestamp < storedAssetTimestamp ? ethUsdTimestamp : storedAssetTimestamp;
-            }
-            if (!dstInUSD) {
-                (uint256 ethUsdPrice, uint256 ethUsdTimestamp,) = getLatestPrice(ETH_USD_FEED, true);
-                if (ethUsdPrice == 0) revert NoValidPrice();
-                dstPrice = (dstPrice * ethUsdPrice) / PRECISION;
-                dstTimestamp = ethUsdTimestamp < dstTimestamp ? ethUsdTimestamp : dstTimestamp;
-            }
-        }
-
-        // Convert stored price to destination asset
-        price = (_storedPrice * storedAssetPrice) / dstPrice;
-        timestamp = uint64(storedAssetTimestamp < dstTimestamp ? storedAssetTimestamp : dstTimestamp);
     }
 
     /**
@@ -512,15 +509,146 @@ contract MaxOracle is OwnableRoles {
             key = getPriceKey(_srcChainId, report.vaultAddress);
             sharePrices[key] = report;
 
-            // Store the price for fallback
-            storedPrices[report.vaultAddress] = StoredPrice({
-                price: report.sharePrice,
+            // Store the share price in the asset's native decimals
+            storedSharePrices[report.vaultAddress] = StoredSharePrice({
+                sharePrice: report.sharePrice,
                 timestamp: block.timestamp,
-                isUSD: true  // Assuming cross-chain prices are in USD
+                asset: report.asset,
+                decimals: uint8(report.assetDecimals) // Explicit conversion to uint8
             });
 
             emit SharePriceUpdated(_srcChainId, report.vaultAddress, report.sharePrice, report.rewardsDelegate);
         }
+    }
+
+    /**
+     * @notice Converts a stored price to a different denomination
+     * @dev This is separated to allow for cleaner error handling
+     */
+    function convertStoredPrice(
+        uint256 _storedPrice,
+        address _storedAsset,
+        address _dstAsset
+    ) external view returns (uint256 price, uint64 timestamp) {
+        // Special handling for stablecoin to stablecoin conversion
+        if (isStablecoin[_storedAsset] && isStablecoin[_dstAsset]) {
+            return _adjustDecimals(
+                _storedPrice,
+                IERC20Metadata(_storedAsset).decimals(),
+                IERC20Metadata(_dstAsset).decimals()
+            );
+        }
+
+        // Get asset categories
+        AssetCategory srcCategory = assetCategories[_storedAsset];
+        AssetCategory dstCategory = assetCategories[_dstAsset];
+
+        // If both assets are of the same category, use direct conversion
+        if (srcCategory == dstCategory && srcCategory != AssetCategory.UNKNOWN) {
+            return _convertSameCategory(
+                _storedPrice,
+                _storedAsset,
+                _dstAsset,
+                srcCategory
+            );
+        }
+
+        return _convertViaUSD(_storedPrice, _storedAsset, _dstAsset);
+    }
+
+    function _convertSameCategory(
+        uint256 amount,
+        address srcAsset,
+        address dstAsset,
+        AssetCategory category
+    ) internal view returns (uint256 price, uint64 timestamp) {
+        // Convert through canonical asset (WBTC/WETH/USDC)
+        uint256 canonicalPrice = _convertToCanonical(amount, srcAsset, category);
+        (price, timestamp) = _convertFromCanonical(canonicalPrice, dstAsset, category);
+
+        // Adjust decimals
+        (price,) = _adjustDecimals(
+            price,
+            IERC20Metadata(srcAsset).decimals(),
+            IERC20Metadata(dstAsset).decimals()
+        );
+    }
+
+    function _convertViaUSD(
+        uint256 _storedPrice,
+        address _storedAsset,
+        address _dstAsset
+    ) internal view returns (uint256 price, uint64 timestamp) {
+        // Get prices in USD
+        (uint256 storedAssetPrice, uint256 storedAssetTimestamp, bool storedAssetInUSD) = getLatestPrice(_storedAsset, true);
+        if (storedAssetPrice == 0) revert NoValidPrice();
+
+        (uint256 dstPrice, uint256 dstTimestamp, bool dstInUSD) = getLatestPrice(_dstAsset, true);
+        if (dstPrice == 0) revert NoValidPrice();
+
+        // Convert both to USD if needed
+        if (!storedAssetInUSD || !dstInUSD) {
+            (storedAssetPrice, storedAssetTimestamp) = _ensureUSDPrice(
+                storedAssetPrice,
+                storedAssetTimestamp,
+                storedAssetInUSD
+            );
+            (dstPrice, dstTimestamp) = _ensureUSDPrice(
+                dstPrice,
+                dstTimestamp,
+                dstInUSD
+            );
+        }
+
+        // Convert price and adjust decimals
+        price = FixedPointMathLib.mulDiv(_storedPrice * PRECISION, storedAssetPrice, dstPrice);
+        (price,) = _adjustDecimals(
+            price,
+            IERC20Metadata(_storedAsset).decimals(),
+            IERC20Metadata(_dstAsset).decimals()
+        );
+        timestamp = uint64(storedAssetTimestamp < dstTimestamp ? storedAssetTimestamp : dstTimestamp);
+    }
+
+    function _ensureUSDPrice(
+        uint256 price,
+        uint256 timestamp,
+        bool inUSD
+    ) internal view returns (uint256 usdPrice, uint256 usdTimestamp) {
+        if (inUSD) {
+            return (price, timestamp);
+        }
+
+        (uint256 ethUsdPrice, uint256 ethUsdTimestamp,) = getLatestPrice(ETH_USD_FEED, true);
+        if (ethUsdPrice == 0) revert NoValidPrice();
+
+        usdPrice = FixedPointMathLib.mulDiv(price * PRECISION, ethUsdPrice, PRECISION);
+        usdTimestamp = ethUsdTimestamp < timestamp ? ethUsdTimestamp : timestamp;
+    }
+
+    /**
+     * @notice Adjusts decimals between assets
+     * @param amount The amount to adjust
+     * @param srcDecimals Source asset decimals
+     * @param dstDecimals Destination asset decimals
+     * @return adjustedAmount The decimal-adjusted amount
+     * @return timestamp Current timestamp
+     */
+    function _adjustDecimals(
+        uint256 amount,
+        uint8 srcDecimals,
+        uint8 dstDecimals
+    ) internal view returns (uint256 adjustedAmount, uint64 timestamp) {
+        if (srcDecimals > dstDecimals) {
+            uint256 scale = 10 ** (srcDecimals - dstDecimals);
+            adjustedAmount = FixedPointMathLib.divWad(amount, scale);
+        } else if (srcDecimals < dstDecimals) {
+            uint256 scale = 10 ** (dstDecimals - srcDecimals);
+            adjustedAmount = FixedPointMathLib.mulWad(amount, scale);
+        } else {
+            adjustedAmount = amount;
+        }
+        return (adjustedAmount, uint64(block.timestamp));
     }
 
     /**
@@ -572,7 +700,179 @@ contract MaxOracle is OwnableRoles {
     }
 
     /**
-     * @notice Gets share price for a vault with optimized conversion for base assets
+     * @notice Gets decimals for an asset with caching
+     * @param asset The asset address
+     * @return decimals The number of decimals
+     */
+    function _getDecimals(address asset) internal returns (uint8) {
+        uint8 decimals = cachedAssetDecimals[asset];
+        if (decimals == 0) {
+            decimals = IERC20Metadata(asset).decimals();
+            cachedAssetDecimals[asset] = decimals;
+        }
+        return decimals;
+    }
+
+    /**
+     * @notice Validates a price and its timestamp
+     * @param price The price to validate
+     * @param timestamp The timestamp of the price
+     * @return valid Whether the price is valid
+     */
+    function _validatePrice(uint256 price, uint256 timestamp) internal view returns (bool valid) {
+        if (price == 0 || price < MIN_PRICE_THRESHOLD) return false;
+        if (block.timestamp - timestamp > PRICE_STALENESS_THRESHOLD) return false;
+        if (price > type(uint240).max) return false;
+        return true;
+    }
+
+    /**
+     * @notice Converts an amount to canonical form based on asset category
+     * @param amount The amount to convert
+     * @param asset The asset address
+     * @param category The asset category
+     * @return canonicalAmount The converted amount
+     */
+    function _convertToCanonical(
+        uint256 amount,
+        address asset,
+        AssetCategory category
+    ) internal view returns (uint256 canonicalAmount) {
+        if (category == AssetCategory.BTC_LIKE) {
+            if (asset == WBTC) return amount;
+            (uint256 btcPrice,,) = getLatestPrice(asset, true);
+            (uint256 wbtcPrice,,) = getLatestPrice(WBTC, true);
+            if (btcPrice < MIN_PRICE_THRESHOLD || wbtcPrice < MIN_PRICE_THRESHOLD) revert PriceTooLow();
+            if (!_validatePrice(btcPrice, block.timestamp) || !_validatePrice(wbtcPrice, block.timestamp)) 
+                revert NoValidPrice();
+            
+            // Adjust decimals before conversion
+            uint8 assetDecimals = IERC20Metadata(asset).decimals();
+            uint8 wbtcDecimals = IERC20Metadata(WBTC).decimals();
+            (amount,) = _adjustDecimals(amount, assetDecimals, wbtcDecimals);
+            
+            return FixedPointMathLib.mulDiv(amount * PRECISION, btcPrice, wbtcPrice);
+        }
+        
+        if (category == AssetCategory.ETH_LIKE) {
+            if (asset == WETH) return amount;
+            (uint256 ethPrice,,) = getLatestPrice(asset, true);
+            (uint256 wethPrice,,) = getLatestPrice(WETH, true);
+            if (ethPrice < MIN_PRICE_THRESHOLD || wethPrice < MIN_PRICE_THRESHOLD) revert PriceTooLow();
+            if (!_validatePrice(ethPrice, block.timestamp) || !_validatePrice(wethPrice, block.timestamp)) 
+                revert NoValidPrice();
+            
+            // Adjust decimals before conversion
+            uint8 assetDecimals = IERC20Metadata(asset).decimals();
+            uint8 wethDecimals = IERC20Metadata(WETH).decimals();
+            (amount,) = _adjustDecimals(amount, assetDecimals, wethDecimals);
+            
+            return FixedPointMathLib.mulDiv(amount * PRECISION, ethPrice, wethPrice);
+        }
+        
+        if (category == AssetCategory.STABLE) {
+            if (asset == USDC) return amount;
+            (uint256 stablePrice,,) = getLatestPrice(asset, true);
+            (uint256 usdcPrice,,) = getLatestPrice(USDC, true);
+            if (stablePrice < MIN_PRICE_THRESHOLD || usdcPrice < MIN_PRICE_THRESHOLD) revert PriceTooLow();
+            if (!_validatePrice(stablePrice, block.timestamp) || !_validatePrice(usdcPrice, block.timestamp)) 
+                revert NoValidPrice();
+            
+            // Adjust decimals before conversion
+            uint8 assetDecimals = IERC20Metadata(asset).decimals();
+            uint8 usdcDecimals = IERC20Metadata(USDC).decimals();
+            (amount,) = _adjustDecimals(amount, assetDecimals, usdcDecimals);
+            
+            return FixedPointMathLib.mulDiv(amount * PRECISION, stablePrice, usdcPrice);
+        }
+
+        return amount;
+    }
+
+    /**
+     * @notice Converts an amount from canonical form to destination asset
+     * @param amount The canonical amount
+     * @param dstAsset The destination asset
+     * @param dstCategory The destination asset category
+     * @return price The converted price
+     * @return timestamp The timestamp of the conversion
+     */
+    function _convertFromCanonical(
+        uint256 amount,
+        address dstAsset,
+        AssetCategory dstCategory
+    ) internal view returns (uint256 price, uint64 timestamp) {
+        if (dstCategory == AssetCategory.BTC_LIKE) {
+            if (dstAsset == WBTC) return (amount, uint64(block.timestamp));
+            (uint256 btcPrice,,) = getLatestPrice(WBTC, true);
+            (uint256 dstPrice,,) = getLatestPrice(dstAsset, true);
+            if (btcPrice < MIN_PRICE_THRESHOLD || dstPrice < MIN_PRICE_THRESHOLD) revert PriceTooLow();
+            if (!_validatePrice(btcPrice, block.timestamp) || !_validatePrice(dstPrice, block.timestamp)) 
+                revert NoValidPrice();
+            
+            // Check price impact
+            uint256 priceImpact = btcPrice > dstPrice ? 
+                ((btcPrice - dstPrice) * PRECISION) / btcPrice :
+                ((dstPrice - btcPrice) * PRECISION) / dstPrice;
+            if (priceImpact > MAX_PRICE_IMPACT) revert PriceImpactTooHigh();
+            
+            // Adjust decimals after conversion
+            uint8 wbtcDecimals = IERC20Metadata(WBTC).decimals();
+            uint8 dstDecimals = IERC20Metadata(dstAsset).decimals();
+            price = FixedPointMathLib.mulDiv(amount * PRECISION, btcPrice, dstPrice);
+            (price,) = _adjustDecimals(price, wbtcDecimals, dstDecimals);
+            return (price, uint64(block.timestamp));
+        }
+
+        if (dstCategory == AssetCategory.ETH_LIKE) {
+            if (dstAsset == WETH) return (amount, uint64(block.timestamp));
+            (uint256 ethPrice,,) = getLatestPrice(WETH, true);
+            (uint256 dstPrice,,) = getLatestPrice(dstAsset, true);
+            if (ethPrice < MIN_PRICE_THRESHOLD || dstPrice < MIN_PRICE_THRESHOLD) revert PriceTooLow();
+            if (!_validatePrice(ethPrice, block.timestamp) || !_validatePrice(dstPrice, block.timestamp)) 
+                revert NoValidPrice();
+            
+            // Check price impact
+            uint256 priceImpact = ethPrice > dstPrice ? 
+                ((ethPrice - dstPrice) * PRECISION) / ethPrice :
+                ((dstPrice - ethPrice) * PRECISION) / dstPrice;
+            if (priceImpact > MAX_PRICE_IMPACT) revert PriceImpactTooHigh();
+            
+            // Adjust decimals after conversion
+            uint8 wethDecimals = IERC20Metadata(WETH).decimals();
+            uint8 dstDecimals = IERC20Metadata(dstAsset).decimals();
+            price = FixedPointMathLib.mulDiv(amount * PRECISION, ethPrice, dstPrice);
+            (price,) = _adjustDecimals(price, wethDecimals, dstDecimals);
+            return (price, uint64(block.timestamp));
+        }
+
+        if (dstCategory == AssetCategory.STABLE) {
+            if (dstAsset == USDC) return (amount, uint64(block.timestamp));
+            (uint256 usdcPrice,,) = getLatestPrice(USDC, true);
+            (uint256 dstPrice,,) = getLatestPrice(dstAsset, true);
+            if (usdcPrice < MIN_PRICE_THRESHOLD || dstPrice < MIN_PRICE_THRESHOLD) revert PriceTooLow();
+            if (!_validatePrice(usdcPrice, block.timestamp) || !_validatePrice(dstPrice, block.timestamp)) 
+                revert NoValidPrice();
+            
+            // Check price impact
+            uint256 priceImpact = usdcPrice > dstPrice ? 
+                ((usdcPrice - dstPrice) * PRECISION) / usdcPrice :
+                ((dstPrice - usdcPrice) * PRECISION) / dstPrice;
+            if (priceImpact > MAX_PRICE_IMPACT) revert PriceImpactTooHigh();
+            
+            // Adjust decimals after conversion
+            uint8 usdcDecimals = IERC20Metadata(USDC).decimals();
+            uint8 dstDecimals = IERC20Metadata(dstAsset).decimals();
+            price = FixedPointMathLib.mulDiv(amount * PRECISION, usdcPrice, dstPrice);
+            (price,) = _adjustDecimals(price, usdcDecimals, dstDecimals);
+            return (price, uint64(block.timestamp));
+        }
+
+        return _convertViaUSD(amount, dstAsset);
+    }
+
+    /**
+     * @notice Gets share price for a vault with optimized conversion
      */
     function _getDstSharePrice(
         address _vaultAddress,
@@ -588,157 +888,15 @@ contract MaxOracle is OwnableRoles {
             return (rawSharePrice, uint64(block.timestamp));
         }
 
-        // Get asset types for optimized conversion
-        AssetType srcType = assetTypes[asset];
-        AssetType dstType = assetTypes[_dstAsset];
+        // Get asset categories
+        AssetCategory srcCategory = assetCategories[asset];
+        AssetCategory dstCategory = assetCategories[_dstAsset];
 
-        // Handle special cases for base assets
-        if (srcType != AssetType.OTHER && dstType != AssetType.OTHER) {
-            // Both assets are base assets, we can optimize
-            if (srcType == dstType) {
-                // Same type (e.g., USDC to DAI, or WBTC to renBTC)
-                return _convertSameBaseType(rawSharePrice, asset, _dstAsset);
-            }
-
-            // Different base types, use optimized conversion
-            return _convertBaseAssets(rawSharePrice, asset, _dstAsset, srcType, dstType);
-        }
-
-        // Special handling for stablecoin to stablecoin conversion
-        if (isStablecoin[asset] && isStablecoin[_dstAsset]) {
-            return _convertStableToStable(rawSharePrice, asset, _dstAsset);
-        }
-
-        // Regular price conversion for other assets
-        return _convertViaUSD(rawSharePrice, asset, _dstAsset);
-    }
-
-    /**
-     * @notice Converts between assets of the same base type
-     */
-    function _convertSameBaseType(
-        uint256 _amount,
-        address _srcAsset,
-        address _dstAsset
-    ) internal view returns (uint256 price, uint64 timestamp) {
-        // Just handle decimal differences
-        uint8 srcDecimals = IERC20Metadata(_srcAsset).decimals();
-        uint8 dstDecimals = IERC20Metadata(_dstAsset).decimals();
+        // First convert to canonical form if needed
+        uint256 canonicalPrice = _convertToCanonical(rawSharePrice, asset, srcCategory);
         
-        if (srcDecimals > dstDecimals) {
-            price = _amount / (10 ** (srcDecimals - dstDecimals));
-        } else if (srcDecimals < dstDecimals) {
-            price = _amount * (10 ** (dstDecimals - srcDecimals));
-        } else {
-            price = _amount;
-        }
-        return (price, uint64(block.timestamp));
-    }
-
-    /**
-     * @notice Converts between different base asset types
-     */
-    function _convertBaseAssets(
-        uint256 _amount,
-        address _srcAsset,
-        address _dstAsset,
-        AssetType _srcType,
-        AssetType _dstType
-    ) internal view returns (uint256 price, uint64 timestamp) {
-        if (_srcType == AssetType.STABLE) {
-            if (_dstType == AssetType.ETH) {
-                // STABLE -> ETH: Use ETH/USD price
-                (uint256 ethPrice,,) = getLatestPrice(ETH_USD_FEED, true);
-                if (ethPrice == 0) revert NoValidPrice();
-                return _convertWithDecimals(_amount, _srcAsset, _dstAsset, PRECISION * PRECISION / ethPrice);
-            }
-            if (_dstType == AssetType.BTC) {
-                // STABLE -> BTC: Use BTC/USD price
-                (uint256 btcPrice,,) = getLatestPrice(WBTC, true);
-                if (btcPrice == 0) revert NoValidPrice();
-                return _convertWithDecimals(_amount, _srcAsset, _dstAsset, PRECISION * PRECISION / btcPrice);
-            }
-        }
-        
-        if (_srcType == AssetType.ETH) {
-            if (_dstType == AssetType.STABLE) {
-                // ETH -> STABLE: Use ETH/USD price
-                (uint256 ethPrice,,) = getLatestPrice(ETH_USD_FEED, true);
-                if (ethPrice == 0) revert NoValidPrice();
-                return _convertWithDecimals(_amount, _srcAsset, _dstAsset, ethPrice);
-            }
-            if (_dstType == AssetType.BTC) {
-                // ETH -> BTC: Use ETH/USD and BTC/USD prices
-                (uint256 ethPrice,,) = getLatestPrice(ETH_USD_FEED, true);
-                (uint256 btcPrice,,) = getLatestPrice(WBTC, true);
-                if (ethPrice == 0 || btcPrice == 0) revert NoValidPrice();
-                return _convertWithDecimals(_amount, _srcAsset, _dstAsset, ethPrice * PRECISION / btcPrice);
-            }
-        }
-
-        if (_srcType == AssetType.BTC) {
-            if (_dstType == AssetType.STABLE) {
-                // BTC -> STABLE: Use BTC/USD price
-                (uint256 btcPrice,,) = getLatestPrice(WBTC, true);
-                if (btcPrice == 0) revert NoValidPrice();
-                return _convertWithDecimals(_amount, _srcAsset, _dstAsset, btcPrice);
-            }
-            if (_dstType == AssetType.ETH) {
-                // BTC -> ETH: Use BTC/USD and ETH/USD prices
-                (uint256 btcPrice,,) = getLatestPrice(WBTC, true);
-                (uint256 ethPrice,,) = getLatestPrice(ETH_USD_FEED, true);
-                if (btcPrice == 0 || ethPrice == 0) revert NoValidPrice();
-                return _convertWithDecimals(_amount, _srcAsset, _dstAsset, btcPrice * PRECISION / ethPrice);
-            }
-        }
-
-        revert NoValidPrice();
-    }
-
-    /**
-     * @notice Helper function to handle decimal adjustments in conversions
-     */
-    function _convertWithDecimals(
-        uint256 _amount,
-        address _srcAsset,
-        address _dstAsset,
-        uint256 _rate
-    ) internal view returns (uint256 price, uint64 timestamp) {
-        uint8 srcDecimals = IERC20Metadata(_srcAsset).decimals();
-        uint8 dstDecimals = IERC20Metadata(_dstAsset).decimals();
-        
-        uint256 adjustedAmount = _amount * _rate / PRECISION;
-        
-        if (srcDecimals > dstDecimals) {
-            price = adjustedAmount / (10 ** (srcDecimals - dstDecimals));
-        } else if (srcDecimals < dstDecimals) {
-            price = adjustedAmount * (10 ** (dstDecimals - srcDecimals));
-        } else {
-            price = adjustedAmount;
-        }
-        return (price, uint64(block.timestamp));
-    }
-
-    /**
-     * @notice Converts between stablecoins
-     */
-    function _convertStableToStable(
-        uint256 _amount,
-        address _srcAsset,
-        address _dstAsset
-    ) internal view returns (uint256 price, uint64 timestamp) {
-        // Just handle decimal differences
-        uint8 srcDecimals = IERC20Metadata(_srcAsset).decimals();
-        uint8 dstDecimals = IERC20Metadata(_dstAsset).decimals();
-        
-        if (srcDecimals > dstDecimals) {
-            price = _amount / (10 ** (srcDecimals - dstDecimals));
-        } else if (srcDecimals < dstDecimals) {
-            price = _amount * (10 ** (dstDecimals - srcDecimals));
-        } else {
-            price = _amount;
-        }
-        return (price, uint64(block.timestamp));
+        // Then convert to destination asset
+        return _convertFromCanonical(canonicalPrice, _dstAsset, dstCategory);
     }
 
     /**
@@ -746,35 +904,32 @@ contract MaxOracle is OwnableRoles {
      */
     function _convertViaUSD(
         uint256 _amount,
-        address _srcAsset,
         address _dstAsset
     ) internal view returns (uint256 price, uint64 timestamp) {
-        // Regular price conversion for other assets
-        (uint256 srcPrice, uint256 srcTimestamp, bool srcInUSD) = getLatestPrice(_srcAsset, true);
+        (uint256 srcPrice, uint256 srcTimestamp, bool srcInUSD) = getLatestPrice(ETH_USD_FEED, true);
         if (srcPrice == 0) revert NoValidPrice();
 
         (uint256 dstPrice, uint256 dstTimestamp, bool dstInUSD) = getLatestPrice(_dstAsset, true);
         if (dstPrice == 0) revert NoValidPrice();
 
-        // Both prices should be in the same denomination (USD)
+        // Both prices should be in USD
         if (srcInUSD != dstInUSD) {
-            // If one is in ETH and other in USD, convert both to USD
             if (!srcInUSD) {
                 (uint256 ethUsdPrice, uint256 ethUsdTimestamp,) = getLatestPrice(ETH_USD_FEED, true);
                 if (ethUsdPrice == 0) revert NoValidPrice();
-                srcPrice = (srcPrice * ethUsdPrice) / PRECISION;
+                srcPrice = FixedPointMathLib.mulDiv(srcPrice * PRECISION, ethUsdPrice, PRECISION);
                 srcTimestamp = ethUsdTimestamp < srcTimestamp ? ethUsdTimestamp : srcTimestamp;
             }
             if (!dstInUSD) {
                 (uint256 ethUsdPrice, uint256 ethUsdTimestamp,) = getLatestPrice(ETH_USD_FEED, true);
                 if (ethUsdPrice == 0) revert NoValidPrice();
-                dstPrice = (dstPrice * ethUsdPrice) / PRECISION;
+                dstPrice = FixedPointMathLib.mulDiv(dstPrice * PRECISION, ethUsdPrice, PRECISION);
                 dstTimestamp = ethUsdTimestamp < dstTimestamp ? ethUsdTimestamp : dstTimestamp;
             }
         }
 
-        // Convert amount to destination asset
-        price = (_amount * srcPrice) / dstPrice;
+        // Convert amount to destination asset using mulDiv
+        price = FixedPointMathLib.mulDiv(_amount * PRECISION, srcPrice, dstPrice);
         timestamp = uint64(srcTimestamp < dstTimestamp ? srcTimestamp : dstTimestamp);
     }
 } 
