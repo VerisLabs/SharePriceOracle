@@ -12,7 +12,7 @@ contract Api3Adaptor is BaseOracleAdapter {
 
     /// @notice Stores configuration data for API3 price sources.
     /// @param proxyFeed The current proxy's feed address.
-    /// @param dapiNameHash The bytes32 encoded name hash of the price feed.
+    /// @param dapiName The bytes32 encoded name of the price feed.
     /// @param isConfigured Whether the asset is configured or not.
     ///                     false = unconfigured; true = configured.
     /// @param heartbeat The max amount of time between price updates.
@@ -21,7 +21,7 @@ contract Api3Adaptor is BaseOracleAdapter {
     ///            0 defaults to use proxy max price reduced by ~10%.
     struct AdaptorData {
         IProxy proxyFeed;
-        bytes32 dapiNameHash;
+        bytes32 dapiName;
         bool isConfigured;
         uint256 heartbeat;
         uint256 max;
@@ -32,6 +32,9 @@ contract Api3Adaptor is BaseOracleAdapter {
     /// @notice If zero is specified for an Api3 asset heartbeat,
     ///         this value is used instead.
     uint256 public constant DEFAULT_HEART_BEAT = 1 days;
+
+    /// @notice Chain WETH address
+    address public immutable WETH;
 
     /// STORAGE ///
 
@@ -55,7 +58,7 @@ contract Api3Adaptor is BaseOracleAdapter {
     /// ERRORS ///
 
     error Api3Adaptor__AssetIsNotSupported();
-    error Api3Adaptor__DAPINameHashError();
+    error Api3Adaptor__DAPINameError();
     error Api3Adaptor__InvalidHeartbeat();
 
     /// CONSTRUCTOR ///
@@ -63,8 +66,11 @@ contract Api3Adaptor is BaseOracleAdapter {
     constructor(
         address _admin,
         address _oracle,
-        address _oracleRouter
-    ) BaseOracleAdapter(_admin, _oracle, _oracleRouter) {}
+        address _oracleRouter,
+        address _weth
+    ) BaseOracleAdapter(_admin, _oracle, _oracleRouter) {
+        WETH = _weth;
+    }
     
     /// EXTERNAL FUNCTIONS ///
 
@@ -119,12 +125,10 @@ contract Api3Adaptor is BaseOracleAdapter {
         }
 
         bytes32 dapiName = Bytes32Helper.stringToBytes32(ticker);
-        bytes32 dapiNameHash = keccak256(abi.encodePacked(dapiName));
 
-        // Validate that the dAPI name and corresponding hash generated off
-        // the symbol and denomation match the proxyFeed documented form.
-        if (dapiNameHash != IProxy(proxyFeed).dapiNameHash()) {
-            revert Api3Adaptor__DAPINameHashError();
+        // Validate that the dAPI name matches the proxyFeed's name
+        if (dapiName != IProxy(proxyFeed).dapiName()) {
+            revert Api3Adaptor__DAPINameError();
         }
 
         AdaptorData storage data;
@@ -145,8 +149,8 @@ contract Api3Adaptor is BaseOracleAdapter {
         // updating its price before/above the min/max price. We use a maximum
         // buffered price of 2^224 - 1, which could overflow when trying to
         // save the final value into an uint240.
-        data.max = (uint256(int256(type(int224).max)) * 9) / 10;
-        data.dapiNameHash = dapiNameHash;
+        data.max = (uint256(int256(type(int224).max)) * 9) / 10; 
+        data.dapiName = dapiName;
         data.proxyFeed = IProxy(proxyFeed);
         data.isConfigured = true;
 
@@ -235,9 +239,17 @@ contract Api3Adaptor is BaseOracleAdapter {
             return pData;
         }
 
-        pData.price = uint240(uint256(price));
+        // Scale down the price if needed to fit in uint240
+        uint256 rawPrice = uint256(price);
+        
+        if (rawPrice > type(uint240).max) {
+            // Scale down by 10^9 (typical for API3 feeds)
+            rawPrice = rawPrice / 1e9;
+        }
+
+        pData.price = uint240(rawPrice);
         pData.hadError = _verifyData(
-                        uint256(price),
+                        rawPrice,
                         updatedAt,
                         data.max,
                         data.heartbeat
@@ -264,7 +276,7 @@ contract Api3Adaptor is BaseOracleAdapter {
         if (value > max) {
             return true;
         }
-
+        
         if (block.timestamp - timestamp > heartbeat) {
             return true;
         }

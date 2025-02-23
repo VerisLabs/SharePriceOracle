@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import { getTokensList } from "../helpers/Tokens.sol";
-import { IERC20 } from "../interfaces/IERC20.sol";
+import { IERC20 } from "../../src/interfaces/IERC20.sol";
 import { Utilities } from "../utils/Utilities.sol";
 import { Test, Vm } from "forge-std/Test.sol";
 

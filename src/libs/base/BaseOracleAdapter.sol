@@ -2,7 +2,7 @@
 pragma solidity ^0.8.17;
 
 import {PriceReturnData} from "../../interfaces/IOracleAdaptor.sol";
-import {OwnableRoles} from "@solady/auth/OwnableRoles.sol";
+import {OwnableRoles} from "../../../lib/solady/src/auth/OwnableRoles.sol";
 
 /**
  * @title BaseOracleAdapter
@@ -62,7 +62,6 @@ abstract contract BaseOracleAdapter is OwnableRoles {
     constructor(address _admin, address _oracle, address _oracleRouter) {
         if (_admin == address(0)) revert ZeroAddress();
         if (_oracle == address(0)) revert ZeroAddress();
-        if (_oracleRouter == address(0)) revert ZeroAddress();
 
         ORACLE_ROUTER_ADDRESS = _oracleRouter;
 

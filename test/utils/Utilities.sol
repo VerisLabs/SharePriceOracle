@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.19;
 
-import { IERC20Metadata } from "../interfaces/IERC20Metadata.sol";
+import { IERC20Metadata } from "../../src/interfaces/IERC20Metadata.sol";
 import { StdCheats } from "forge-std/StdCheats.sol";
 import { Vm } from "forge-std/Vm.sol";
 
