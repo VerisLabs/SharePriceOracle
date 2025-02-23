@@ -12,6 +12,7 @@ import { ISharePriceOracle } from "../../src/interfaces/ISharePriceOracle.sol";
 import { VaultLib } from "../../src/libs/VaultLib.sol";
 import { Ownable } from "@solady/auth/Ownable.sol";
 import { OwnableRoles } from "@solady/auth/OwnableRoles.sol";
+import { MockERC4626Factory } from "../mocks/MockERC4626Factory.sol";
 
 /// @title SharePriceOracle Test Suite
 /// @notice Comprehensive test suite for SharePriceOracle contract functionality
@@ -25,6 +26,7 @@ contract SharePriceOracleTest is Test {
     MockPriceFeed public sequencer;
     MockERC4626 public vaultA;
     MockERC4626 public vaultB;
+    MockERC4626Factory public factory;
     address public admin;
     address public endpoint;
     address public user;
@@ -57,9 +59,10 @@ contract SharePriceOracleTest is Test {
         tokenAFeed.setPrice(100e8); // $100 USD/TokenA
         tokenBFeed.setPrice(50e8); // $50 USD/TokenB
 
-        // Deploy mock vaults with 18 decimals
-        vaultA = new MockERC4626(18);
-        vaultB = new MockERC4626(18);
+        // Deploy factory and mock vaults
+        factory = new MockERC4626Factory();
+        vaultA = factory.createVault(18);
+        vaultB = factory.createVault(18);
 
         // Set initial share prices
         vaultA.setMockSharePrice(1.5e18); // 1.5 tokens per share
@@ -165,16 +168,16 @@ contract SharePriceOracleTest is Test {
         vm.warp(baseTime);
 
         // Setup DAI vault with 18 decimals
-        MockERC4626 daiVault = new MockERC4626(18);
+        MockERC4626 daiVault = factory.createVault(18);
         daiVault.setMockSharePrice(1e18); // 1:1 ratio for simplicity
+
+        // Setup USDC mock with 6 decimals
+        MockERC4626 usdcVault = factory.createVault(6);
 
         // Setup DAI price feed (8 decimals)
         MockPriceFeed daiFeed = new MockPriceFeed(8);
         daiFeed.setPrice(100_000_000); // $1.00 USD
         daiFeed.setTimestamp(baseTime); // Current time
-
-        // Setup USDC mock with 6 decimals
-        MockERC4626 usdcVault = new MockERC4626(6);
 
         // Setup USDC price feed (8 decimals)
         MockPriceFeed usdcFeed = new MockPriceFeed(8);
@@ -214,14 +217,16 @@ contract SharePriceOracleTest is Test {
         vm.warp(currentTime);
 
         // Setup with same values
-        MockERC4626 ethVault = new MockERC4626(18);
+        MockERC4626 ethVault = factory.createVault(18);
         ethVault.setMockSharePrice(1_057_222_067_502_682_416); // 1.057 ETH
+
+        // Setup USDC mock with 6 decimals
+        MockERC4626 usdcVault = factory.createVault(6);
 
         // Setup price feeds with proper timestamps
         _setMockPrice(ethUsdFeed, 334_201_032_054, currentTime); // $3342.01 USD/ETH
         MockPriceFeed usdcFeed = new MockPriceFeed(8);
         _setMockPrice(usdcFeed, 100_005_101, currentTime); // $1.00005 USD/USDC
-        MockERC4626 usdcVault = new MockERC4626(6);
 
         // Setup price feeds
         vm.startPrank(admin);
@@ -259,16 +264,15 @@ contract SharePriceOracleTest is Test {
     }
 
     function test_PriceConversion_ETHtoETH() public {
-        // Set current block timestamp
         uint256 currentTime = block.timestamp;
         vm.warp(currentTime);
 
         // Setup source ETH vault
-        MockERC4626 srcEthVault = new MockERC4626(18);
+        MockERC4626 srcEthVault = factory.createVault(18);
         srcEthVault.setMockSharePrice(1e18); // 1 ETH per share
 
         // Setup destination ETH vault
-        MockERC4626 dstEthVault = new MockERC4626(18);
+        MockERC4626 dstEthVault = factory.createVault(18);
 
         // Setup ETH price feed with proper decimals and fresh timestamp
         MockPriceFeed ethFeed = new MockPriceFeed(18);
@@ -352,7 +356,7 @@ contract SharePriceOracleTest is Test {
     /// @notice Tests stablecoin to stablecoin conversion (DAI to USDC)
     function test_priceConversion_stablecoinToStablecoin() public {
         // Setup DAI vault with 18 decimals
-        MockERC4626 daiVault = new MockERC4626(18);
+        MockERC4626 daiVault = factory.createVault(18);
         daiVault.setMockSharePrice(1e18); // 1:1 ratio for simplicity
 
         // Setup DAI price feed (8 decimals)
@@ -360,7 +364,7 @@ contract SharePriceOracleTest is Test {
         daiFeed.setPrice(100_000_000); // $1.00 USD
 
         // Setup USDC mock with 6 decimals
-        MockERC4626 usdcVault = new MockERC4626(6);
+        MockERC4626 usdcVault = factory.createVault(6);
 
         // Setup USDC price feed (8 decimals)
         MockPriceFeed usdcFeed = new MockPriceFeed(8);
@@ -407,7 +411,7 @@ contract SharePriceOracleTest is Test {
     /// @notice Tests ETH to stablecoin conversion
     function test_priceConversion_ethToStablecoin() public {
         // Setup ETH vault with 18 decimals
-        MockERC4626 ethVault = new MockERC4626(18);
+        MockERC4626 ethVault = factory.createVault(18);
         ethVault.setMockSharePrice(1e18); // 1:1 ratio for simplicity
 
         // Setup ETH price feed (18 decimals)
@@ -415,7 +419,7 @@ contract SharePriceOracleTest is Test {
         ethFeed.setPrice(1e18); // 1 ETH = 1 ETH
 
         // Setup USDC mock with 6 decimals
-        MockERC4626 usdcVault = new MockERC4626(6);
+        MockERC4626 usdcVault = factory.createVault(6);
 
         // Setup USDC price feed (8 decimals)
         MockPriceFeed usdcFeed = new MockPriceFeed(8);
@@ -461,7 +465,7 @@ contract SharePriceOracleTest is Test {
     /// @notice Tests stablecoin to ETH conversion
     function test_priceConversion_stablecoinToEth() public {
         // Setup DAI vault with 18 decimals
-        MockERC4626 daiVault = new MockERC4626(18);
+        MockERC4626 daiVault = factory.createVault(18);
         daiVault.setMockSharePrice(2000e18); // 2000 DAI per share
 
         // Setup DAI price feed (8 decimals)
@@ -469,7 +473,7 @@ contract SharePriceOracleTest is Test {
         daiFeed.setPrice(100_000_000); // $1.00 USD
 
         // Setup ETH vault with 18 decimals
-        MockERC4626 ethVault = new MockERC4626(18);
+        MockERC4626 ethVault = factory.createVault(18);
 
         // Setup ETH price feed (18 decimals)
         MockPriceFeed ethFeed = new MockPriceFeed(18);
@@ -515,7 +519,7 @@ contract SharePriceOracleTest is Test {
     /// @notice Tests complex amount conversions with different decimals
     function test_priceConversion_complexAmounts() public {
         // Setup USDC vault with 6 decimals
-        MockERC4626 usdcVault = new MockERC4626(6);
+        MockERC4626 usdcVault = factory.createVault(6);
         usdcVault.setMockSharePrice(1_302_009_000_000); // 1,302,009 USDC per share (6 decimals)
 
         // Setup USDC price feed (8 decimals)
@@ -523,7 +527,7 @@ contract SharePriceOracleTest is Test {
         usdcFeed.setPrice(100_000_000); // $1.00 USD
 
         // Setup ETH vault with 18 decimals
-        MockERC4626 ethVault = new MockERC4626(18);
+        MockERC4626 ethVault = factory.createVault(18);
 
         // Setup ETH price feed (18 decimals)
         MockPriceFeed ethFeed = new MockPriceFeed(18);
@@ -596,7 +600,7 @@ contract SharePriceOracleTest is Test {
     /// @notice Tests edge cases in price conversion
     function test_priceConversion_edgeCases() public {
         // Setup USDC vault with 6 decimals
-        MockERC4626 usdcVault = new MockERC4626(6);
+        MockERC4626 usdcVault = factory.createVault(6);
         usdcVault.setMockSharePrice(1); // 0.000001 USDC per share (smallest unit)
 
         // Setup USDC price feed (8 decimals)
@@ -604,7 +608,7 @@ contract SharePriceOracleTest is Test {
         usdcFeed.setPrice(100_000_000); // $1.00 USD
 
         // Setup ETH vault with 18 decimals
-        MockERC4626 ethVault = new MockERC4626(18);
+        MockERC4626 ethVault = factory.createVault(18);
 
         // Setup ETH price feed (18 decimals)
         MockPriceFeed ethFeed = new MockPriceFeed(18);
