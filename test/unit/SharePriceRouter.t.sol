@@ -9,6 +9,8 @@ import {IERC20Metadata} from "../../src/interfaces/IERC20Metadata.sol";
 import {VaultReport} from "../../src/interfaces/ISharePriceRouter.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
 import {MockVault} from "../mocks/MockVault.sol";
+import {MockChainlinkSequencer} from "../mocks/MockChainlinkSequencer.sol";
+import {IChainlink} from "../../src/interfaces/chainlink/IChainlink.sol";
 
 // Constants for BASE network
 address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
@@ -610,6 +612,473 @@ contract SharePriceRouterTest is Test {
             uint64(block.timestamp),
             "Timestamp should be current"
         );
+    }
+
+    // Sequencer tests
+    function testSetSequencer() public {
+        address newSequencer = makeAddr("newSequencer");
+        
+        vm.prank(admin);
+        router.setSequencer(newSequencer);
+        
+        assertEq(router.sequencer(), newSequencer, "Sequencer should be updated");
+    }
+
+    function testRevertSetSequencer_NotAdmin() public {
+        address newSequencer = makeAddr("newSequencer");
+        
+        vm.prank(user);
+        vm.expectRevert();
+        router.setSequencer(newSequencer);
+    }
+
+    function testIsSequencerValid_NoSequencer() public {
+        // When no sequencer is set, should return true
+        assertTrue(router.isSequencerValid(), "Should be valid when no sequencer is set");
+    }
+
+    function testIsSequencerValid_WithSequencer() public {
+        address mockSequencer = address(new MockChainlinkSequencer());
+        
+        vm.prank(admin);
+        router.setSequencer(mockSequencer);
+
+        assertTrue(router.isSequencerValid(), "Should be valid when sequencer is up");
+    }
+
+    function testIsSequencerValid_SequencerDown() public {
+        MockChainlinkSequencer mockSequencer = new MockChainlinkSequencer();
+        mockSequencer.setDown(); // Custom function to simulate sequencer being down
+        
+        vm.prank(admin);
+        router.setSequencer(address(mockSequencer));
+
+        assertFalse(router.isSequencerValid(), "Should be invalid when sequencer is down");
+    }
+
+    function testIsSequencerValid_GracePeriod() public {
+        MockChainlinkSequencer mockSequencer = new MockChainlinkSequencer();
+        mockSequencer.setStartedAt(block.timestamp); // Just started
+        
+        vm.prank(admin);
+        router.setSequencer(address(mockSequencer));
+
+        assertFalse(router.isSequencerValid(), "Should be invalid during grace period");
+        
+        // Move past grace period
+        vm.warp(block.timestamp + router.GRACE_PERIOD_TIME() + 1);
+        assertTrue(router.isSequencerValid(), "Should be valid after grace period");
+    }
+
+    // Cross-Chain Asset Mapping Tests
+    function testSetCrossChainAssetMapping() public {
+        address srcAsset = makeAddr("srcAsset");
+        address localAsset = makeAddr("localAsset");
+        uint32 srcChain = 10; // Optimism chain ID
+        
+        vm.prank(admin);
+        router.setCrossChainAssetMapping(srcChain, srcAsset, localAsset);
+        
+        bytes32 key = keccak256(abi.encodePacked(srcChain, srcAsset));
+        assertEq(router.crossChainAssetMap(key), localAsset, "Cross chain mapping should be set");
+    }
+
+    function testRevertSetCrossChainAssetMapping_SameChain() public {
+        address srcAsset = makeAddr("srcAsset");
+        address localAsset = makeAddr("localAsset");
+        
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(SharePriceRouter.InvalidChainId.selector, uint32(block.chainid)));
+        router.setCrossChainAssetMapping(uint32(block.chainid), srcAsset, localAsset);
+    }
+
+    function testRevertSetCrossChainAssetMapping_ZeroAddresses() public {
+        uint32 srcChain = 10;
+        
+        vm.startPrank(admin);
+        vm.expectRevert(SharePriceRouter.ZeroAddress.selector);
+        router.setCrossChainAssetMapping(srcChain, address(0), makeAddr("local"));
+        
+        vm.expectRevert(SharePriceRouter.ZeroAddress.selector);
+        router.setCrossChainAssetMapping(srcChain, makeAddr("src"), address(0));
+        vm.stopPrank();
+    }
+
+    function testRevertSetCrossChainAssetMapping_NotAdmin() public {
+        vm.prank(user);
+        vm.expectRevert();
+        router.setCrossChainAssetMapping(10, makeAddr("src"), makeAddr("local"));
+    }
+
+    // Share Price Update Tests
+    function testUpdateSharePrices() public {
+        uint32 srcChain = 10;
+        address vaultAddr = makeAddr("vault");
+        address asset = makeAddr("asset");
+        uint256 sharePrice = 1e18;
+        
+        VaultReport[] memory reports = new VaultReport[](1);
+        reports[0] = VaultReport({
+            sharePrice: sharePrice,
+            lastUpdate: uint64(block.timestamp),
+            chainId: srcChain,
+            rewardsDelegate: address(0),
+            vaultAddress: vaultAddr,
+            asset: asset,
+            assetDecimals: 18
+        });
+        
+        vm.prank(endpoint);
+        router.updateSharePrices(srcChain, reports);
+        
+        VaultReport memory stored = router.getLatestSharePriceReport(srcChain, vaultAddr);
+        assertEq(stored.sharePrice, sharePrice, "Share price should be stored");
+        assertEq(router.vaultChainIds(vaultAddr), srcChain, "Chain ID should be stored");
+    }
+
+    function testUpdateSharePrices_WithLocalEquivalent() public {
+        uint32 srcChain = 10;
+        address vaultAddr = makeAddr("vault");
+        address srcAsset = makeAddr("srcAsset");
+        address localAsset = USDC; // Using USDC as local equivalent
+        uint256 sharePrice = 1e18;
+
+        // Set up cross-chain mapping
+        vm.prank(admin);
+        router.setCrossChainAssetMapping(srcChain, srcAsset, localAsset);
+
+        // Set up price feeds
+        vm.startPrank(admin);
+        router.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
+        router.addAdapter(address(chainlinkAdapter), 1);
+        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ADMIN_ROLE());
+        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ORACLE_ROLE());
+        vm.stopPrank();
+
+        chainlinkAdapter.addAsset(USDC, USDC_USD_FEED, CHAINLINK_HEARTBEAT, true);
+
+        VaultReport[] memory reports = new VaultReport[](1);
+        reports[0] = VaultReport({
+            sharePrice: sharePrice,
+            lastUpdate: uint64(block.timestamp),
+            chainId: srcChain,
+            rewardsDelegate: address(0),
+            vaultAddress: vaultAddr,
+            asset: srcAsset,
+            assetDecimals: 18
+        });
+
+        vm.prank(endpoint);
+        router.updateSharePrices(srcChain, reports);
+
+        // Verify stored share price
+        VaultReport memory stored = router.getLatestSharePriceReport(srcChain, vaultAddr);
+        assertEq(stored.sharePrice, sharePrice, "Share price should be stored");
+    }
+
+    function testRevertUpdateSharePrices_InvalidChainId() public {
+        uint32 srcChain = 10; // Different chain ID
+        VaultReport[] memory reports = new VaultReport[](1);
+        reports[0] = VaultReport({
+            sharePrice: 1e18,
+            lastUpdate: uint64(block.timestamp),
+            chainId: uint32(block.chainid), // Same as current chain
+            rewardsDelegate: address(0),
+            vaultAddress: makeAddr("vault"),
+            asset: makeAddr("asset"),
+            assetDecimals: 18
+        });
+        
+        vm.prank(endpoint);
+        vm.expectRevert(abi.encodeWithSelector(SharePriceRouter.InvalidChainId.selector, uint32(block.chainid)));
+        router.updateSharePrices(srcChain, reports);
+    }
+
+    function testRevertUpdateSharePrices_TooManyReports() public {
+        VaultReport[] memory reports = new VaultReport[](router.MAX_REPORTS() + 1);
+        
+        vm.prank(endpoint);
+        vm.expectRevert(SharePriceRouter.ExceedsMaxReports.selector);
+        router.updateSharePrices(10, reports);
+    }
+
+    function testRevertUpdateSharePrices_NotEndpoint() public {
+        vm.prank(user);
+        vm.expectRevert();
+        router.updateSharePrices(10, new VaultReport[](1));
+    }
+
+    // Price Conversion Tests
+    function testConvertStoredPrice_SameAsset() public {
+        // Test converting price when source and destination are the same asset
+        vm.startPrank(admin);
+        router.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
+        router.addAdapter(address(chainlinkAdapter), 1);
+        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ADMIN_ROLE());
+        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ORACLE_ROLE());
+        vm.stopPrank();
+        
+        chainlinkAdapter.addAsset(USDC, USDC_USD_FEED, CHAINLINK_HEARTBEAT, true);
+        
+        (uint256 price, uint64 timestamp) = router.convertStoredPrice(1e6, USDC, USDC);
+        assertEq(price, 1e6, "Price should remain unchanged for same asset");
+        assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
+    }
+
+    function testRevertConvertStoredPrice_UnknownCategory() public {
+        address randomAsset = makeAddr("random");
+        
+        vm.expectRevert(SharePriceRouter.InvalidAssetType.selector);
+        router.convertStoredPrice(1e18, randomAsset, USDC);
+    }
+
+    function testConvertStoredPrice_CrossCategory() public {
+        vm.startPrank(admin);
+        router.setAssetCategory(WETH, SharePriceRouter.AssetCategory.ETH_LIKE);
+        router.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
+        router.addAdapter(address(chainlinkAdapter), 1);
+        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ADMIN_ROLE());
+        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ORACLE_ROLE());
+        vm.stopPrank();
+        
+        chainlinkAdapter.addAsset(WETH, ETH_USD_FEED, CHAINLINK_HEARTBEAT, true);
+        chainlinkAdapter.addAsset(USDC, USDC_USD_FEED, CHAINLINK_HEARTBEAT, true);
+        
+        (uint256 price, uint64 timestamp) = router.convertStoredPrice(1e18, WETH, USDC);
+        assertTrue(price > 0, "Converted price should be non-zero");
+        assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
+    }
+
+    // Price Validation Tests
+    function testGetPrice_NoAdapters() public {
+        vm.expectRevert(SharePriceRouter.NoAdaptersConfigured.selector);
+        router.getLatestPrice(USDC, true);
+    }
+
+    function testGetPrice_NoValidPrice() public {
+        vm.prank(admin);
+        router.addAdapter(address(chainlinkAdapter), 1);
+        
+        vm.expectRevert(SharePriceRouter.NoValidPrice.selector);
+        router.getLatestPrice(makeAddr("random"), true);
+    }
+
+    function testGetPrice_StoredPriceFallback() public {
+        // First set up the adapter and get an initial price
+        vm.startPrank(admin);
+        router.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
+        router.addAdapter(address(chainlinkAdapter), 1);
+        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ADMIN_ROLE());
+        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ORACLE_ROLE());
+        vm.stopPrank();
+        
+        chainlinkAdapter.addAsset(USDC, USDC_USD_FEED, CHAINLINK_HEARTBEAT, true);
+        
+        // Get and store initial price
+        (uint256 initialPrice, , ) = router.getLatestPrice(USDC, true);
+        vm.prank(updater);
+        router.updatePrice(USDC, true);
+        
+        // Remove adapter and verify stored price is returned
+        vm.startPrank(admin);
+        router.removeAdapter(address(chainlinkAdapter));
+        vm.stopPrank();
+
+        // Add a new adapter but don't configure it for USDC
+        vm.prank(admin);
+        router.addAdapter(address(api3Adapter), 1);
+        
+        // Try to get price - should fall back to stored price
+        (uint256 price, uint256 timestamp, bool isUSD) = router.getLatestPrice(USDC, true);
+        assertEq(price, initialPrice, "Should return stored price");
+        assertTrue(isUSD, "Should maintain USD flag");
+        assertTrue(timestamp > 0, "Should have valid timestamp");
+    }
+
+    function testGetLatestSharePriceReport() public {
+        uint32 srcChain = 10;
+        address vaultAddr = makeAddr("vault");
+        address asset = makeAddr("asset");
+        uint256 sharePrice = 1e18;
+        
+        VaultReport[] memory reports = new VaultReport[](1);
+        reports[0] = VaultReport({
+            sharePrice: sharePrice,
+            lastUpdate: uint64(block.timestamp),
+            chainId: srcChain,
+            rewardsDelegate: address(0),
+            vaultAddress: vaultAddr,
+            asset: asset,
+            assetDecimals: 18
+        });
+        
+        vm.prank(endpoint);
+        router.updateSharePrices(srcChain, reports);
+        
+        VaultReport memory report = router.getLatestSharePriceReport(srcChain, vaultAddr);
+        assertEq(report.sharePrice, sharePrice, "Should return correct share price");
+        assertEq(report.chainId, srcChain, "Should return correct chain ID");
+        assertEq(report.vaultAddress, vaultAddr, "Should return correct vault address");
+    }
+
+    function testNotifyFeedRemoval() public {
+        vm.startPrank(admin);
+        router.addAdapter(address(chainlinkAdapter), 1);
+        vm.stopPrank();
+
+        vm.prank(address(chainlinkAdapter));
+        router.notifyFeedRemoval(USDC);
+
+        assertEq(router.adapterPriorities(address(chainlinkAdapter)), 0, "Adapter should be removed");
+    }
+
+    function testRevertNotifyFeedRemoval_AdapterNotFound() public {
+        vm.prank(address(chainlinkAdapter));
+        vm.expectRevert(SharePriceRouter.AdapterNotFound.selector);
+        router.notifyFeedRemoval(USDC);
+    }
+
+    // Cross-Chain Asset Mapping Tests
+    function testMultipleMappings() public {
+        address srcAsset1 = makeAddr("srcAsset1");
+        address srcAsset2 = makeAddr("srcAsset2");
+        address localAsset = makeAddr("localAsset");
+        uint32 srcChain1 = 10;
+        uint32 srcChain2 = 20;
+
+        vm.startPrank(admin);
+        // Map two different source assets to the same local asset
+        router.setCrossChainAssetMapping(srcChain1, srcAsset1, localAsset);
+        router.setCrossChainAssetMapping(srcChain2, srcAsset2, localAsset);
+        vm.stopPrank();
+
+        bytes32 key1 = keccak256(abi.encodePacked(srcChain1, srcAsset1));
+        bytes32 key2 = keccak256(abi.encodePacked(srcChain2, srcAsset2));
+
+        assertEq(router.crossChainAssetMap(key1), localAsset, "First mapping should be set");
+        assertEq(router.crossChainAssetMap(key2), localAsset, "Second mapping should be set");
+    }
+
+    function testCrossChainPriceConversion_WithMapping() public {
+        address srcAsset = makeAddr("srcAsset");
+        uint32 srcChain = 10;
+        uint256 initialPrice = 1.5e18; // 1.5 units
+
+        vm.startPrank(admin);
+        // Set up USDC as local equivalent
+        router.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
+        router.setCrossChainAssetMapping(srcChain, srcAsset, USDC);
+        router.addAdapter(address(chainlinkAdapter), 1);
+        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ADMIN_ROLE());
+        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ORACLE_ROLE());
+        vm.stopPrank();
+
+        // Add price feed for USDC
+        chainlinkAdapter.addAsset(USDC, USDC_USD_FEED, CHAINLINK_HEARTBEAT, true);
+
+        // Create and store a vault report
+        VaultReport[] memory reports = new VaultReport[](1);
+        reports[0] = VaultReport({
+            sharePrice: initialPrice,
+            lastUpdate: uint64(block.timestamp),
+            chainId: srcChain,
+            rewardsDelegate: address(0),
+            vaultAddress: makeAddr("vault"),
+            asset: srcAsset,
+            assetDecimals: 18
+        });
+
+        vm.prank(endpoint);
+        router.updateSharePrices(srcChain, reports);
+
+        // Get latest share price in USDC
+        (uint256 price, uint64 timestamp) = router.getLatestSharePrice(
+            srcChain,
+            reports[0].vaultAddress,
+            USDC
+        );
+
+        assertTrue(price > 0, "Should get valid converted price");
+        assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
+    }
+
+    // Adapter Management Tests
+    function testAdapterPriority() public {
+        vm.startPrank(admin);
+        // Add two adapters with different priorities
+        router.addAdapter(address(chainlinkAdapter), 2); // Lower priority
+        router.addAdapter(address(api3Adapter), 1); // Higher priority
+
+        // Set up asset and roles
+        router.setAssetCategory(WETH, SharePriceRouter.AssetCategory.ETH_LIKE);
+        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ADMIN_ROLE());
+        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ORACLE_ROLE());
+        api3Adapter.grantRole(address(this), api3Adapter.ADMIN_ROLE());
+        api3Adapter.grantRole(address(this), api3Adapter.ORACLE_ROLE());
+        vm.stopPrank();
+
+        // Configure both adapters for WETH
+        chainlinkAdapter.addAsset(WETH, ETH_USD_FEED, CHAINLINK_HEARTBEAT, true);
+        api3Adapter.addAsset(WETH, "ETH/USD", API3_ETH_USD_FEED, API3_HEARTBEAT, true);
+
+        // Get price - should use API3 due to higher priority
+        (uint256 price, uint256 timestamp, bool isUSD) = router.getLatestPrice(WETH, true);
+        assertTrue(price > 0, "Should get valid price");
+        assertTrue(isUSD, "Price should be in USD");
+    }
+
+    function testAdapterRemovalDuringPriceQuery() public {
+        vm.startPrank(admin);
+        router.setAssetCategory(WETH, SharePriceRouter.AssetCategory.ETH_LIKE);
+        router.addAdapter(address(chainlinkAdapter), 1);
+        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ADMIN_ROLE());
+        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ORACLE_ROLE());
+        vm.stopPrank();
+
+        // Add asset to adapter
+        chainlinkAdapter.addAsset(WETH, ETH_USD_FEED, CHAINLINK_HEARTBEAT, true);
+
+        // Get initial price
+        (uint256 initialPrice, , ) = router.getLatestPrice(WETH, true);
+        assertTrue(initialPrice > 0, "Should get initial price");
+
+        // Store the price
+        vm.prank(updater);
+        router.updatePrice(WETH, true);
+
+        // Remove adapter
+        vm.prank(admin);
+        router.removeAdapter(address(chainlinkAdapter));
+
+        // Add a new adapter but don't configure it for WETH
+        vm.prank(admin);
+        router.addAdapter(address(api3Adapter), 1);
+
+        // Try to get price - should use stored price
+        (uint256 price, , bool isUSD) = router.getLatestPrice(WETH, true);
+        assertEq(price, initialPrice, "Should return stored price");
+        assertTrue(isUSD, "Price should be in USD");
+    }
+
+    function testAdapterStateAfterRemoval() public {
+        vm.startPrank(admin);
+        router.addAdapter(address(chainlinkAdapter), 1);
+        
+        // Verify adapter was added
+        assertEq(router.adapterPriorities(address(chainlinkAdapter)), 1, "Priority should be set");
+        
+        // Remove adapter
+        router.removeAdapter(address(chainlinkAdapter));
+        vm.stopPrank();
+
+        // Verify adapter was removed
+        assertEq(router.adapterPriorities(address(chainlinkAdapter)), 0, "Priority should be cleared");
+        
+        // Verify adapter cannot be removed again
+        vm.startPrank(admin);
+        vm.expectRevert(SharePriceRouter.AdapterNotFound.selector);
+        router.removeAdapter(address(chainlinkAdapter));
+        vm.stopPrank();
     }
 }
 
