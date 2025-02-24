@@ -228,8 +228,9 @@ contract SharePriceRouterTest is Test {
         // Add price feed for USDC
         chainlinkAdapter.addAsset(USDC, USDC_USD_FEED, 86400, true);
 
+        // Get latest share price
         (uint256 actualSharePrice, uint64 timestamp) = router
-            .getLatestSharePrice(address(usdcVault), USDC);
+            .getLatestSharePrice(router.chainId(), address(usdcVault), USDC);
 
         uint256 expectedSharePrice = 1.1e6; // 1.1 in USDC decimals
 
@@ -279,8 +280,9 @@ contract SharePriceRouterTest is Test {
         uint256 sharePrice = 1.1e18; // DAI uses 18 decimals
         daiVault = new MockVault(DAI, 18, sharePrice);
 
+        // Get latest share price
         (uint256 actualSharePrice, uint64 timestamp) = router
-            .getLatestSharePrice(address(daiVault), USDC);
+            .getLatestSharePrice(router.chainId(), address(daiVault), USDC);
 
         uint256 expectedSharePrice = 1.1e6; // 1.1 in USDC decimals
 
@@ -357,8 +359,9 @@ contract SharePriceRouterTest is Test {
         uint256 expectedSharePrice = (sharePrice * ethPrice) /
             (usdcPrice * 10 ** (wethDecimals - usdcDecimals));
 
+        // Get latest share price
         (uint256 actualSharePrice, uint64 timestamp) = router
-            .getLatestSharePrice(address(wethVault), USDC);
+            .getLatestSharePrice(router.chainId(), address(wethVault), USDC);
 
         // Allow for a small deviation (2%) due to cross-category conversion and multiple price sources
         uint256 maxDelta = (expectedSharePrice * 2) / 100; // 2% of expected price
@@ -440,8 +443,9 @@ contract SharePriceRouterTest is Test {
         uint256 expectedSharePrice = (sharePrice * ethPrice) /
             (btcPrice * 10 ** (wethDecimals - wbtcDecimals));
 
+        // Get latest share price
         (uint256 actualSharePrice, uint64 timestamp) = router
-            .getLatestSharePrice(address(wethVault), WBTC);
+            .getLatestSharePrice(router.chainId(), address(wethVault), WBTC);
 
         // Allow for a larger deviation (1%) due to cross-category conversion and multiple price sources
         uint256 maxDelta = expectedSharePrice / 100; // 1% of expected price
@@ -512,8 +516,9 @@ contract SharePriceRouterTest is Test {
         (uint256 btcPrice, , ) = router.getLatestPrice(WBTC, true);
         (uint256 usdcPrice, , ) = router.getLatestPrice(USDC, true);
 
+        // Get latest share price
         (uint256 actualSharePrice, uint64 timestamp) = router
-            .getLatestSharePrice(address(wbtcVault), USDC);
+            .getLatestSharePrice(router.chainId(), address(wbtcVault), USDC);
 
         uint256 expectedSharePrice = (sharePrice * btcPrice) /
             (usdcPrice * 10 ** (btcDecimals - usdcDecimals));
@@ -585,8 +590,9 @@ contract SharePriceRouterTest is Test {
         (uint256 btcPrice, , ) = router.getLatestPrice(WBTC, true);
         (uint256 usdcPrice, , ) = router.getLatestPrice(USDC, true);
 
+        // Get latest share price
         (uint256 actualSharePrice, uint64 timestamp) = router
-            .getLatestSharePrice(address(usdcVault), WBTC);
+            .getLatestSharePrice(router.chainId(), address(usdcVault), WBTC);
 
         uint256 shareUsdValue = (sharePrice * usdcPrice) / 1e6;
         uint256 expectedSharePrice = (shareUsdValue * 1e8) / btcPrice;
