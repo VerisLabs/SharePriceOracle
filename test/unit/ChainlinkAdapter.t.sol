@@ -128,16 +128,6 @@ contract ChainlinkAdapterTest is Test {
     }
 
     function testCanAddSameAsset() public {
-        // Get current adapter data
-        (
-            IChainlink aggregator,
-            bool isConfigured,
-            uint256 decimals,
-            uint256 heartbeat,
-            uint256 max,
-            uint256 min
-        ) = adapter.adaptorDataUSD(WETH);
-
         // Should be able to add the same asset again
         adapter.addAsset(
             WETH,

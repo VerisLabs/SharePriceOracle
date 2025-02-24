@@ -114,7 +114,7 @@ contract Api3AdapterTest is Test {
         console.log("ETH/USD Price:", priceData.price);
     }
 
-    function testReturnsCorrectPrice_WBTC_USD() public {
+    function testReturnsCorrectPrice_WBTC_USD() public view {
         PriceReturnData memory priceData = adapter.getPrice(WBTC, true, false);
         
         assertEq(priceData.hadError, false, "Price should not have error");
@@ -200,16 +200,6 @@ contract Api3AdapterTest is Test {
     }
 
     function testCanAddSameAsset() public {
-        // Get current adapter data
-        (
-            IProxy proxyFeed,
-            bytes32 dapiNameHash,
-            bool isConfigured,
-            uint256 heartbeat,
-            uint256 max,
-            uint256 min
-        ) = adapter.adaptorDataUSD(WETH);
-
         // Should be able to add the same asset again
         adapter.addAsset(
             WETH,

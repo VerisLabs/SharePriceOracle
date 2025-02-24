@@ -579,8 +579,6 @@ contract SharePriceRouterTest is Test {
 
         // Create USDC vault with 1.1 USDC per share
         uint256 sharePrice = 1.1e6; // USDC uses 6 decimals
-        uint8 usdcDecimals = IERC20Metadata(USDC).decimals();
-        uint8 wbtcDecimals = IERC20Metadata(WBTC).decimals();
         usdcVault = new MockVault(USDC, 6, sharePrice);
 
         // Get current prices to calculate expected value
@@ -589,13 +587,6 @@ contract SharePriceRouterTest is Test {
 
         (uint256 actualSharePrice, uint64 timestamp) = router
             .getLatestSharePrice(address(usdcVault), WBTC);
-
-        (uint256 directConversion,) = router
-            .convertStoredPrice(
-                sharePrice, // 1.1e6
-                USDC,
-                WBTC
-            );
 
         uint256 shareUsdValue = (sharePrice * usdcPrice) / 1e6;
         uint256 expectedSharePrice = (shareUsdValue * 1e8) / btcPrice;
