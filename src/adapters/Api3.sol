@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {BaseOracleAdapter} from "../libs/base/BaseOracleAdapter.sol";
+import { BaseOracleAdapter } from "../libs/base/BaseOracleAdapter.sol";
 import { Bytes32Helper } from "../libs/Bytes32Helper.sol";
-import {IOracleRouter} from "../interfaces/IOracleRouter.sol";
-import {PriceReturnData} from "../interfaces/IOracleAdaptor.sol";
+import { ISharePriceRouter, PriceReturnData } from "../interfaces/ISharePriceRouter.sol";
 import { IProxy } from "../interfaces/api3/IProxy.sol";
 
 contract Api3Adaptor is BaseOracleAdapter {
@@ -183,7 +182,7 @@ contract Api3Adaptor is BaseOracleAdapter {
         delete adaptorDataNonUSD[asset];
 
         // Notify the Oracle Router that we are going to stop supporting the asset.
-        IOracleRouter(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
+        ISharePriceRouter(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
         
         emit Api3AssetRemoved(asset);
     }

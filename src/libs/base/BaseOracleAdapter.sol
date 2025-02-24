@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {PriceReturnData} from "../../interfaces/IOracleAdaptor.sol";
-import {OwnableRoles} from "../../../lib/solady/src/auth/OwnableRoles.sol";
+import { PriceReturnData } from "../../interfaces/ISharePriceRouter.sol";
+import { OwnableRoles } from "@solady/auth/OwnableRoles.sol";
 
 /**
  * @title BaseOracleAdapter

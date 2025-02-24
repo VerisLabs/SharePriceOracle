@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.17;
 
-import {OwnableRoles} from "@solady/auth/OwnableRoles.sol";
-import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
-import {IERC4626} from "./interfaces/IERC4626.sol";
-import {IERC20Metadata} from "./interfaces/IERC20Metadata.sol";
-import {IOracleAdaptor, PriceReturnData} from "./interfaces/IOracleAdaptor.sol";
-import {VaultReport} from "./interfaces/ISharePriceRouter.sol";
-import {IChainlink} from "./interfaces/chainlink/IChainlink.sol";
+import { OwnableRoles } from "@solady/auth/OwnableRoles.sol";
+import { FixedPointMathLib } from "@solady/utils/FixedPointMathLib.sol";
+import { IERC4626 } from "./interfaces/IERC4626.sol";
+import { IERC20Metadata } from "./interfaces/IERC20Metadata.sol";
+import { ISharePriceRouter, PriceReturnData, VaultReport } from "./interfaces/ISharePriceRouter.sol";
+import { BaseOracleAdapter } from "./libs/base/BaseOracleAdapter.sol";
+import { IChainlink } from "./interfaces/chainlink/IChainlink.sol";
 
 /**
  * @title SharePriceRouter
@@ -74,17 +74,27 @@ contract SharePriceRouter is OwnableRoles {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
     /// @notice Chain ID this oracle is deployed on
+    /// @dev Immutable value set in constructor
     uint32 public immutable chainId;
 
     /// @notice ETH/USD price feed address (Chainlink)
+    /// @dev Immutable value set in constructor
     address public immutable ETH_USD_FEED;
 
-    /// @notice Common base assets
+    /// @notice USDC token address
+    /// @dev Immutable value set in constructor
     address public immutable USDC;
+
+    /// @notice WBTC token address
+    /// @dev Immutable value set in constructor
     address public immutable WBTC;
+
+    /// @notice WETH token address
+    /// @dev Immutable value set in constructor
     address public immutable WETH;
 
     /// @notice Sequencer uptime feed address
+    /// @dev Used to check L2 sequencer status
     address public sequencer;
 
     /// @notice Asset categories for optimized conversion
@@ -241,7 +251,10 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Internal function to remove an adapter from the system
+     * @dev Handles removal of adapter while maintaining array consistency
+     *      Uses a swap-and-pop pattern to avoid array shifting
      * @param adapter Address of the adapter to remove
+     * @custom:throws AdapterNotFound if adapter is not in the system or already removed
      */
     function _removeAdapter(address adapter) internal {
         if (adapterPriorities[adapter] == 0) revert AdapterNotFound();
@@ -325,7 +338,7 @@ contract SharePriceRouter is OwnableRoles {
      */
     function isSupportedAsset(address asset) external view returns (bool) {
         for (uint256 i = 0; i < oracleAdapters.length; i++) {
-            IOracleAdaptor adapter = IOracleAdaptor(oracleAdapters[i]);
+            BaseOracleAdapter adapter = BaseOracleAdapter(oracleAdapters[i]);
             if (adapter.isSupportedAsset(asset)) {
                 return true;
             }
@@ -388,7 +401,7 @@ contract SharePriceRouter is OwnableRoles {
 
         // Try all adapters in priority order
         for (uint256 i = 0; i < oracleAdapters.length; i++) {
-            IOracleAdaptor adapter = IOracleAdaptor(oracleAdapters[i]);
+            BaseOracleAdapter adapter = BaseOracleAdapter(oracleAdapters[i]);
 
             if (adapter.isSupportedAsset(asset)) {
                 PriceReturnData memory priceData = adapter.getPrice(
@@ -651,6 +664,29 @@ contract SharePriceRouter is OwnableRoles {
     }
 
     /**
+     * @notice Helper function to get and adjust decimals for asset conversion
+     * @dev Handles both cross-chain and local assets
+     * @param _asset The asset to get decimals for
+     * @param _price The price to adjust
+     * @param _dstAsset The destination asset
+     * @return adjustedPrice The price adjusted for decimals
+     * @return timestamp The timestamp of the adjustment
+     */
+    function _getAndAdjustDecimals(
+        address _asset,
+        uint256 _price,
+        address _dstAsset
+    ) internal view returns (uint256 adjustedPrice, uint64 timestamp) {
+        uint32 srcChain = vaultChainIds[_asset];
+        uint32 dstChain = vaultChainIds[_dstAsset];
+
+        uint8 srcDecimals = _getAssetDecimalsWithReport(_asset, srcChain);
+        uint8 dstDecimals = _getAssetDecimalsWithReport(_dstAsset, dstChain);
+
+        return _adjustDecimals(_price, srcDecimals, dstDecimals);
+    }
+
+    /**
      * @notice Converts a stored price to a different denomination
      * @dev All adapters return standardized prices, so we can use the same conversion for all
      */
@@ -661,19 +697,7 @@ contract SharePriceRouter is OwnableRoles {
     ) external view returns (uint256 price, uint64 timestamp) {
         // If same asset, just adjust decimals if needed
         if (_storedAsset == _dstAsset) {
-            // Check if this is a cross-chain asset
-            uint32 srcChain = vaultChainIds[_storedAsset];
-            uint8 srcDecimals;
-            if (srcChain != 0 && srcChain != chainId) {
-                // Use stored decimals from VaultReport for cross-chain assets
-                VaultReport memory report = sharePrices[getPriceKey(srcChain, _storedAsset)];
-                srcDecimals = uint8(report.assetDecimals);
-            } else {
-                srcDecimals = _getAssetDecimals(_storedAsset);
-            }
-            uint8 dstDecimals = _getAssetDecimals(_dstAsset);
-            (price, ) = _adjustDecimals(_storedPrice, srcDecimals, dstDecimals);
-            return (price, uint64(block.timestamp));
+            return _getAndAdjustDecimals(_storedAsset, _storedPrice, _dstAsset);
         }
 
         // Get asset categories
@@ -708,9 +732,9 @@ contract SharePriceRouter is OwnableRoles {
     /**
      * @notice Internal function to check sequencer status
      * @dev Checks if sequencer is up and grace period has passed
-     * @return True if sequencer is valid
+     * @return isValid True if sequencer is up and grace period has passed, or if no sequencer check is needed (e.g. on L1)
      */
-    function _isSequencerValid() internal view returns (bool) {
+    function _isSequencerValid() internal view returns (bool isValid) {
         if (sequencer == address(0)) {
             return true; // No sequencer check needed (e.g. on L1)
         }
@@ -748,10 +772,13 @@ contract SharePriceRouter is OwnableRoles {
 
      /**
      * @notice Gets decimals for a potentially cross-chain asset
-     * @dev Returns decimals from VaultReport if cross-chain, otherwise queries token
+     * @dev Handles both local and cross-chain assets:
+     *      - For local assets: Queries the token contract directly
+     *      - For cross-chain assets: Retrieves from stored VaultReport
      * @param asset The asset address
      * @param chain The chain ID where the asset exists
      * @return decimals The number of decimals
+     * @custom:edge-case Returns 0 if cross-chain report doesn't exist
      */
     function _getAssetDecimalsWithReport(
         address asset,
@@ -765,6 +792,19 @@ contract SharePriceRouter is OwnableRoles {
         return _getAssetDecimals(asset);
     }
 
+    /**
+     * @notice Adjusts token amounts for decimal differences
+     * @dev Handles scaling of amounts when source and destination decimals differ:
+     *      - If srcDecimals > dstDecimals: Scales down by dividing
+     *      - If srcDecimals < dstDecimals: Scales up by multiplying
+     *      - If decimals match: Returns original amount
+     * @param amount The amount to adjust
+     * @param srcDecimals Source token decimals
+     * @param dstDecimals Destination token decimals
+     * @return adjustedAmount The decimal-adjusted amount
+     * @return timestamp Current block timestamp
+     * @custom:edge-case May return 0 if scaling down results in complete loss of precision
+     */
     function _adjustDecimals(
         uint256 amount,
         uint8 srcDecimals,
@@ -787,13 +827,14 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Validates a price and its timestamp
-     * @dev Checks if:
-     *      1. Price is above minimum threshold
-     *      2. Price is not stale
-     *      3. Price fits within uint240
+     * @dev Performs multiple validation checks:
+     *      1. Price is above minimum threshold (MIN_PRICE_THRESHOLD)
+     *      2. Price is not stale (within PRICE_STALENESS_THRESHOLD)
+     *      3. Price fits within uint240 storage
      * @param price The price to validate
      * @param timestamp The timestamp of the price
      * @return valid Whether the price is valid
+     * @custom:edge-case Returns false for prices that would overflow uint240 storage
      */
     function _validatePrice(
         uint256 price,
@@ -808,10 +849,15 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Stores a share price with metadata
-     * @dev Updates the storedSharePrices mapping with current price data
+     * @dev Updates storedSharePrices mapping with:
+     *      1. Share price (truncated to uint248)
+     *      2. Asset decimals from the vault's asset
+     *      3. Asset address
+     *      4. Current timestamp
      * @param _vaultAddress The vault address
      * @param _price The share price to store
      * @param _timestamp The timestamp of the price
+     * @custom:edge-case Silently truncates prices larger than uint248
      */
     function _storeSharePrice(
         address _vaultAddress,
@@ -831,13 +877,19 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Gets the cross-chain price for a vault
-     * @dev Attempts to get and convert a price from another chain
-     *      Returns (0,0) if no valid price is found
+     * @dev Attempts to retrieve and convert a price from another chain:
+     *      1. Checks for direct price match (same asset)
+     *      2. Attempts price conversion if assets differ
+     *      3. Validates converted price before returning
      * @param _vaultAddress The vault address
      * @param _dstAsset The destination asset
      * @param _srcChain The source chain ID
      * @return price The converted price in terms of _dstAsset
      * @return timestamp The price timestamp as uint64
+     * @custom:edge-case Returns (0,0) if:
+     *      - No valid price exists
+     *      - Price conversion fails
+     *      - Converted price fails validation
      */
     function _getCrossChainPrice(
         address _vaultAddress,
@@ -869,11 +921,15 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Gets share price for a vault with standardized conversion
-     * @dev First gets raw share price from vault, then converts to destination asset if needed
+     * @dev Process:
+     *      1. Gets raw share price from vault in terms of its asset
+     *      2. If destination asset differs, converts price
+     *      3. Handles decimal adjustments during conversion
      * @param _vaultAddress The address of the vault
      * @param _dstAsset The destination asset to convert the price to
      * @return price The share price in terms of _dstAsset
      * @return timestamp The timestamp of the price
+     * @custom:throws NoValidPrice if price conversion fails
      */
     function _getDstSharePrice(
         address _vaultAddress,
@@ -894,6 +950,20 @@ contract SharePriceRouter is OwnableRoles {
         return this.convertStoredPrice(rawSharePrice, asset, _dstAsset);
     }
 
+    /**
+     * @notice Converts a price within the same asset category
+     * @dev Conversion process:
+     *      1. Gets current prices for both assets in same denomination
+     *      2. Calculates conversion ratio while maintaining precision
+     *      3. Adjusts decimals if needed
+     * @param _storedPrice Original price to convert
+     * @param _storedAsset Source asset address
+     * @param _dstAsset Destination asset address
+     * @param _inUSD Whether to use USD prices for conversion
+     * @return price Converted price in destination asset terms
+     * @return timestamp Timestamp of the conversion
+     * @custom:throws NoValidPrice if either asset price is unavailable
+     */
     function _convertSameCategory(
         uint256 _storedPrice,
         address _storedAsset,
@@ -925,17 +995,23 @@ contract SharePriceRouter is OwnableRoles {
         );
 
         // Handle decimal adjustments if needed
-        uint32 srcChain = vaultChainIds[_storedAsset];
-        uint32 dstChain = vaultChainIds[_dstAsset];
-
-        uint8 srcDecimals = _getAssetDecimalsWithReport(_storedAsset, srcChain);
-        uint8 dstDecimals = _getAssetDecimalsWithReport(_dstAsset, dstChain);
-
-        if (srcDecimals != dstDecimals) {
-            (price, ) = _adjustDecimals(price, srcDecimals, dstDecimals);
-        }
+        return _getAndAdjustDecimals(_storedAsset, price, _dstAsset);
     }
 
+    /**
+     * @notice Converts a price between different asset categories
+     * @dev Conversion process:
+     *      1. Gets USD prices for both assets
+     *      2. Converts through USD as intermediate step
+     *      3. Handles decimal scaling during conversion
+     * @param _storedPrice Original price to convert
+     * @param _storedAsset Source asset address
+     * @param _dstAsset Destination asset address
+     * @return price Converted price in destination asset terms
+     * @return timestamp Timestamp of the conversion
+     * @custom:throws NoValidPrice if either USD price is unavailable
+     * @custom:edge-case May lose precision during decimal adjustments
+     */
     function _convertCrossCategory(
         uint256 _storedPrice,
         address _storedAsset,

@@ -1,7 +1,20 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity ^0.8.17;
 
 import { MessagingFee } from "./ILayerZeroEndpointV2.sol";
+
+/**
+ * @title PriceReturnData
+ * @notice Structure containing price data and metadata from oracle adapters
+ * @param price Price normalized to WAD (1e18)
+ * @param hadError Error flag for price retrieval
+ * @param inUSD Whether price is denominated in USD
+ */
+struct PriceReturnData {
+    uint240 price;        // Price normalized to WAD (1e18)
+    bool hadError;        // Error flag - keeping consistent with your existing naming
+    bool inUSD;           // Price denomination
+}
 
 /**
  * @title VaultReport
@@ -11,6 +24,8 @@ import { MessagingFee } from "./ILayerZeroEndpointV2.sol";
  * @param chainId ID of the chain where the vault exists
  * @param rewardsDelegate Address to delegate rewards to
  * @param vaultAddress Address of the vault
+ * @param asset Address of the vault's underlying asset
+ * @param assetDecimals Decimals of the underlying asset
  */
 struct VaultReport {
     uint256 sharePrice;
@@ -25,6 +40,7 @@ struct VaultReport {
 /**
  * @title ISharePriceRouter
  * @notice Interface for cross-chain ERC4626 vault share price router
+ * @dev Combines functionality of price oracle adapters and router
  */
 interface ISharePriceRouter {
     /*//////////////////////////////////////////////////////////////
@@ -66,18 +82,17 @@ interface ISharePriceRouter {
     /// @notice Generate a unique key for a vault's price data
     function getPriceKey(uint32 _chainId, address _vault) external pure returns (bytes32);
 
-    /// @notice Get the latest price for an asset
+    /// @notice Get the price for an asset from the best available adapter
     function getPrice(
         address asset,
-        bool inUSD,
-        bool getLower
+        bool inUSD
     ) external view returns (uint256 price, uint256 errorCode);
 
     /// @notice Get the latest price from all adapters
     function getLatestPrice(
         address asset,
         bool inUSD
-    ) external view returns (uint256 price, uint256 timestamp, uint256 errorCode);
+    ) external view returns (uint256 price, uint256 timestamp, bool isUSD);
 
     /// @notice Get current share prices for multiple vaults
     function getSharePrices(

@@ -4,8 +4,7 @@ pragma solidity ^0.8.19;
 import { Test } from "forge-std/Test.sol";
 import { Api3Adaptor } from "../../src/adapters/Api3.sol";
 import { IProxy } from "../../src/interfaces/api3/IProxy.sol";
-import { PriceReturnData } from "../../src/interfaces/IOracleAdaptor.sol";
-import { IOracleRouter } from "../../src/interfaces/IOracleRouter.sol";
+import { ISharePriceRouter, PriceReturnData } from "../../src/interfaces/ISharePriceRouter.sol";
 import { SharePriceRouter } from "../../src/SharePriceRouter.sol";
 
 contract Api3AdapterTest is Test {

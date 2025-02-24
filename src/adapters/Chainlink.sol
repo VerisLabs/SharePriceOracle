@@ -2,8 +2,7 @@
 pragma solidity ^0.8.17;
 
 import {BaseOracleAdapter} from "../libs/base/BaseOracleAdapter.sol";
-import {IOracleRouter} from "../interfaces/IOracleRouter.sol";
-import {PriceReturnData} from "../interfaces/IOracleAdaptor.sol";
+import {ISharePriceRouter, PriceReturnData} from "../interfaces/ISharePriceRouter.sol";
 import {IChainlink} from "../interfaces/chainlink/IChainlink.sol";
 
 /**
@@ -207,7 +206,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
 
         // Notify the Oracle Router that we are going to stop supporting
         // the asset.
-        IOracleRouter(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
+        ISharePriceRouter(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
         emit ChainlinkAssetRemoved(asset);
     }
 
@@ -257,7 +256,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
         bool inUSD
     ) internal view returns (PriceReturnData memory pData) {
         pData.inUSD = inUSD;
-        if (!IOracleRouter(ORACLE_ROUTER_ADDRESS).isSequencerValid()) {
+        if (!ISharePriceRouter(ORACLE_ROUTER_ADDRESS).isSequencerValid()) {
             revert ChainlinkAdaptor__SequencerDown();
         }
 

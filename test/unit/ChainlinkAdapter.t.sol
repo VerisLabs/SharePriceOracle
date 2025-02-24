@@ -4,8 +4,7 @@ pragma solidity ^0.8.19;
 import { Test } from "forge-std/Test.sol";
 import { ChainlinkAdapter } from "../../src/adapters/Chainlink.sol";
 import { IChainlink } from "../../src/interfaces/chainlink/IChainlink.sol";
-import { PriceReturnData } from "../../src/interfaces/IOracleAdaptor.sol";
-import { IOracleRouter } from "../../src/interfaces/IOracleRouter.sol";
+import { ISharePriceRouter, PriceReturnData } from "../../src/interfaces/ISharePriceRouter.sol";
 import { SharePriceRouter } from "../../src/SharePriceRouter.sol";
 
 contract ChainlinkAdapterTest is Test {

@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {BaseOracleAdapter} from "../libs/base/BaseOracleAdapter.sol";
+import { BaseOracleAdapter } from "../libs/base/BaseOracleAdapter.sol";
 import { ERC20 } from "@solady/tokens/ERC20.sol";
-import {IOracleRouter} from "../interfaces/IOracleRouter.sol";
-import {PriceReturnData} from "../interfaces/IOracleAdaptor.sol";
+import { ISharePriceRouter, PriceReturnData } from "../interfaces/ISharePriceRouter.sol";
 import { IStaticOracle } from "../interfaces/uniswap/IStaticOracle.sol";
 import { UniswapV3Pool } from "../interfaces/uniswap/UniswapV3Pool.sol";
 
@@ -55,8 +54,9 @@ contract UniswapV3Adapter is BaseOracleAdapter {
 
     /// ERRORS ///
 
-    error UniswapV3Adaptor__AssetIsNotSupported();
-    error UniswapV3Adaptor__SecondsAgoIsLessThanMinimum();
+    error UniswapV3Adaptor__AssetIsNotSupported(address asset);
+    error UniswapV3Adaptor__SecondsAgoIsLessThanMinimum(uint32 provided, uint32 minimum);
+    error UniswapV3Adaptor__AssetNotInPool(address asset, address pool, address token0, address token1);
 
     /// CONSTRUCTOR ///
 
@@ -86,12 +86,14 @@ contract UniswapV3Adapter is BaseOracleAdapter {
     ) external view override returns (PriceReturnData memory pData) {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
-            revert UniswapV3Adaptor__AssetIsNotSupported();
+            revert UniswapV3Adaptor__AssetIsNotSupported(asset);
         }
 
         AdaptorData memory data = adaptorData[asset];
 
-        address[] memory pools = new address[](1);
+        // Cache array length in memory for gas optimization
+        uint256 poolLength = 1;
+        address[] memory pools = new address[](poolLength);
         pools[0] = data.priceSource;
         uint256 twapPrice;
 
@@ -121,7 +123,7 @@ contract UniswapV3Adapter is BaseOracleAdapter {
             return pData;
         }
 
-        IOracleRouter OracleRouter = IOracleRouter(
+        ISharePriceRouter OracleRouter = ISharePriceRouter(
             ORACLE_ROUTER_ADDRESS
         );
         pData.inUSD = inUSD;
@@ -211,7 +213,7 @@ contract UniswapV3Adapter is BaseOracleAdapter {
 
         // Verify twap time sample is reasonable.
         if (data.secondsAgo < MINIMUM_SECONDS_AGO) {
-            revert UniswapV3Adaptor__SecondsAgoIsLessThanMinimum();
+            revert UniswapV3Adaptor__SecondsAgoIsLessThanMinimum(data.secondsAgo, MINIMUM_SECONDS_AGO);
         }
 
         UniswapV3Pool pool = UniswapV3Pool(data.priceSource);
@@ -227,7 +229,7 @@ contract UniswapV3Adapter is BaseOracleAdapter {
             data.baseDecimals = ERC20(asset).decimals();
             data.quoteDecimals = ERC20(token0).decimals();
             data.quoteToken = token0;
-        } else revert UniswapV3Adaptor__AssetIsNotSupported();
+        } else revert UniswapV3Adaptor__AssetNotInPool(asset, data.priceSource, token0, token1);
 
         // Save adaptor data and update mapping that we support `asset` now.
         adaptorData[asset] = data;
@@ -252,7 +254,7 @@ contract UniswapV3Adapter is BaseOracleAdapter {
 
         // Validate that `asset` is currently supported.
         if (!isSupportedAsset[asset]) {
-            revert UniswapV3Adaptor__AssetIsNotSupported();
+            revert UniswapV3Adaptor__AssetIsNotSupported(asset);
         }
 
         // Wipe config mapping entries for a gas refund.
@@ -262,7 +264,7 @@ contract UniswapV3Adapter is BaseOracleAdapter {
 
         // Notify the Oracle Router that we are going
         // to stop supporting the asset.
-        IOracleRouter(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
+        ISharePriceRouter(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
         emit UniswapV3AssetRemoved(asset);
     }
 }

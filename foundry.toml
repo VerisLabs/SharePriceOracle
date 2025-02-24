@@ -6,6 +6,11 @@ gas_reports = ['*']
 
 solc_version = "0.8.19"
 
+remappings = [
+    "@solady/=lib/solady/src/",
+    "src/=src/"
+]
+
 fs_permissions = [
     { access = "read-write", path = "./deployments" },
     { access = "read", path = "./script/config" },
