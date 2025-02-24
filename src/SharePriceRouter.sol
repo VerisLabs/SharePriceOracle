@@ -107,6 +107,9 @@ contract SharePriceRouter is OwnableRoles {
     /// @notice Array of all oracle adapters
     address[] public oracleAdapters;
 
+    /// @notice Mapping of adapter address to its index in oracleAdapters array plus 1 (0 means not in array)
+    mapping(address => uint256) private adapterIndices;
+
     /// @notice Mapping of asset to its last stored price data
     /// @dev asset => (price, timestamp)
     mapping(address => StoredPrice) public storedPrices;
@@ -229,7 +232,38 @@ contract SharePriceRouter is OwnableRoles {
 
         adapterPriorities[adapter] = priority;
         oracleAdapters.push(adapter);
+        adapterIndices[adapter] = oracleAdapters.length;
         emit AdapterAdded(adapter, priority);
+    }
+
+    /**
+     * @notice Internal function to remove an adapter from the system
+     * @param adapter Address of the adapter to remove
+     */
+    function _removeAdapter(address adapter) internal {
+        if (adapterPriorities[adapter] == 0) revert AdapterNotFound();
+        
+        uint256 index = adapterIndices[adapter];
+        if (index == 0) revert AdapterNotFound();
+        index--; // Convert from 1-based to 0-based index
+
+        // Get the last adapter
+        address lastAdapter = oracleAdapters[oracleAdapters.length - 1];
+
+        // If not removing the last element, move the last element to the removed position
+        if (index != oracleAdapters.length - 1) {
+            oracleAdapters[index] = lastAdapter;
+            adapterIndices[lastAdapter] = index + 1; // Update the moved adapter's index (1-based)
+        }
+
+        // Remove the last element
+        oracleAdapters.pop();
+        
+        // Clean up storage
+        delete adapterPriorities[adapter];
+        delete adapterIndices[adapter];
+
+        emit AdapterRemoved(adapter);
     }
 
     /**
@@ -239,21 +273,7 @@ contract SharePriceRouter is OwnableRoles {
      */
     function removeAdapter(address adapter) external onlyAdmin {
         if (adapter == address(0)) revert ZeroAddress();
-        if (adapterPriorities[adapter] == 0) revert AdapterNotFound();
-
-        // Remove from priorities
-        delete adapterPriorities[adapter];
-
-        // Remove from array
-        for (uint256 i = 0; i < oracleAdapters.length; i++) {
-            if (oracleAdapters[i] == adapter) {
-                oracleAdapters[i] = oracleAdapters[oracleAdapters.length - 1];
-                oracleAdapters.pop();
-                break;
-            }
-        }
-
-        emit AdapterRemoved(adapter);
+        _removeAdapter(adapter);
     }
 
     /**
@@ -661,17 +681,10 @@ contract SharePriceRouter is OwnableRoles {
 
         // Handle same category conversions
         if (srcCategory == dstCategory) {
-            if (srcCategory == AssetCategory.ETH_LIKE) {
-                return _convertEthToEth(_storedPrice, _storedAsset, _dstAsset);
-            } else if (srcCategory == AssetCategory.BTC_LIKE) {
-                return _convertBtcToBtc(_storedPrice, _storedAsset, _dstAsset);
+            if (srcCategory == AssetCategory.ETH_LIKE || srcCategory == AssetCategory.BTC_LIKE) {
+                return _convertSameCategory(_storedPrice, _storedAsset, _dstAsset, false);
             } else if (srcCategory == AssetCategory.STABLE) {
-                return
-                    _convertStableToStable(
-                        _storedPrice,
-                        _storedAsset,
-                        _dstAsset
-                    );
+                return _convertSameCategory(_storedPrice, _storedAsset, _dstAsset, true);
             }
         }
 
@@ -873,126 +886,75 @@ contract SharePriceRouter is OwnableRoles {
     }
 
     /**
-     * @notice Converts a price between two BTC-like assets
-     * @dev Handles decimal adjustments and uses the latest prices for conversion
+     * @notice Internal function to convert prices between assets of the same category
+     * @dev Handles decimal adjustments and uses appropriate price denomination based on category
      * @param _storedPrice The price to convert
-     * @param _storedAsset The source BTC-like asset
-     * @param _dstAsset The destination BTC-like asset
+     * @param _storedAsset The source asset
+     * @param _dstAsset The destination asset
+     * @param _inUSD Whether to use USD prices (true) or not (false)
      * @return price The converted price
-     * @return timestamp The timestamp of the conversion (earliest of source timestamps)
+     * @return timestamp The timestamp of the conversion
      */
+    function _convertSameCategory(
+        uint256 _storedPrice,
+        address _storedAsset,
+        address _dstAsset,
+        bool _inUSD
+    ) internal view returns (uint256 price, uint64 timestamp) {
+        // Get prices in appropriate denomination (USD or ETH/BTC)
+        (uint256 srcPrice, uint256 srcTimestamp, ) = getLatestPrice(
+            _storedAsset,
+            _inUSD
+        );
+        (uint256 dstPrice, uint256 dstTimestamp, ) = getLatestPrice(
+            _dstAsset,
+            _inUSD
+        );
+
+        if (srcPrice == 0 || dstPrice == 0) revert NoValidPrice();
+
+        // Convert using ratio of prices
+        price = FixedPointMathLib.mulDiv(
+            _storedPrice,
+            srcPrice,
+            dstPrice
+        );
+
+        // Use earliest timestamp
+        timestamp = uint64(
+            srcTimestamp < dstTimestamp ? srcTimestamp : dstTimestamp
+        );
+
+        // Handle decimal adjustments if needed
+        uint8 srcDecimals = _getAssetDecimals(_storedAsset);
+        uint8 dstDecimals = _getAssetDecimals(_dstAsset);
+        if (srcDecimals != dstDecimals) {
+            (price, ) = _adjustDecimals(price, srcDecimals, dstDecimals);
+        }
+    }
+
     function _convertBtcToBtc(
         uint256 _storedPrice,
         address _storedAsset,
         address _dstAsset
     ) internal view returns (uint256 price, uint64 timestamp) {
-        (uint256 srcBtcPrice, uint256 srcTimestamp, ) = getLatestPrice(
-            _storedAsset,
-            false
-        );
-        (uint256 dstBtcPrice, uint256 dstTimestamp, ) = getLatestPrice(
-            _dstAsset,
-            false
-        );
-
-        if (srcBtcPrice == 0 || dstBtcPrice == 0) revert NoValidPrice();
-
-        price = FixedPointMathLib.mulDiv(
-            _storedPrice,
-            srcBtcPrice,
-            dstBtcPrice
-        );
-        timestamp = uint64(
-            srcTimestamp < dstTimestamp ? srcTimestamp : dstTimestamp
-        );
-
-        uint8 srcDecimals = _getAssetDecimals(_storedAsset);
-        uint8 dstDecimals = _getAssetDecimals(_dstAsset);
-        if (srcDecimals != dstDecimals) {
-            (price, ) = _adjustDecimals(price, srcDecimals, dstDecimals);
-        }
+        return _convertSameCategory(_storedPrice, _storedAsset, _dstAsset, false);
     }
 
-    /**
-     * @notice Converts a price between two ETH-like assets
-     * @dev Handles decimal adjustments and uses the latest prices for conversion
-     * @param _storedPrice The price to convert
-     * @param _storedAsset The source ETH-like asset
-     * @param _dstAsset The destination ETH-like asset
-     * @return price The converted price
-     * @return timestamp The timestamp of the conversion (earliest of source timestamps)
-     */
     function _convertEthToEth(
         uint256 _storedPrice,
         address _storedAsset,
         address _dstAsset
     ) internal view returns (uint256 price, uint64 timestamp) {
-        (uint256 srcEthPrice, uint256 srcTimestamp, ) = getLatestPrice(
-            _storedAsset,
-            false
-        );
-        (uint256 dstEthPrice, uint256 dstTimestamp, ) = getLatestPrice(
-            _dstAsset,
-            false
-        );
-
-        if (srcEthPrice == 0 || dstEthPrice == 0) revert NoValidPrice();
-
-        price = FixedPointMathLib.mulDiv(
-            _storedPrice,
-            srcEthPrice,
-            dstEthPrice
-        );
-        timestamp = uint64(
-            srcTimestamp < dstTimestamp ? srcTimestamp : dstTimestamp
-        );
-
-        uint8 srcDecimals = _getAssetDecimals(_storedAsset);
-        uint8 dstDecimals = _getAssetDecimals(_dstAsset);
-        if (srcDecimals != dstDecimals) {
-            (price, ) = _adjustDecimals(price, srcDecimals, dstDecimals);
-        }
+        return _convertSameCategory(_storedPrice, _storedAsset, _dstAsset, false);
     }
 
-    /**
-     * @notice Converts a price between two stablecoins
-     * @dev Handles decimal adjustments and uses USD prices for conversion
-     * @param _storedPrice The price to convert
-     * @param _storedAsset The source stablecoin
-     * @param _dstAsset The destination stablecoin
-     * @return price The converted price
-     * @return timestamp The timestamp of the conversion (earliest of source timestamps)
-     */
     function _convertStableToStable(
         uint256 _storedPrice,
         address _storedAsset,
         address _dstAsset
     ) internal view returns (uint256 price, uint64 timestamp) {
-        (uint256 srcUsdPrice, uint256 srcTimestamp, ) = getLatestPrice(
-            _storedAsset,
-            true
-        );
-        (uint256 dstUsdPrice, uint256 dstTimestamp, ) = getLatestPrice(
-            _dstAsset,
-            true
-        );
-
-        if (srcUsdPrice == 0 || dstUsdPrice == 0) revert NoValidPrice();
-
-        price = FixedPointMathLib.mulDiv(
-            _storedPrice,
-            srcUsdPrice,
-            dstUsdPrice
-        );
-        timestamp = uint64(
-            srcTimestamp < dstTimestamp ? srcTimestamp : dstTimestamp
-        );
-
-        uint8 srcDecimals = _getAssetDecimals(_storedAsset);
-        uint8 dstDecimals = _getAssetDecimals(_dstAsset);
-        if (srcDecimals != dstDecimals) {
-            (price, ) = _adjustDecimals(price, srcDecimals, dstDecimals);
-        }
+        return _convertSameCategory(_storedPrice, _storedAsset, _dstAsset, true);
     }
 
     /**
@@ -1031,14 +993,12 @@ contract SharePriceRouter is OwnableRoles {
 
         // Then convert to destination asset with proper decimal scaling
         if (srcDecimals <= dstDecimals) {
-            // If dst has more or equal decimals (like USDC->BTC: 6->8), we need to multiply
             price = FixedPointMathLib.mulDiv(
                 usdValue * (10 ** (dstDecimals - srcDecimals)),
                 1,
                 dstUsdPrice
             );
         } else {
-            // If dst has fewer decimals (like BTC->USDC: 8->6), we need to divide
             price = FixedPointMathLib.mulDiv(
                 usdValue,
                 1,
@@ -1057,21 +1017,7 @@ contract SharePriceRouter is OwnableRoles {
      * @param asset The address of the asset
      */
     function notifyFeedRemoval(address asset) external {
-        if (adapterPriorities[msg.sender] == 0) revert AdapterNotFound();
-        
-        // Remove from priorities
-        delete adapterPriorities[msg.sender];
-
-        // Remove from array
-        for (uint256 i = 0; i < oracleAdapters.length; i++) {
-            if (oracleAdapters[i] == msg.sender) {
-                oracleAdapters[i] = oracleAdapters[oracleAdapters.length - 1];
-                oracleAdapters.pop();
-                break;
-            }
-        }
-
-        emit AdapterRemoved(msg.sender);
+        _removeAdapter(msg.sender);
     }
 }
 
