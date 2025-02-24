@@ -2,7 +2,6 @@
 pragma solidity ^0.8.19;
 
 import {Test} from "forge-std/Test.sol";
-import {console} from "forge-std/console.sol";
 import {SharePriceRouter} from "../../src/SharePriceRouter.sol";
 import {ChainlinkAdapter} from "../../src/adapters/Chainlink.sol";
 import {Api3Adaptor} from "../../src/adapters/Api3.sol";
@@ -59,16 +58,9 @@ contract SharePriceRouterTest is Test {
         endpoint = makeAddr("endpoint");
         user = makeAddr("user");
 
-        console.log("=== Test Setup ===");
-        console.log("Admin address:", admin);
-        console.log("Updater address:", updater);
-        console.log("Endpoint address:", endpoint);
-        console.log("User address:", user);
-
         // Deploy router with admin as owner
         vm.prank(admin);
         router = new SharePriceRouter(admin, ETH_USD_FEED, USDC, WBTC, WETH);
-        console.log("Router deployed at:", address(router));
 
         // Deploy adapters
         chainlinkAdapter = new ChainlinkAdapter(
@@ -76,10 +68,7 @@ contract SharePriceRouterTest is Test {
             address(router),
             address(router) // Router is now its own router
         );
-        console.log(
-            "Chainlink adapter deployed at:",
-            address(chainlinkAdapter)
-        );
+        
 
         api3Adapter = new Api3Adaptor(
             admin,
@@ -87,7 +76,6 @@ contract SharePriceRouterTest is Test {
             address(router), // Router is now its own router
             WETH
         );
-        console.log("API3 adapter deployed at:", address(api3Adapter));
 
         // Deploy mock vaults with correct decimals for each asset
         // USDC: 6 decimals
@@ -98,38 +86,17 @@ contract SharePriceRouterTest is Test {
         wbtcVault = new MockVault(WBTC, 8, 1.1e8); // 1.1 BTC
         // DAI: 18 decimals
         daiVault = new MockVault(DAI, 18, 1.1e18); // 1.1 DAI
-        console.log("Mock vaults deployed");
 
         // Setup roles
         vm.startPrank(admin);
-        console.log("Setting up roles as admin");
         router.grantRole(updater, router.UPDATER_ROLE());
         router.grantRole(endpoint, router.ENDPOINT_ROLE());
         vm.stopPrank();
-        console.log("Roles setup completed");
-
-        // Verify initial state
-        console.log("Verifying initial state:");
-        console.log(
-            "Admin has ADMIN_ROLE:",
-            router.hasAnyRole(admin, router.ADMIN_ROLE())
-        );
-        console.log(
-            "Updater has UPDATER_ROLE:",
-            router.hasAnyRole(updater, router.UPDATER_ROLE())
-        );
-        console.log(
-            "Endpoint has ENDPOINT_ROLE:",
-            router.hasAnyRole(endpoint, router.ENDPOINT_ROLE())
-        );
     }
 
     // Admin function tests
     function testGrantRole() public {
         address newAdmin = makeAddr("newAdmin");
-
-        console.log("Admin address:", admin);
-        console.log("New admin address:", newAdmin);
 
         vm.startPrank(admin);
         router.grantRole(newAdmin, router.ADMIN_ROLE());
@@ -218,11 +185,7 @@ contract SharePriceRouterTest is Test {
     }
 
     function testRevertSetAssetCategory_NotAdmin() public {
-        console.log("User address:", user);
-        console.log("Current admin:", admin);
-
         vm.prank(user);
-        console.log("Pranking as user to attempt setting asset category");
         vm.expectRevert();
         router.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
     }
@@ -244,8 +207,6 @@ contract SharePriceRouterTest is Test {
 
     // Share price tests
     function testGetLatestSharePrice_USDC() public {
-        console.log("\n=== Testing USDC Share Price ===");
-
         // Set USDC category
         vm.startPrank(admin);
         router.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
@@ -267,13 +228,10 @@ contract SharePriceRouterTest is Test {
         // Add price feed for USDC
         chainlinkAdapter.addAsset(USDC, USDC_USD_FEED, 86400, true);
 
-        console.log("Getting share price from router...");
         (uint256 actualSharePrice, uint64 timestamp) = router
             .getLatestSharePrice(address(usdcVault), USDC);
 
         uint256 expectedSharePrice = 1.1e6; // 1.1 in USDC decimals
-        console.log("Expected price:", expectedSharePrice);
-        console.log("Actual price:", actualSharePrice);
 
         // Allow for a small deviation (0.1%) in price
         uint256 maxDelta = expectedSharePrice / 1000; // 0.1% of expected price
@@ -291,8 +249,6 @@ contract SharePriceRouterTest is Test {
     }
 
     function testGetLatestSharePrice_DAI_to_USDC() public {
-        console.log("\n=== Testing DAI to USDC Share Price ===");
-
         vm.startPrank(admin);
         // Set asset categories
         router.setAssetCategory(DAI, SharePriceRouter.AssetCategory.STABLE);
@@ -321,18 +277,12 @@ contract SharePriceRouterTest is Test {
 
         // Create DAI vault with 1.1 DAI per share
         uint256 sharePrice = 1.1e18; // DAI uses 18 decimals
-        console.log("Setting DAI vault share price to:", sharePrice);
-        console.log("DAI decimals:", IERC20Metadata(DAI).decimals());
-        console.log("USDC decimals:", IERC20Metadata(USDC).decimals());
         daiVault = new MockVault(DAI, 18, sharePrice);
 
-        console.log("Getting share price from router...");
         (uint256 actualSharePrice, uint64 timestamp) = router
             .getLatestSharePrice(address(daiVault), USDC);
 
         uint256 expectedSharePrice = 1.1e6; // 1.1 in USDC decimals
-        console.log("Expected price:", expectedSharePrice);
-        console.log("Actual price:", actualSharePrice);
 
         // Allow for a small deviation (0.1%) in price due to conversion
         uint256 maxDelta = expectedSharePrice / 1000; // 0.1% of expected price
@@ -350,10 +300,6 @@ contract SharePriceRouterTest is Test {
     }
 
     function testGetLatestSharePrice_ETH_to_USDC() public {
-        console.log(
-            "\n=== Testing ETH to USDC Share Price (Cross Category) ==="
-        );
-
         vm.startPrank(admin);
         // Set asset categories
         router.setAssetCategory(WETH, SharePriceRouter.AssetCategory.ETH_LIKE);
@@ -400,31 +346,19 @@ contract SharePriceRouterTest is Test {
         // Get current ETH/USD price to calculate expected value
         (uint256 ethPrice, , ) = router.getLatestPrice(WETH, true);
         (uint256 usdcPrice, , ) = router.getLatestPrice(USDC, true);
-        console.log("Current ETH/USD price:", ethPrice);
-        console.log("Current USDC/USD price:", usdcPrice);
 
         // Create ETH vault with 1.1 ETH per share
         uint256 sharePrice = 1.1e18; // ETH uses 18 decimals
-        console.log("Setting ETH vault share price to:", sharePrice);
         uint8 wethDecimals = IERC20Metadata(WETH).decimals();
         uint8 usdcDecimals = IERC20Metadata(USDC).decimals();
-        console.log("WETH decimals:", wethDecimals);
-        console.log("USDC decimals:", usdcDecimals);
+        
         wethVault = new MockVault(WETH, 18, sharePrice);
 
         uint256 expectedSharePrice = (sharePrice * ethPrice) /
             (usdcPrice * 10 ** (wethDecimals - usdcDecimals));
-        console.log(
-            "Expected price (1.1 * ETH/USD in USDC decimals):",
-            expectedSharePrice
-        );
 
-        console.log("Getting share price from router...");
         (uint256 actualSharePrice, uint64 timestamp) = router
             .getLatestSharePrice(address(wethVault), USDC);
-
-        console.log("Expected price:", expectedSharePrice);
-        console.log("Actual price:", actualSharePrice);
 
         // Allow for a small deviation (2%) due to cross-category conversion and multiple price sources
         uint256 maxDelta = (expectedSharePrice * 2) / 100; // 2% of expected price
@@ -442,10 +376,6 @@ contract SharePriceRouterTest is Test {
     }
 
     function testGetLatestSharePrice_CrossCategory_ETH_to_BTC() public {
-        console.log(
-            "\n=== Testing ETH to BTC Share Price (Cross Category) ==="
-        );
-
         vm.startPrank(admin);
         // Set asset categories
         router.setAssetCategory(WETH, SharePriceRouter.AssetCategory.ETH_LIKE);
@@ -498,11 +428,8 @@ contract SharePriceRouterTest is Test {
 
         // Create ETH vault with 1.1 ETH per share
         uint256 sharePrice = 1.1e18; // ETH uses 18 decimals
-        console.log("Setting ETH vault share price to:", sharePrice);
         uint8 wethDecimals = IERC20Metadata(WETH).decimals();
         uint8 wbtcDecimals = IERC20Metadata(WBTC).decimals();
-        console.log("WETH decimals:", wethDecimals);
-        console.log("WBTC decimals:", wbtcDecimals);
         wethVault = new MockVault(WETH, 18, sharePrice);
 
         // Get current prices to calculate expected value
@@ -512,14 +439,9 @@ contract SharePriceRouterTest is Test {
         // Calculate expected price: (1.1 * ETH/USD) / (BTC/USD) in BTC decimals
         uint256 expectedSharePrice = (sharePrice * ethPrice) /
             (btcPrice * 10 ** (wethDecimals - wbtcDecimals));
-        console.log("Expected price:", expectedSharePrice);
 
-        console.log("Getting share price from router...");
         (uint256 actualSharePrice, uint64 timestamp) = router
             .getLatestSharePrice(address(wethVault), WBTC);
-
-        console.log("Expected price:", expectedSharePrice);
-        console.log("Actual price:", actualSharePrice);
 
         // Allow for a larger deviation (1%) due to cross-category conversion and multiple price sources
         uint256 maxDelta = expectedSharePrice / 100; // 1% of expected price
@@ -537,10 +459,6 @@ contract SharePriceRouterTest is Test {
     }
 
     function testGetLatestSharePrice_CrossCategory_BTC_to_USDC() public {
-        console.log(
-            "\n=== Testing BTC to USDC Share Price (Cross Category) ==="
-        );
-
         vm.startPrank(admin);
         // Set asset categories
         router.setAssetCategory(WBTC, SharePriceRouter.AssetCategory.BTC_LIKE);
@@ -586,27 +504,19 @@ contract SharePriceRouterTest is Test {
 
         // Create BTC vault with 1.1 BTC per share
         uint256 sharePrice = 1.1e8; // BTC uses 8 decimals
-        console.log("Setting BTC vault share price to:", sharePrice);
         uint8 btcDecimals = IERC20Metadata(WBTC).decimals();
         uint8 usdcDecimals = IERC20Metadata(USDC).decimals();
-        console.log("WBTC decimals:", btcDecimals);
-        console.log("USDC decimals:", usdcDecimals);
         wbtcVault = new MockVault(WBTC, 8, sharePrice);
 
         // Get current BTC/USD price to calculate expected value
         (uint256 btcPrice, , ) = router.getLatestPrice(WBTC, true);
         (uint256 usdcPrice, , ) = router.getLatestPrice(USDC, true);
-        console.log("Current BTC/USD price:", btcPrice);
-        console.log("Current USDC/USD price:", usdcPrice);
 
-        console.log("Getting share price from router...");
         (uint256 actualSharePrice, uint64 timestamp) = router
             .getLatestSharePrice(address(wbtcVault), USDC);
 
         uint256 expectedSharePrice = (sharePrice * btcPrice) /
             (usdcPrice * 10 ** (btcDecimals - usdcDecimals));
-        console.log("Expected price:", expectedSharePrice);
-        console.log("Actual price:", actualSharePrice);
 
         // Allow for a larger deviation (2%) due to cross-category conversion and multiple price sources
         uint256 maxDelta = (expectedSharePrice * 2) / 100; // 2% of expected price
@@ -624,10 +534,6 @@ contract SharePriceRouterTest is Test {
     }
 
     function testGetLatestSharePrice_CrossCategory_USDC_to_BTC() public {
-        console.log(
-            "\n=== Testing USDC to BTC Share Price (Cross Category) ==="
-        );
-
         vm.startPrank(admin);
         // Set asset categories
         router.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
@@ -673,20 +579,14 @@ contract SharePriceRouterTest is Test {
 
         // Create USDC vault with 1.1 USDC per share
         uint256 sharePrice = 1.1e6; // USDC uses 6 decimals
-        console.log("Setting USDC vault share price to:", sharePrice);
         uint8 usdcDecimals = IERC20Metadata(USDC).decimals();
         uint8 wbtcDecimals = IERC20Metadata(WBTC).decimals();
-        console.log("USDC decimals:", usdcDecimals);
-        console.log("WBTC decimals:", wbtcDecimals);
         usdcVault = new MockVault(USDC, 6, sharePrice);
 
         // Get current prices to calculate expected value
         (uint256 btcPrice, , ) = router.getLatestPrice(WBTC, true);
         (uint256 usdcPrice, , ) = router.getLatestPrice(USDC, true);
-        console.log("Current BTC/USD price:", btcPrice);
-        console.log("Current USDC/USD price:", usdcPrice);
 
-        console.log("Getting share price from router...");
         (uint256 actualSharePrice, uint64 timestamp) = router
             .getLatestSharePrice(address(usdcVault), WBTC);
 
@@ -696,12 +596,9 @@ contract SharePriceRouterTest is Test {
                 USDC,
                 WBTC
             );
-        console.log("Direct convertStoredPrice result:", directConversion);
 
         uint256 shareUsdValue = (sharePrice * usdcPrice) / 1e6;
         uint256 expectedSharePrice = (shareUsdValue * 1e8) / btcPrice;
-        console.log("Expected price:", expectedSharePrice);
-        console.log("Actual price:", actualSharePrice);
 
         // Allow for a larger deviation (1%) due to cross-category conversion and multiple price sources
         uint256 maxDelta = expectedSharePrice / 100; // 1% of expected price

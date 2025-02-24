@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity ^0.8.19;
 
 import {OwnableRoles} from "@solady/auth/OwnableRoles.sol";
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
@@ -7,7 +7,7 @@ import {IERC4626} from "./interfaces/IERC4626.sol";
 import {IERC20Metadata} from "./interfaces/IERC20Metadata.sol";
 import {IOracleAdaptor, PriceReturnData} from "./interfaces/IOracleAdaptor.sol";
 import {VaultReport} from "./interfaces/ISharePriceOracle.sol";
-import {console} from "forge-std/console.sol";
+import {IChainlink} from "./interfaces/chainlink/IChainlink.sol";
 
 /**
  * @title SharePriceRouter
@@ -32,6 +32,7 @@ contract SharePriceRouter is OwnableRoles {
     error InvalidPriceData();
     error ExceedsMaxReports();
     error InvalidAssetType();
+    error SequencerDown();
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
@@ -47,6 +48,7 @@ contract SharePriceRouter is OwnableRoles {
         uint256 sharePrice,
         address rewardsDelegate
     );
+    event SequencerUpdated(address oldSequencer, address newSequencer);
 
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
@@ -67,6 +69,8 @@ contract SharePriceRouter is OwnableRoles {
     uint256 public constant MIN_PRICE_THRESHOLD = 1e2; // 0.0000000001 in 18 decimals
     /// @notice Maximum price impact allowed for conversions (1% = 10000)
     uint256 public constant MAX_PRICE_IMPACT = 10000; // 1%
+    /// @notice Grace period after sequencer is back up
+    uint256 public constant GRACE_PERIOD_TIME = 3600; // 1 hour
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
@@ -81,6 +85,9 @@ contract SharePriceRouter is OwnableRoles {
     address public immutable USDC;
     address public immutable WBTC;
     address public immutable WETH;
+
+    /// @notice Sequencer uptime feed address
+    address public sequencer;
 
     /// @notice Asset categories for optimized conversion
     enum AssetCategory {
@@ -184,7 +191,8 @@ contract SharePriceRouter is OwnableRoles {
     //////////////////////////////////////////////////////////////*/
     /**
      * @notice Grants a role to an account
-     * @param account Address to grant the role to
+     * @dev Only callable by admin
+     * @param account Address to receive the role
      * @param role Role identifier to grant
      */
     function grantRole(address account, uint256 role) external onlyAdmin {
@@ -197,7 +205,8 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Revokes a role from an account
-     * @param account Address to revoke the role from
+     * @dev Only callable by admin
+     * @param account Address to lose the role
      * @param role Role identifier to revoke
      */
     function revokeRole(address account, uint256 role) external onlyAdmin {
@@ -210,7 +219,8 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Adds a new oracle adapter
-     * @param adapter Address of the oracle adapter
+     * @dev Only callable by admin. Sets adapter priority and enables it
+     * @param adapter Address of the oracle adapter to add
      * @param priority Priority level for the adapter (lower = higher priority)
      */
     function addAdapter(address adapter, uint256 priority) external onlyAdmin {
@@ -224,6 +234,7 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Removes an oracle adapter
+     * @dev Only callable by admin. Completely removes adapter from the system
      * @param adapter Address of the oracle adapter to remove
      */
     function removeAdapter(address adapter) external onlyAdmin {
@@ -247,8 +258,9 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Sets the category for an asset
+     * @dev Only callable by admin. Categories determine price conversion logic
      * @param asset The asset address
-     * @param category The asset category
+     * @param category The asset category (BTC_LIKE, ETH_LIKE, STABLE)
      */
     function setAssetCategory(
         address asset,
@@ -259,22 +271,35 @@ contract SharePriceRouter is OwnableRoles {
         assetCategories[asset] = category;
     }
 
+    /**
+     * @notice Sets the sequencer uptime feed address
+     * @dev Only callable by admin
+     * @param _sequencer The new sequencer uptime feed address
+     */
+    function setSequencer(address _sequencer) external onlyAdmin {
+        address oldSequencer = sequencer;
+        sequencer = _sequencer;
+        emit SequencerUpdated(oldSequencer, _sequencer);
+    }
+
     /*//////////////////////////////////////////////////////////////
                           EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Checks if the sequencer is valid (for L2s)
+     * @dev Returns true for L1s or if no sequencer check needed
      * @return True if the sequencer is valid
      */
-    function isSequencerValid() external pure returns (bool) {
-        return true; // For L1s or if no sequencer check needed
+    function isSequencerValid() external view returns (bool) {
+        return _isSequencerValid();
     }
 
     /**
      * @notice Checks if an asset is supported by any adapter
+     * @dev Iterates through all adapters to check support
      * @param asset The asset to check
-     * @return True if the asset is supported
+     * @return True if the asset is supported by any adapter
      */
     function isSupportedAsset(address asset) external view returns (bool) {
         for (uint256 i = 0; i < oracleAdapters.length; i++) {
@@ -288,8 +313,10 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Generates a unique key for storing share prices
+     * @dev Uses keccak256 hash of chain ID and vault address
      * @param _chainId Chain ID
      * @param _vaultAddress Vault address
+     * @return The unique key as bytes32
      */
     function getPriceKey(
         uint32 _chainId,
@@ -300,6 +327,7 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Gets the price for an asset from the best available adapter
+     * @dev Returns price and error code (0 = no error)
      * @param asset The asset to get the price for
      * @param inUSD Whether to get the price in USD
      * @param getLower Whether to get the lower of two prices if available
@@ -325,6 +353,7 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Gets the latest price for an asset using all available adapters
+     * @dev Tries adapters in priority order until valid price is found
      * @param asset Address of the asset
      * @param inUSD Whether to return the price in USD
      * @return price Latest price of the asset
@@ -372,6 +401,7 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Gets share prices for multiple vaults
+     * @dev Returns array of vault reports with current prices
      * @param vaultAddresses Array of vault addresses
      * @param rewardsDelegate Address of the rewards delegate
      * @return reports Array of vault reports
@@ -408,6 +438,12 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Gets the latest share price for a vault
+     * @dev Tries multiple methods to get the price in order:
+     *      1. Current price calculation
+     *      2. Cross-chain price for remote vaults
+     *      3. Stored prices
+     *      4. Raw vault ratio if assets match
+     *      5. 1:1 ratio as absolute fallback
      * @param _vaultAddress Address of the vault
      * @param _dstAsset Asset to get the price in
      * @return sharePrice Current share price in terms of _dstAsset
@@ -456,17 +492,15 @@ contract SharePriceRouter is OwnableRoles {
                         _dstAsset
                     )
                 returns (uint256 convertedPrice, uint64 convertedTime) {
-                    console.log("Try block succeeded, price:", convertedPrice);
                     bool validPrice = _validatePrice(
                         convertedPrice,
                         convertedTime
                     );
-                    console.log("_validatePrice result:", validPrice);
                     if (validPrice) {
                         return (convertedPrice, convertedTime);
                     }
-                } catch (bytes memory err) {
-                    console.log("Caught exception in convertStoredPrice");
+                } catch (bytes memory /* err */) {
+                    // Continue with next attempt if conversion fails
                 }
             }
 
@@ -501,9 +535,28 @@ contract SharePriceRouter is OwnableRoles {
         return (PRECISION, uint64(block.timestamp));
     }
 
+     /**
+     * @notice Get latest share price report for a specific vault
+     * @dev Returns the stored report for a vault from a specific chain
+     * @param _srcChainId The source chain ID
+     * @param _vaultAddress The vault address
+     * @return The vault report containing share price and metadata
+     */
+    function getLatestSharePriceReport(
+        uint32 _srcChainId,
+        address _vaultAddress
+    ) external view returns (VaultReport memory) {
+        bytes32 key = getPriceKey(_srcChainId, _vaultAddress);
+        return sharePrices[key];
+    }
+
     /**
      * @notice Calculates current share price without storing it
      * @dev This is separated to allow for view-only calls and cleaner error handling
+     * @param _vaultAddress The address of the vault to calculate price for
+     * @param _dstAsset The asset to denominate the share price in
+     * @return sharePrice The calculated share price in terms of _dstAsset
+     * @return timestamp The timestamp of the calculation
      */
     function calculateSharePrice(
         address _vaultAddress,
@@ -514,8 +567,9 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Updates and stores the latest price for an asset
+     * @dev Fetches the latest price and stores it in the contract state
      * @param asset Address of the asset to update
-     * @param inUSD Whether to store the price in USD
+     * @param inUSD Whether to store the price in USD (true) or ETH (false)
      */
     function updatePrice(address asset, bool inUSD) external {
         (uint256 price, uint256 timestamp, bool isUSD) = getLatestPrice(
@@ -534,6 +588,7 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Updates share prices from another chain via LayerZero
+     * @dev Only callable by endpoint. Validates chain IDs and report count
      * @param _srcChainId Source chain ID
      * @param reports Array of vault reports to update
      */
@@ -572,79 +627,6 @@ contract SharePriceRouter is OwnableRoles {
                 report.sharePrice,
                 report.rewardsDelegate
             );
-        }
-    }
-
-    /**
-     * @notice Batch updates prices for multiple assets with gas optimizations for related pairs
-     * @param assets Array of asset addresses to update
-     * @param inUSD Array of booleans indicating if each price should be in USD
-     * @dev Optimizes gas usage by caching shared price lookups (e.g., ETH/USD for ETH-related pairs)
-     */
-    function batchUpdatePrices(
-        address[] calldata assets,
-        bool[] calldata inUSD
-    ) external {
-        if (assets.length != inUSD.length) revert InvalidPriceData();
-        if (assets.length == 0) revert InvalidPriceData();
-
-        // Cache for ETH/USD price to optimize gas for ETH-related pairs
-        uint256 ethUsdPrice;
-        uint256 ethUsdTimestamp;
-        bool ethUsdCached;
-
-        for (uint256 i = 0; i < assets.length; i++) {
-            address asset = assets[i];
-            bool requiresUSD = inUSD[i];
-
-            // Special handling for ETH-like assets
-            if (assetCategories[asset] == AssetCategory.ETH_LIKE) {
-                // Cache ETH/USD price if not already cached
-                if (!ethUsdCached && requiresUSD) {
-                    (ethUsdPrice, ethUsdTimestamp, ) = getLatestPrice(
-                        ETH_USD_FEED,
-                        true
-                    );
-                    ethUsdCached = true;
-                }
-
-                // Get asset's price in ETH
-                (uint256 price, uint256 timestamp, bool isUSD) = getLatestPrice(
-                    asset,
-                    false
-                );
-                if (price > 0) {
-                    if (requiresUSD && !isUSD && ethUsdCached) {
-                        // Convert to USD using cached ETH/USD price
-                        price = FixedPointMathLib.mulDiv(
-                            price * PRECISION,
-                            ethUsdPrice,
-                            PRECISION
-                        );
-                        timestamp = timestamp < ethUsdTimestamp
-                            ? timestamp
-                            : ethUsdTimestamp;
-                        isUSD = true;
-                    }
-
-                    storedPrices[asset] = StoredPrice({
-                        price: price,
-                        timestamp: timestamp,
-                        isUSD: isUSD
-                    });
-
-                    emit PriceStored(asset, price, timestamp);
-                }
-                continue;
-            }
-
-            // Standard price update for other assets
-            try this.updatePrice(asset, requiresUSD) {
-                // Price update and event emission handled in updatePrice
-            } catch {
-                // Continue with next asset if update fails
-                continue;
-            }
         }
     }
 
@@ -700,8 +682,31 @@ contract SharePriceRouter is OwnableRoles {
     /*//////////////////////////////////////////////////////////////
                           INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////* /
+    
+    /**
+     * @notice Internal function to check sequencer status
+     * @dev Checks if sequencer is up and grace period has passed
+     * @return True if sequencer is valid
+     */
+    function _isSequencerValid() internal view returns (bool) {
+        if (sequencer == address(0)) {
+            return true; // No sequencer check needed (e.g. on L1)
+        }
+
+        (, int256 answer, uint256 startedAt, , ) = IChainlink(sequencer).latestRoundData();
+
+        // Answer == 0: Sequencer is up
+        // Check that the sequencer is up or the grace period has passed
+        if (answer != 0 || block.timestamp < startedAt + GRACE_PERIOD_TIME) {
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * @notice Checks if a timestamp is considered stale
+     * @dev Compares against PRICE_STALENESS_THRESHOLD
      * @param timestamp The timestamp to check
      * @return True if the timestamp is stale
      */
@@ -711,6 +716,7 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Gets decimals for an asset with caching
+     * @dev Caches result to save gas on subsequent calls
      * @param asset The asset address
      * @return decimals The number of decimals
      */
@@ -724,7 +730,8 @@ contract SharePriceRouter is OwnableRoles {
     }
 
     /**
-     * @notice Gets decimals for an asset with caching (view-only version)
+     * @notice Gets decimals for an asset (view-only version)
+     * @dev Uses cached value if available, otherwise queries token
      * @param asset The asset address
      * @return decimals The number of decimals
      */
@@ -758,6 +765,10 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Validates a price and its timestamp
+     * @dev Checks if:
+     *      1. Price is above minimum threshold
+     *      2. Price is not stale
+     *      3. Price fits within uint240
      * @param price The price to validate
      * @param timestamp The timestamp of the price
      * @return valid Whether the price is valid
@@ -775,6 +786,7 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Stores a share price with metadata
+     * @dev Updates the storedSharePrices mapping with current price data
      * @param _vaultAddress The vault address
      * @param _price The share price to store
      * @param _timestamp The timestamp of the price
@@ -797,10 +809,12 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Gets the cross-chain price for a vault
+     * @dev Attempts to get and convert a price from another chain
+     *      Returns (0,0) if no valid price is found
      * @param _vaultAddress The vault address
      * @param _dstAsset The destination asset
      * @param _srcChain The source chain ID
-     * @return price The converted price
+     * @return price The converted price in terms of _dstAsset
      * @return timestamp The price timestamp as uint64
      */
     function _getCrossChainPrice(
@@ -833,35 +847,40 @@ contract SharePriceRouter is OwnableRoles {
 
     /**
      * @notice Gets share price for a vault with standardized conversion
+     * @dev First gets raw share price from vault, then converts to destination asset if needed
+     * @param _vaultAddress The address of the vault
+     * @param _dstAsset The destination asset to convert the price to
+     * @return price The share price in terms of _dstAsset
+     * @return timestamp The timestamp of the price
      */
     function _getDstSharePrice(
         address _vaultAddress,
         address _dstAsset
     ) internal view returns (uint256 price, uint64 timestamp) {
-        console.log(
-            "_getDstSharePrice: Getting share price for vault",
-            _vaultAddress
-        );
-        console.log("Converting to asset:", _dstAsset);
-
         IERC4626 vault = IERC4626(_vaultAddress);
         address asset = vault.asset();
-        console.log("Vault's underlying asset:", asset);
 
         uint8 assetDecimals = _getAssetDecimals(asset);
         uint256 assetUnit = 10 ** assetDecimals;
 
         uint256 rawSharePrice = vault.convertToAssets(assetUnit);
-        console.log("Raw share price from vault:", rawSharePrice);
 
         if (asset == _dstAsset) {
             return (rawSharePrice, uint64(block.timestamp));
         }
 
-        console.log("Converting through USD");
         return this.convertStoredPrice(rawSharePrice, asset, _dstAsset);
     }
 
+    /**
+     * @notice Converts a price between two BTC-like assets
+     * @dev Handles decimal adjustments and uses the latest prices for conversion
+     * @param _storedPrice The price to convert
+     * @param _storedAsset The source BTC-like asset
+     * @param _dstAsset The destination BTC-like asset
+     * @return price The converted price
+     * @return timestamp The timestamp of the conversion (earliest of source timestamps)
+     */
     function _convertBtcToBtc(
         uint256 _storedPrice,
         address _storedAsset,
@@ -894,6 +913,15 @@ contract SharePriceRouter is OwnableRoles {
         }
     }
 
+    /**
+     * @notice Converts a price between two ETH-like assets
+     * @dev Handles decimal adjustments and uses the latest prices for conversion
+     * @param _storedPrice The price to convert
+     * @param _storedAsset The source ETH-like asset
+     * @param _dstAsset The destination ETH-like asset
+     * @return price The converted price
+     * @return timestamp The timestamp of the conversion (earliest of source timestamps)
+     */
     function _convertEthToEth(
         uint256 _storedPrice,
         address _storedAsset,
@@ -926,6 +954,15 @@ contract SharePriceRouter is OwnableRoles {
         }
     }
 
+    /**
+     * @notice Converts a price between two stablecoins
+     * @dev Handles decimal adjustments and uses USD prices for conversion
+     * @param _storedPrice The price to convert
+     * @param _storedAsset The source stablecoin
+     * @param _dstAsset The destination stablecoin
+     * @return price The converted price
+     * @return timestamp The timestamp of the conversion (earliest of source timestamps)
+     */
     function _convertStableToStable(
         uint256 _storedPrice,
         address _storedAsset,
@@ -958,6 +995,16 @@ contract SharePriceRouter is OwnableRoles {
         }
     }
 
+    /**
+     * @notice Converts a price between assets of different categories
+     * @dev Converts through USD as an intermediate step
+     *      Handles decimal adjustments for different asset precisions
+     * @param _storedPrice The price to convert
+     * @param _storedAsset The source asset
+     * @param _dstAsset The destination asset
+     * @return price The converted price
+     * @return timestamp The timestamp of the conversion (earliest of source timestamps)
+     */
     function _convertCrossCategory(
         uint256 _storedPrice,
         address _storedAsset,
@@ -1002,6 +1049,29 @@ contract SharePriceRouter is OwnableRoles {
         timestamp = uint64(
             srcTimestamp < dstTimestamp ? srcTimestamp : dstTimestamp
         );
+    }
+
+    /**
+     * @notice Removes a price feed for a specific asset triggered by an adapter's notification
+     * @dev Requires that the feed exists for the asset
+     * @param asset The address of the asset
+     */
+    function notifyFeedRemoval(address asset) external {
+        if (adapterPriorities[msg.sender] == 0) revert AdapterNotFound();
+        
+        // Remove from priorities
+        delete adapterPriorities[msg.sender];
+
+        // Remove from array
+        for (uint256 i = 0; i < oracleAdapters.length; i++) {
+            if (oracleAdapters[i] == msg.sender) {
+                oracleAdapters[i] = oracleAdapters[oracleAdapters.length - 1];
+                oracleAdapters.pop();
+                break;
+            }
+        }
+
+        emit AdapterRemoved(msg.sender);
     }
 }
 

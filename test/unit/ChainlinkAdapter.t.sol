@@ -8,13 +8,6 @@ import { PriceReturnData } from "../../src/interfaces/IOracleAdaptor.sol";
 import { IOracleRouter } from "../../src/interfaces/IOracleRouter.sol";
 import { SharePriceRouter } from "../../src/SharePriceRouter.sol";
 
-contract MockRouter {
-    function notifyFeedRemoval(address) external pure {}
-    function isSequencerValid() external pure returns (bool) {
-        return true;  // Always return true for tests
-    }
-}
-
 contract ChainlinkAdapterTest is Test {
     // Constants for BASE network
     address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
@@ -31,18 +24,14 @@ contract ChainlinkAdapterTest is Test {
     
     // Test contracts
     ChainlinkAdapter public adapter;
-    SharePriceRouter public oracle;
-    MockRouter public router;
+    SharePriceRouter public router;
     
     function setUp() public {
         string memory baseRpcUrl = vm.envString("BASE_RPC_URL");
         vm.createSelectFork(baseRpcUrl);
 
-        // Deploy mock router
-        router = new MockRouter();
-
-        // Deploy oracle
-        oracle = new SharePriceRouter(
+        // Deploy router
+        router = new SharePriceRouter(
             address(this),  // admin
             ETH_USD_FEED,  // ETH/USD feed
             USDC,
@@ -53,12 +42,12 @@ contract ChainlinkAdapterTest is Test {
         // Deploy adapter
         adapter = new ChainlinkAdapter(
             address(this),  // admin
-            address(oracle),  // oracle
+            address(router),  // oracle
             address(router)  // router
         );
 
-        // Add adapter to oracle
-        oracle.addAdapter(address(adapter), 1);
+        // Add adapter to router
+        router.addAdapter(address(adapter), 1);
 
         // Grant ORACLE_ROLE to test contract
         adapter.grantRole(address(this), uint256(adapter.ORACLE_ROLE()));
