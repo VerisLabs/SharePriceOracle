@@ -120,21 +120,29 @@ contract SharePriceRouter is OwnableRoles {
     mapping(address => uint32) public vaultChainIds;
 
     /// @notice Mapping of vault address to its last stored share price data
+    /// @dev Packed into 2 storage slots:
+    ///      Slot 1: sharePrice (248 bits) + decimals (8 bits)
+    ///      Slot 2: asset (160 bits) + timestamp (64 bits)
     mapping(address => StoredSharePrice) public storedSharePrices;
 
     /// @notice Struct to store historical price data
+    /// @dev Packed into a single storage slot:
+    ///      price (240 bits) + timestamp (64 bits) + isUSD (1 bit)
     struct StoredPrice {
-        uint256 price;
-        uint256 timestamp;
-        bool isUSD;
+        uint240 price;     // Reduced from uint256 since prices must fit uint240
+        uint64 timestamp;  // Packed with price
+        bool isUSD;       // Packed with price and timestamp
     }
 
     /// @notice Struct to store historical share price data
+    /// @dev Packed into 2 storage slots:
+    ///      Slot 1: sharePrice (248 bits) + decimals (8 bits)
+    ///      Slot 2: asset (160 bits) + timestamp (64 bits)
     struct StoredSharePrice {
-        uint256 sharePrice;
-        uint256 timestamp;
-        address asset;
-        uint8 decimals;
+        uint248 sharePrice;  // Reduced from uint256 since prices must fit uint240
+        uint8 decimals;      // Packed with sharePrice
+        address asset;       // New slot
+        uint64 timestamp;    // Packed with asset
     }
 
     ////////////////////////////////////////////////////////////////
@@ -267,7 +275,6 @@ contract SharePriceRouter is OwnableRoles {
      * @param adapter Address of the oracle adapter to remove
      */
     function removeAdapter(address adapter) external onlyAdmin {
-        if (adapter == address(0)) revert ZeroAddress();
         _removeAdapter(adapter);
     }
 
@@ -345,14 +352,12 @@ contract SharePriceRouter is OwnableRoles {
      * @dev Returns price and error code (0 = no error)
      * @param asset The asset to get the price for
      * @param inUSD Whether to get the price in USD
-     * @param getLower Whether to get the lower of two prices if available
      * @return price The price of the asset
      * @return errorCode Error code (0 = no error)
      */
     function getPrice(
         address asset,
-        bool inUSD,
-        bool getLower
+        bool inUSD
     ) external view returns (uint256 price, uint256 errorCode) {
         try this.getLatestPrice(asset, inUSD) returns (
             uint256 p,
@@ -388,8 +393,7 @@ contract SharePriceRouter is OwnableRoles {
             if (adapter.isSupportedAsset(asset)) {
                 PriceReturnData memory priceData = adapter.getPrice(
                     asset,
-                    inUSD,
-                    true
+                    inUSD
                 );
 
                 if (!priceData.hadError && priceData.price > 0) {
@@ -593,8 +597,8 @@ contract SharePriceRouter is OwnableRoles {
         );
 
         storedPrices[asset] = StoredPrice({
-            price: price,
-            timestamp: timestamp,
+            price: uint240(price),  // Explicit cast to uint240
+            timestamp: uint64(timestamp),  // Explicit cast to uint64
             isUSD: isUSD
         });
 
@@ -611,6 +615,7 @@ contract SharePriceRouter is OwnableRoles {
         uint32 _srcChainId,
         VaultReport[] calldata reports
     ) external onlyEndpoint {
+        if (reports.length == 0) return;
         if (_srcChainId == chainId) revert InvalidChainId(_srcChainId);
         if (reports.length > MAX_REPORTS) revert ExceedsMaxReports();
 
@@ -630,10 +635,10 @@ contract SharePriceRouter is OwnableRoles {
 
             // Store the share price in the asset's native decimals
             storedSharePrices[report.vaultAddress] = StoredSharePrice({
-                sharePrice: report.sharePrice,
-                timestamp: block.timestamp,
+                sharePrice: uint248(report.sharePrice),
+                timestamp: uint64(block.timestamp),
                 asset: report.asset,
-                decimals: uint8(report.assetDecimals) // Explicit conversion to uint8
+                decimals: uint8(report.assetDecimals)
             });
 
             emit SharePriceUpdated(
@@ -817,10 +822,10 @@ contract SharePriceRouter is OwnableRoles {
         address asset = vault.asset();
 
         storedSharePrices[_vaultAddress] = StoredSharePrice({
-            sharePrice: _price,
-            timestamp: _timestamp,
+            sharePrice: uint248(_price),
+            decimals: uint8(_getAssetDecimals(asset)),
             asset: asset,
-            decimals: _getAssetDecimals(asset)
+            timestamp: _timestamp
         });
     }
 
@@ -981,9 +986,8 @@ contract SharePriceRouter is OwnableRoles {
     /**
      * @notice Removes a price feed for a specific asset triggered by an adapter's notification
      * @dev Requires that the feed exists for the asset
-     * @param asset The address of the asset
      */
-    function notifyFeedRemoval(address asset) external {
+    function notifyFeedRemoval(address) external {
         _removeAdapter(msg.sender);
     }
 }

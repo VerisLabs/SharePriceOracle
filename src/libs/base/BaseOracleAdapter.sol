@@ -78,13 +78,11 @@ abstract contract BaseOracleAdapter is OwnableRoles {
      * @notice Retrieves the price of a specified asset
      * @param asset Address of the asset to price
      * @param inUSD Whether to return the price in USD (true) or ETH (false)
-     * @param getLower Whether to return lower of two oracle prices if available
      * @return PriceReturnData Structure containing price, error status, and denomination
      */
     function getPrice(
         address asset,
-        bool inUSD,
-        bool getLower
+        bool inUSD
     ) external view virtual returns (PriceReturnData memory);
 
     /**

@@ -9,8 +9,6 @@ interface IOracleRouter {
     ///      If it has two or more oracles, it fetches the price from both feeds.
     /// @param asset The address of the asset to retrieve the price for.
     /// @param inUSD Whether the price should be returned in USD or ETH.
-    /// @param getLower Whether the lower or higher price should be returned
-    ///                 if two feeds are available.
     /// @return price The price of the asset.
     /// @return errorCode An error code related to fetching the price. 
     ///                   '1' indicates that price should be taken with
@@ -19,9 +17,8 @@ interface IOracleRouter {
     ///                   a price.
     function getPrice(
         address asset,
-        bool inUSD,
-        bool getLower
-    ) external view returns (uint256, uint256);
+        bool inUSD
+    ) external view returns (uint256 price, uint256 errorCode);
 
     /// @notice Removes a price feed for a specific asset
     ///         triggered by an adaptors notification.

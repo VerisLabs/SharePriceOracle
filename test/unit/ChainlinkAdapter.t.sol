@@ -73,7 +73,7 @@ contract ChainlinkAdapterTest is Test {
     }
 
     function testReturnsCorrectPrice_ETH_USD() public {
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true, false);
+        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         
         assertEq(priceData.hadError, false, "Price should not have error");
         assertGt(priceData.price, 0, "Price should be greater than 0");
@@ -84,7 +84,7 @@ contract ChainlinkAdapterTest is Test {
     }
 
     function testReturnsCorrectPrice_WBTC_USD() public {
-        PriceReturnData memory priceData = adapter.getPrice(WBTC, true, false);
+        PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
         
         assertEq(priceData.hadError, false, "Price should not have error");
         assertGt(priceData.price, 0, "Price should be greater than 0");
@@ -109,7 +109,7 @@ contract ChainlinkAdapterTest is Test {
         );
 
         vm.expectRevert(ChainlinkAdapter.ChainlinkAdaptor__SequencerDown.selector);
-        adapter.getPrice(WETH, true, false);
+        adapter.getPrice(WETH, true);
     }
 
     function testPriceError_SequencerGracePeriod() public {
@@ -127,7 +127,7 @@ contract ChainlinkAdapterTest is Test {
         );
 
         vm.expectRevert(ChainlinkAdapter.ChainlinkAdaptor__SequencerDown.selector);
-        adapter.getPrice(WETH, true, false);
+        adapter.getPrice(WETH, true);
     }
 
     function testPriceError_StalePrice() public {
@@ -157,18 +157,18 @@ contract ChainlinkAdapterTest is Test {
             )
         );
 
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true, false);
+        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, true, "Should error on stale price");
     }
 
     function testRevertGetPrice_AssetNotSupported() public {
         vm.expectRevert(ChainlinkAdapter.ChainlinkAdaptor__AssetNotSupported.selector);
-        adapter.getPrice(USDC, true, false);
+        adapter.getPrice(USDC, true);
     }
 
     function testRevertAfterAssetRemove() public {
         // Get price before removal to ensure it works
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true, false);
+        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, false, "Price should not have error before removal");
         assertGt(priceData.price, 0, "Price should be greater than 0 before removal");
 
@@ -177,7 +177,7 @@ contract ChainlinkAdapterTest is Test {
 
         // Verify it reverts after removal
         vm.expectRevert(ChainlinkAdapter.ChainlinkAdaptor__AssetNotSupported.selector);
-        adapter.getPrice(WETH, true, false);
+        adapter.getPrice(WETH, true);
     }
 
     function testRevertAddAsset_InvalidHeartbeat() public {
@@ -200,7 +200,7 @@ contract ChainlinkAdapterTest is Test {
         );
 
         // Verify it still works
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true, false);
+        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, false, "Price should not have error");
         assertGt(priceData.price, 0, "Price should be greater than 0");
 

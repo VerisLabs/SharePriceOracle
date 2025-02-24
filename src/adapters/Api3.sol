@@ -79,18 +79,19 @@ contract Api3Adaptor is BaseOracleAdapter {
     
     /// EXTERNAL FUNCTIONS ///
 
-    /// @notice Retrieves the price of a given asset.
-    /// @dev Uses Api3 oracles to fetch the price data.
-    ///      Price is returned in USD or ETH depending on 'inUSD' parameter.
-    /// @param asset The address of the asset for which the price is needed.
-    /// @param inUSD A boolean to determine if the price should be returned in
-    ///              USD or not.
-    /// @return A structure containing the price, error status,
-    ///         and the quote format of the price.
+    /**
+     * @notice Retrieves the price of a given asset
+     * @dev Uses Api3 oracles to fetch the price data.
+     *      Price is returned in USD or ETH depending on 'inUSD' parameter.
+     * @param asset The address of the asset for which the price is needed.
+     * @param inUSD A boolean to determine if the price should be returned in
+     *              USD or not.
+     * @return A structure containing the price, error status,
+     *         and the quote format of the price.
+     */
     function getPrice(
         address asset,
-        bool inUSD,
-        bool /* getLower */
+        bool inUSD
     ) external view override returns (PriceReturnData memory) {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {

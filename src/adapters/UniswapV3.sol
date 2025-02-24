@@ -78,14 +78,11 @@ contract UniswapV3Adapter is BaseOracleAdapter {
     /// @param asset The address of the asset for which the price is needed.
     /// @param inUSD A boolean to determine if the price should be returned in
     ///              USD or not.
-    /// @param getLower A boolean to determine if lower of two oracle prices
-    ///                 should be retrieved.
     /// @return pData A structure containing the price, error status,
     ///                         and the quote format of the price.
     function getPrice(
         address asset,
-        bool inUSD,
-        bool getLower
+        bool inUSD
     ) external view override returns (PriceReturnData memory pData) {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
@@ -140,7 +137,7 @@ contract UniswapV3Adapter is BaseOracleAdapter {
                 return pData;
             }
 
-            (uint256 quoteTokenDenominator, uint256 errorCode) = OracleRouter.getPrice(data.quoteToken, true, getLower);
+            (uint256 quoteTokenDenominator, uint256 errorCode) = OracleRouter.getPrice(data.quoteToken, true);
 
             // Validate we did not run into any errors pricing the quote asset.
             if (errorCode > 0) {
@@ -171,8 +168,7 @@ contract UniswapV3Adapter is BaseOracleAdapter {
                 return pData;
             }
 
-            (uint256 quoteTokenDenominator, uint256 errorCode) = OracleRouter
-                .getPrice(data.quoteToken, false, getLower);
+            (uint256 quoteTokenDenominator, uint256 errorCode) = OracleRouter.getPrice(data.quoteToken, false);
 
             // Validate we did not run into any errors pricing the quote asset.
             if (errorCode > 0) {

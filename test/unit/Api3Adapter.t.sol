@@ -104,7 +104,7 @@ contract Api3AdapterTest is Test {
         vm.stopPrank();
 
         // Get price
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true, false);
+        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         
         assertFalse(priceData.hadError);
         assertTrue(priceData.inUSD);
@@ -112,7 +112,7 @@ contract Api3AdapterTest is Test {
     }
 
     function testReturnsCorrectPrice_WBTC_USD() public view {
-        PriceReturnData memory priceData = adapter.getPrice(WBTC, true, false);
+        PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
         
         assertEq(priceData.hadError, false, "Price should not have error");
         assertGt(priceData.price, 0, "Price should be greater than 0");
@@ -128,7 +128,7 @@ contract Api3AdapterTest is Test {
         );
 
         vm.expectRevert(Api3Adaptor.Api3Adaptor__InvalidPrice.selector);
-        adapter.getPrice(WETH, true, false);
+        adapter.getPrice(WETH, true);
     }
 
     function testPriceError_StaleTimestamp() public {
@@ -139,7 +139,7 @@ contract Api3AdapterTest is Test {
             abi.encode(100, uint32(block.timestamp - 5 hours))
         );
 
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true, false);
+        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, true, "Should error on stale timestamp");
     }
 
@@ -151,18 +151,18 @@ contract Api3AdapterTest is Test {
             abi.encode(type(int224).max, uint32(block.timestamp))
         );
 
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true, false);
+        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, true, "Should error on price exceeding max");
     }
 
     function testRevertGetPrice_AssetNotSupported() public {
         vm.expectRevert(Api3Adaptor.Api3Adaptor__AssetNotSupported.selector);
-        adapter.getPrice(USDC, true, false);
+        adapter.getPrice(USDC, true);
     }
 
     function testRevertAfterAssetRemove() public {
         // Get price before removal to ensure it works
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true, false);
+        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, false, "Price should not have error before removal");
         assertGt(priceData.price, 0, "Price should be greater than 0 before removal");
 
@@ -171,7 +171,7 @@ contract Api3AdapterTest is Test {
 
         // Verify it reverts after removal
         vm.expectRevert(Api3Adaptor.Api3Adaptor__AssetNotSupported.selector);
-        adapter.getPrice(WETH, true, false);
+        adapter.getPrice(WETH, true);
     }
 
     function testRevertAddAsset_InvalidHeartbeat() public {
@@ -207,7 +207,7 @@ contract Api3AdapterTest is Test {
         );
 
         // Verify it still works
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true, false);
+        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, false, "Price should not have error");
         assertGt(priceData.price, 0, "Price should be greater than 0");
     }
