@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { IERC4626 } from "../../src/interfaces/IERC4626.sol";
-import { IERC20 } from "../../src/interfaces/IERC20.sol";
-import { IERC20Metadata } from "../../src/interfaces/IERC20Metadata.sol";
+import {IERC4626} from "../../src/interfaces/IERC4626.sol";
+import {IERC20} from "../../src/interfaces/IERC20.sol";
+import {IERC20Metadata} from "../../src/interfaces/IERC20Metadata.sol";
 
 contract MockVault is IERC4626 {
     address public immutable override asset;
@@ -22,9 +22,9 @@ contract MockVault is IERC4626 {
     function convertToAssets(
         uint256 shares
     ) external view override returns (uint256) {
-        // The share price is already in the asset's decimals
-        // We just need to multiply shares by share price and divide by WAD
-        return (shares * sharePrice) / 1e18;
+        // Calculate based on the asset's actual decimals
+        uint256 assetUnit = 10 ** decimals;
+        return (shares * sharePrice) / assetUnit;
     }
 
     // IERC20 implementation

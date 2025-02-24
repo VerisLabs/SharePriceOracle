@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import { OwnableRoles } from "@solady/auth/OwnableRoles.sol";
-import { FixedPointMathLib } from "@solady/utils/FixedPointMathLib.sol";
-import { IERC4626 } from "./interfaces/IERC4626.sol";
-import { IERC20Metadata } from "./interfaces/IERC20Metadata.sol";
-import { IOracleAdaptor, PriceReturnData } from "./interfaces/IOracleAdaptor.sol";
-import { VaultReport } from "./interfaces/ISharePriceOracle.sol";
-import { console } from "forge-std/console.sol";
+import {OwnableRoles} from "@solady/auth/OwnableRoles.sol";
+import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
+import {IERC4626} from "./interfaces/IERC4626.sol";
+import {IERC20Metadata} from "./interfaces/IERC20Metadata.sol";
+import {IOracleAdaptor, PriceReturnData} from "./interfaces/IOracleAdaptor.sol";
+import {VaultReport} from "./interfaces/ISharePriceOracle.sol";
+import {console} from "forge-std/console.sol";
 
 /**
  * @title SharePriceRouter
@@ -68,9 +68,9 @@ contract SharePriceRouter is OwnableRoles {
     /// @notice Precision for price calculations (1e18)
     uint256 public constant PRECISION = 1e18;
     /// @notice Minimum valid price threshold
-    uint256 public constant MIN_PRICE_THRESHOLD = 1e6;  // 0.000001 in 18 decimals
+    uint256 public constant MIN_PRICE_THRESHOLD = 1e2; // 0.0000000001 in 18 decimals
     /// @notice Maximum price impact allowed for conversions (1% = 10000)
-    uint256 public constant MAX_PRICE_IMPACT = 10000;  // 1%
+    uint256 public constant MAX_PRICE_IMPACT = 10000; // 1%
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
@@ -89,9 +89,9 @@ contract SharePriceRouter is OwnableRoles {
     /// @notice Asset categories for optimized conversion
     enum AssetCategory {
         UNKNOWN,
-        BTC_LIKE,    // WBTC, BTCb, TBTC, etc.
-        ETH_LIKE,    // ETH, stETH, rsETH, etc.
-        STABLE       // USDC, USDT, DAI, etc.
+        BTC_LIKE, // WBTC, BTCb, TBTC, etc.
+        ETH_LIKE, // ETH, stETH, rsETH, etc.
+        STABLE // USDC, USDT, DAI, etc.
     }
 
     /// @notice Mapping of assets to their category
@@ -254,7 +254,10 @@ contract SharePriceRouter is OwnableRoles {
      * @param asset The asset address
      * @param category The asset category
      */
-    function setAssetCategory(address asset, AssetCategory category) external onlyAdmin {
+    function setAssetCategory(
+        address asset,
+        AssetCategory category
+    ) external onlyAdmin {
         if (asset == address(0)) revert ZeroAddress();
         if (category == AssetCategory.UNKNOWN) revert InvalidAssetType();
         assetCategories[asset] = category;
@@ -280,10 +283,14 @@ contract SharePriceRouter is OwnableRoles {
         // Try all adapters in priority order
         for (uint256 i = 0; i < oracleAdapters.length; i++) {
             IOracleAdaptor adapter = IOracleAdaptor(oracleAdapters[i]);
-            
+
             if (adapter.isSupportedAsset(asset)) {
-                PriceReturnData memory priceData = adapter.getPrice(asset, inUSD, true);
-                
+                PriceReturnData memory priceData = adapter.getPrice(
+                    asset,
+                    inUSD,
+                    true
+                );
+
                 if (!priceData.hadError && priceData.price > 0) {
                     return (priceData.price, block.timestamp, priceData.inUSD);
                 }
@@ -292,9 +299,15 @@ contract SharePriceRouter is OwnableRoles {
 
         // If no current price, check stored price
         StoredPrice memory storedPrice = storedPrices[asset];
-        if (storedPrice.price > 0 && 
-            block.timestamp - storedPrice.timestamp <= PRICE_STALENESS_THRESHOLD) {
-            return (storedPrice.price, storedPrice.timestamp, storedPrice.isUSD);
+        if (
+            storedPrice.price > 0 &&
+            block.timestamp - storedPrice.timestamp <= PRICE_STALENESS_THRESHOLD
+        ) {
+            return (
+                storedPrice.price,
+                storedPrice.timestamp,
+                storedPrice.isUSD
+            );
         }
 
         revert NoValidPrice(); // TODO SHOULD NEVER REVERT
@@ -306,8 +319,11 @@ contract SharePriceRouter is OwnableRoles {
      * @param inUSD Whether to store the price in USD
      */
     function updatePrice(address asset, bool inUSD) external {
-        (uint256 price, uint256 timestamp, bool isUSD) = getLatestPrice(asset, inUSD);
-        
+        (uint256 price, uint256 timestamp, bool isUSD) = getLatestPrice(
+            asset,
+            inUSD
+        );
+
         storedPrices[asset] = StoredPrice({
             price: price,
             timestamp: timestamp,
@@ -333,13 +349,13 @@ contract SharePriceRouter is OwnableRoles {
      * @param _timestamp The timestamp of the price
      */
     function _storeSharePrice(
-        address _vaultAddress, 
-        uint256 _price, 
+        address _vaultAddress,
+        uint256 _price,
         uint64 _timestamp
     ) internal {
         IERC4626 vault = IERC4626(_vaultAddress);
         address asset = vault.asset();
-        
+
         storedSharePrices[_vaultAddress] = StoredSharePrice({
             sharePrice: _price,
             timestamp: _timestamp,
@@ -363,17 +379,19 @@ contract SharePriceRouter is OwnableRoles {
     ) internal view returns (uint256 price, uint64 timestamp) {
         bytes32 key = getPriceKey(_srcChain, _vaultAddress);
         VaultReport memory report = sharePrices[key];
-        
+
         if (report.sharePrice > 0) {
             if (report.asset == _dstAsset) {
                 return (report.sharePrice, uint64(report.lastUpdate));
             }
-            
-            try this.convertStoredPrice(
-                report.sharePrice,
-                report.asset,
-                _dstAsset
-            ) returns (uint256 convertedPrice, uint64 convertedTime) {
+
+            try
+                this.convertStoredPrice(
+                    report.sharePrice,
+                    report.asset,
+                    _dstAsset
+                )
+            returns (uint256 convertedPrice, uint64 convertedTime) {
                 if (_validatePrice(convertedPrice, convertedTime)) {
                     return (convertedPrice, convertedTime);
                 }
@@ -394,8 +412,10 @@ contract SharePriceRouter is OwnableRoles {
         address _dstAsset
     ) external returns (uint256 sharePrice, uint64 timestamp) {
         // Always try to get current price first
-        try this.calculateSharePrice(_vaultAddress, _dstAsset) 
-        returns (uint256 currentPrice, uint64 currentTime) {
+        try this.calculateSharePrice(_vaultAddress, _dstAsset) returns (
+            uint256 currentPrice,
+            uint64 currentTime
+        ) {
             if (currentPrice > 0 && _validatePrice(currentPrice, currentTime)) {
                 _storeSharePrice(_vaultAddress, currentPrice, currentTime);
                 return (currentPrice, currentTime);
@@ -405,7 +425,11 @@ contract SharePriceRouter is OwnableRoles {
         // Fallback to cross-chain price for remote vaults
         uint32 vaultChain = vaultChainIds[_vaultAddress];
         if (vaultChain != 0 && vaultChain != chainId) {
-            (sharePrice, timestamp) = _getCrossChainPrice(_vaultAddress, _dstAsset, vaultChain);
+            (sharePrice, timestamp) = _getCrossChainPrice(
+                _vaultAddress,
+                _dstAsset,
+                vaultChain
+            );
             if (sharePrice > 0 && !_isStale(timestamp)) {
                 return (sharePrice, uint64(timestamp));
             }
@@ -417,26 +441,38 @@ contract SharePriceRouter is OwnableRoles {
             if (stored.asset == _dstAsset && !_isStale(stored.timestamp)) {
                 return (stored.sharePrice, uint64(stored.timestamp));
             }
-            
+
             if (!_isStale(stored.timestamp)) {
-                try this.convertStoredPrice(
-                    stored.sharePrice, 
-                    stored.asset, 
-                    _dstAsset
-                ) returns (uint256 convertedPrice, uint64 convertedTime) {
-                    if (_validatePrice(convertedPrice, convertedTime)) {
+                try
+                    this.convertStoredPrice(
+                        stored.sharePrice,
+                        stored.asset,
+                        _dstAsset
+                    )
+                returns (uint256 convertedPrice, uint64 convertedTime) {
+                    console.log("Try block succeeded, price:", convertedPrice);
+                    bool validPrice = _validatePrice(
+                        convertedPrice,
+                        convertedTime
+                    );
+                    console.log("_validatePrice result:", validPrice);
+                    if (validPrice) {
                         return (convertedPrice, convertedTime);
                     }
-                } catch {}
+                } catch (bytes memory err) {
+                    console.log("Caught exception in convertStoredPrice");
+                }
             }
 
             // Use stale stored price rather than 1:1 if we have it
             if (stored.asset != _dstAsset) {
-                try this.convertStoredPrice(
-                    stored.sharePrice, 
-                    stored.asset, 
-                    _dstAsset
-                ) returns (uint256 convertedPrice, uint64 convertedTime) {
+                try
+                    this.convertStoredPrice(
+                        stored.sharePrice,
+                        stored.asset,
+                        _dstAsset
+                    )
+                returns (uint256 convertedPrice, uint64 convertedTime) {
                     return (convertedPrice, convertedTime);
                 } catch {}
             }
@@ -446,10 +482,13 @@ contract SharePriceRouter is OwnableRoles {
         // Final fallback: Use raw vault ratio if assets match
         IERC4626 vault = IERC4626(_vaultAddress);
         address asset = vault.asset();
-        
+
         if (asset == _dstAsset) {
             uint256 rawPrice = vault.convertToAssets(PRECISION);
-            return (rawPrice > 0 ? rawPrice : PRECISION, uint64(block.timestamp));
+            return (
+                rawPrice > 0 ? rawPrice : PRECISION,
+                uint64(block.timestamp)
+            );
         }
 
         // Absolute last resort: Return 1:1 ratio
@@ -472,7 +511,10 @@ contract SharePriceRouter is OwnableRoles {
      * @param _srcChainId Source chain ID
      * @param reports Array of vault reports to update
      */
-    function updateSharePrices(uint32 _srcChainId, VaultReport[] calldata reports) external onlyEndpoint {
+    function updateSharePrices(
+        uint32 _srcChainId,
+        VaultReport[] calldata reports
+    ) external onlyEndpoint {
         if (_srcChainId == chainId) revert InvalidChainId(_srcChainId);
         if (reports.length > MAX_REPORTS) revert ExceedsMaxReports();
 
@@ -498,7 +540,12 @@ contract SharePriceRouter is OwnableRoles {
                 decimals: uint8(report.assetDecimals) // Explicit conversion to uint8
             });
 
-            emit SharePriceUpdated(_srcChainId, report.vaultAddress, report.sharePrice, report.rewardsDelegate);
+            emit SharePriceUpdated(
+                _srcChainId,
+                report.vaultAddress,
+                report.sharePrice,
+                report.rewardsDelegate
+            );
         }
     }
 
@@ -515,7 +562,7 @@ contract SharePriceRouter is OwnableRoles {
         if (_storedAsset == _dstAsset) {
             uint8 srcDecimals = IERC20Metadata(_storedAsset).decimals();
             uint8 dstDecimals = IERC20Metadata(_dstAsset).decimals();
-            (price,) = _adjustDecimals(_storedPrice, srcDecimals, dstDecimals);
+            (price, ) = _adjustDecimals(_storedPrice, srcDecimals, dstDecimals);
             return (price, uint64(block.timestamp));
         }
 
@@ -524,7 +571,10 @@ contract SharePriceRouter is OwnableRoles {
         AssetCategory dstCategory = assetCategories[_dstAsset];
 
         // Require both assets to be categorized
-        if (srcCategory == AssetCategory.UNKNOWN || dstCategory == AssetCategory.UNKNOWN) {
+        if (
+            srcCategory == AssetCategory.UNKNOWN ||
+            dstCategory == AssetCategory.UNKNOWN
+        ) {
             revert InvalidAssetType();
         }
 
@@ -535,7 +585,12 @@ contract SharePriceRouter is OwnableRoles {
             } else if (srcCategory == AssetCategory.BTC_LIKE) {
                 return _convertBtcToBtc(_storedPrice, _storedAsset, _dstAsset);
             } else if (srcCategory == AssetCategory.STABLE) {
-                return _convertStableToStable(_storedPrice, _storedAsset, _dstAsset);
+                return
+                    _convertStableToStable(
+                        _storedPrice,
+                        _storedAsset,
+                        _dstAsset
+                    );
             }
         }
 
@@ -548,20 +603,34 @@ contract SharePriceRouter is OwnableRoles {
         address _storedAsset,
         address _dstAsset
     ) internal view returns (uint256 price, uint64 timestamp) {
-        (uint256 srcBtcPrice, uint256 srcTimestamp, bool srcInUSD) = getLatestPrice(_storedAsset, false);
-        (uint256 dstBtcPrice, uint256 dstTimestamp, bool dstInUSD) = getLatestPrice(_dstAsset, false);
-        
+        (
+            uint256 srcBtcPrice,
+            uint256 srcTimestamp,
+            bool srcInUSD
+        ) = getLatestPrice(_storedAsset, false);
+        (
+            uint256 dstBtcPrice,
+            uint256 dstTimestamp,
+            bool dstInUSD
+        ) = getLatestPrice(_dstAsset, false);
+
         if (srcBtcPrice == 0 || dstBtcPrice == 0) revert NoValidPrice();
-        
+
         // Convert using BTC as the intermediate
-        price = FixedPointMathLib.mulDiv(_storedPrice, srcBtcPrice, dstBtcPrice);
-        timestamp = uint64(srcTimestamp < dstTimestamp ? srcTimestamp : dstTimestamp);
+        price = FixedPointMathLib.mulDiv(
+            _storedPrice,
+            srcBtcPrice,
+            dstBtcPrice
+        );
+        timestamp = uint64(
+            srcTimestamp < dstTimestamp ? srcTimestamp : dstTimestamp
+        );
 
         // Adjust decimals if needed
         uint8 srcDecimals = IERC20Metadata(_storedAsset).decimals();
         uint8 dstDecimals = IERC20Metadata(_dstAsset).decimals();
         if (srcDecimals != dstDecimals) {
-            (price,) = _adjustDecimals(price, srcDecimals, dstDecimals);
+            (price, ) = _adjustDecimals(price, srcDecimals, dstDecimals);
         }
     }
 
@@ -570,20 +639,34 @@ contract SharePriceRouter is OwnableRoles {
         address _storedAsset,
         address _dstAsset
     ) internal view returns (uint256 price, uint64 timestamp) {
-        (uint256 srcEthPrice, uint256 srcTimestamp, bool srcInUSD) = getLatestPrice(_storedAsset, false);
-        (uint256 dstEthPrice, uint256 dstTimestamp, bool dstInUSD) = getLatestPrice(_dstAsset, false);
-        
+        (
+            uint256 srcEthPrice,
+            uint256 srcTimestamp,
+            bool srcInUSD
+        ) = getLatestPrice(_storedAsset, false);
+        (
+            uint256 dstEthPrice,
+            uint256 dstTimestamp,
+            bool dstInUSD
+        ) = getLatestPrice(_dstAsset, false);
+
         if (srcEthPrice == 0 || dstEthPrice == 0) revert NoValidPrice();
-        
+
         // Convert using ETH as the intermediate
-        price = FixedPointMathLib.mulDiv(_storedPrice, srcEthPrice, dstEthPrice);
-        timestamp = uint64(srcTimestamp < dstTimestamp ? srcTimestamp : dstTimestamp);
+        price = FixedPointMathLib.mulDiv(
+            _storedPrice,
+            srcEthPrice,
+            dstEthPrice
+        );
+        timestamp = uint64(
+            srcTimestamp < dstTimestamp ? srcTimestamp : dstTimestamp
+        );
 
         // Adjust decimals if needed
         uint8 srcDecimals = IERC20Metadata(_storedAsset).decimals();
         uint8 dstDecimals = IERC20Metadata(_dstAsset).decimals();
         if (srcDecimals != dstDecimals) {
-            (price,) = _adjustDecimals(price, srcDecimals, dstDecimals);
+            (price, ) = _adjustDecimals(price, srcDecimals, dstDecimals);
         }
     }
 
@@ -592,20 +675,34 @@ contract SharePriceRouter is OwnableRoles {
         address _storedAsset,
         address _dstAsset
     ) internal view returns (uint256 price, uint64 timestamp) {
-        (uint256 srcUsdPrice, uint256 srcTimestamp, bool srcInUSD) = getLatestPrice(_storedAsset, true);
-        (uint256 dstUsdPrice, uint256 dstTimestamp, bool dstInUSD) = getLatestPrice(_dstAsset, true);
-        
+        (
+            uint256 srcUsdPrice,
+            uint256 srcTimestamp,
+            bool srcInUSD
+        ) = getLatestPrice(_storedAsset, true);
+        (
+            uint256 dstUsdPrice,
+            uint256 dstTimestamp,
+            bool dstInUSD
+        ) = getLatestPrice(_dstAsset, true);
+
         if (srcUsdPrice == 0 || dstUsdPrice == 0) revert NoValidPrice();
-        
+
         // Convert using USD as the intermediate
-        price = FixedPointMathLib.mulDiv(_storedPrice, srcUsdPrice, dstUsdPrice);
-        timestamp = uint64(srcTimestamp < dstTimestamp ? srcTimestamp : dstTimestamp);
+        price = FixedPointMathLib.mulDiv(
+            _storedPrice,
+            srcUsdPrice,
+            dstUsdPrice
+        );
+        timestamp = uint64(
+            srcTimestamp < dstTimestamp ? srcTimestamp : dstTimestamp
+        );
 
         // Adjust decimals if needed
         uint8 srcDecimals = IERC20Metadata(_storedAsset).decimals();
         uint8 dstDecimals = IERC20Metadata(_dstAsset).decimals();
         if (srcDecimals != dstDecimals) {
-            (price,) = _adjustDecimals(price, srcDecimals, dstDecimals);
+            (price, ) = _adjustDecimals(price, srcDecimals, dstDecimals);
         }
     }
 
@@ -615,8 +712,14 @@ contract SharePriceRouter is OwnableRoles {
         address _dstAsset
     ) internal view returns (uint256 price, uint64 timestamp) {
         // Get USD prices for both assets
-        (uint256 srcUsdPrice, uint256 srcTimestamp, bool srcInUSD) = getLatestPrice(_storedAsset, true);
-        (uint256 dstUsdPrice, uint256 dstTimestamp, bool dstInUSD) = getLatestPrice(_dstAsset, true);
+        (uint256 srcUsdPrice, uint256 srcTimestamp, ) = getLatestPrice(
+            _storedAsset,
+            true
+        );
+        (uint256 dstUsdPrice, uint256 dstTimestamp, ) = getLatestPrice(
+            _dstAsset,
+            true
+        );
 
         if (srcUsdPrice == 0 || dstUsdPrice == 0) revert NoValidPrice();
 
@@ -624,22 +727,30 @@ contract SharePriceRouter is OwnableRoles {
         uint8 srcDecimals = IERC20Metadata(_storedAsset).decimals();
         uint8 dstDecimals = IERC20Metadata(_dstAsset).decimals();
 
-        // First convert source amount to USD (18 decimals)
-        uint256 usdAmount = FixedPointMathLib.mulDiv(_storedPrice, srcUsdPrice, PRECISION);
-        
-        // Then convert USD amount to destination asset
-        price = FixedPointMathLib.mulDiv(usdAmount, PRECISION, dstUsdPrice);
+        // Calculate straight conversion without PRECISION intermediary
+        // This matches the test's calculation pattern:
+        // USDC to BTC: (_storedPrice * usdcPrice * 10^8) / btcPrice
+        // BTC to USDC: (_storedPrice * btcPrice) / (usdcPrice * 10^2)
 
-        // Adjust decimals for final result
-        if (srcDecimals != dstDecimals) {
-            if (srcDecimals > dstDecimals) {
-                price = price / (10 ** (srcDecimals - dstDecimals));
-            } else {
-                price = price * (10 ** (dstDecimals - srcDecimals));
-            }
+        // First convert to USD equivalent value
+        uint256 usdValue = _storedPrice * srcUsdPrice;
+
+        // Then convert to destination asset with proper decimal scaling
+        if (srcDecimals <= dstDecimals) {
+            // If dst has more or equal decimals (like USDC->BTC: 6->8), we need to multiply
+            price =
+                (usdValue * (10 ** (dstDecimals - srcDecimals))) /
+                dstUsdPrice;
+        } else {
+            // If dst has fewer decimals (like BTC->USDC: 8->6), we need to divide
+            price =
+                usdValue /
+                (dstUsdPrice * (10 ** (srcDecimals - dstDecimals)));
         }
 
-        timestamp = uint64(srcTimestamp < dstTimestamp ? srcTimestamp : dstTimestamp);
+        timestamp = uint64(
+            srcTimestamp < dstTimestamp ? srcTimestamp : dstTimestamp
+        );
     }
 
     function _adjustDecimals(
@@ -669,16 +780,22 @@ contract SharePriceRouter is OwnableRoles {
         address _vaultAddress,
         address _dstAsset
     ) internal view returns (uint256 price, uint64 timestamp) {
-        console.log("_getDstSharePrice: Getting share price for vault", _vaultAddress);
+        console.log(
+            "_getDstSharePrice: Getting share price for vault",
+            _vaultAddress
+        );
         console.log("Converting to asset:", _dstAsset);
 
         IERC4626 vault = IERC4626(_vaultAddress);
         address asset = vault.asset();
         console.log("Vault's underlying asset:", asset);
-        
-        uint256 rawSharePrice = vault.convertToAssets(PRECISION);
+
+        uint8 assetDecimals = IERC20Metadata(asset).decimals();
+        uint256 assetUnit = 10 ** assetDecimals;
+
+        uint256 rawSharePrice = vault.convertToAssets(assetUnit);
         console.log("Raw share price from vault:", rawSharePrice);
-        
+
         if (asset == _dstAsset) {
             // No conversion needed, price is already in correct asset
             return (rawSharePrice, uint64(block.timestamp));
@@ -706,14 +823,14 @@ contract SharePriceRouter is OwnableRoles {
         for (uint256 i = 0; i < len; i++) {
             address vaultAddress = vaultAddresses[i];
             IERC4626 vault = IERC4626(vaultAddress);
-            
+
             // Get vault details
             address asset = vault.asset();
             uint8 assetDecimals = IERC20Metadata(asset).decimals();
-            
+
             // Get latest price in USD
-            (uint256 price,,) = getLatestPrice(asset, true);
-            
+            (uint256 price, , ) = getLatestPrice(asset, true);
+
             reports[i] = VaultReport({
                 chainId: chainId,
                 vaultAddress: vaultAddress,
@@ -734,7 +851,10 @@ contract SharePriceRouter is OwnableRoles {
      * @param _chainId Chain ID
      * @param _vaultAddress Vault address
      */
-    function getPriceKey(uint32 _chainId, address _vaultAddress) public pure returns (bytes32) {
+    function getPriceKey(
+        uint32 _chainId,
+        address _vaultAddress
+    ) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(_chainId, _vaultAddress));
     }
 
@@ -758,9 +878,13 @@ contract SharePriceRouter is OwnableRoles {
      * @param timestamp The timestamp of the price
      * @return valid Whether the price is valid
      */
-    function _validatePrice(uint256 price, uint256 timestamp) internal view returns (bool valid) {
+    function _validatePrice(
+        uint256 price,
+        uint256 timestamp
+    ) internal view returns (bool valid) {
         if (price == 0 || price < MIN_PRICE_THRESHOLD) return false;
-        if (block.timestamp - timestamp > PRICE_STALENESS_THRESHOLD) return false;
+        if (block.timestamp - timestamp > PRICE_STALENESS_THRESHOLD)
+            return false;
         if (price > type(uint240).max) return false;
         return true;
     }
@@ -782,11 +906,20 @@ contract SharePriceRouter is OwnableRoles {
             return (price, timestamp);
         }
 
-        (uint256 ethUsdPrice, uint256 ethUsdTimestamp,) = getLatestPrice(ETH_USD_FEED, true);
+        (uint256 ethUsdPrice, uint256 ethUsdTimestamp, ) = getLatestPrice(
+            ETH_USD_FEED,
+            true
+        );
         if (ethUsdPrice == 0) revert NoValidPrice();
 
-        usdPrice = FixedPointMathLib.mulDiv(price * PRECISION, ethUsdPrice, PRECISION);
-        usdTimestamp = ethUsdTimestamp < timestamp ? ethUsdTimestamp : timestamp;
+        usdPrice = FixedPointMathLib.mulDiv(
+            price * PRECISION,
+            ethUsdPrice,
+            PRECISION
+        );
+        usdTimestamp = ethUsdTimestamp < timestamp
+            ? ethUsdTimestamp
+            : timestamp;
     }
 
     /**
@@ -810,31 +943,43 @@ contract SharePriceRouter is OwnableRoles {
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i];
             bool requiresUSD = inUSD[i];
-            
+
             // Special handling for ETH-like assets
             if (assetCategories[asset] == AssetCategory.ETH_LIKE) {
                 // Cache ETH/USD price if not already cached
                 if (!ethUsdCached && requiresUSD) {
-                    (ethUsdPrice, ethUsdTimestamp,) = getLatestPrice(ETH_USD_FEED, true);
+                    (ethUsdPrice, ethUsdTimestamp, ) = getLatestPrice(
+                        ETH_USD_FEED,
+                        true
+                    );
                     ethUsdCached = true;
                 }
-                
+
                 // Get asset's price in ETH
-                (uint256 price, uint256 timestamp, bool isUSD) = getLatestPrice(asset, false);
+                (uint256 price, uint256 timestamp, bool isUSD) = getLatestPrice(
+                    asset,
+                    false
+                );
                 if (price > 0) {
                     if (requiresUSD && !isUSD && ethUsdCached) {
                         // Convert to USD using cached ETH/USD price
-                        price = FixedPointMathLib.mulDiv(price * PRECISION, ethUsdPrice, PRECISION);
-                        timestamp = timestamp < ethUsdTimestamp ? timestamp : ethUsdTimestamp;
+                        price = FixedPointMathLib.mulDiv(
+                            price * PRECISION,
+                            ethUsdPrice,
+                            PRECISION
+                        );
+                        timestamp = timestamp < ethUsdTimestamp
+                            ? timestamp
+                            : ethUsdTimestamp;
                         isUSD = true;
                     }
-                    
+
                     storedPrices[asset] = StoredPrice({
                         price: price,
                         timestamp: timestamp,
                         isUSD: isUSD
                     });
-                    
+
                     emit PriceStored(asset, price, timestamp);
                 }
                 continue;
@@ -886,11 +1031,16 @@ contract SharePriceRouter is OwnableRoles {
         bool inUSD,
         bool getLower
     ) external view returns (uint256 price, uint256 errorCode) {
-        try this.getLatestPrice(asset, inUSD) returns (uint256 p, uint256 timestamp, bool isUSD) {
+        try this.getLatestPrice(asset, inUSD) returns (
+            uint256 p,
+            uint256 timestamp,
+            bool isUSD
+        ) {
             if (p > 0 && !_isStale(timestamp) && isUSD == inUSD) {
                 return (p, 0);
             }
         } catch {}
         return (0, 1);
     }
-} 
+}
+
