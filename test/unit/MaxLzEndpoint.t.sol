@@ -56,172 +56,97 @@ contract MaxLzEndpointTest is BaseTest {
     uint256 constant BTC_HEARTBEAT = 1200;  // 20 minutes
 
     function setUp() public {
-        _setUp(CHAINS, FORK_BLOCKS);
+    _setUp(CHAINS, FORK_BLOCKS);
 
-        admin = makeAddr("admin");
-        user = makeAddr("user");
+    admin = makeAddr("admin");
+    user = makeAddr("user");
 
-        // Mock Chainlink price feeds for BASE
-        vm.mockCall(
-            BASE_ETH_USD_FEED,
-            abi.encodeWithSelector(IChainlink.latestRoundData.selector),
-            abi.encode(uint80(1), int256(2000e8), uint256(block.timestamp), uint256(block.timestamp), uint80(1))
-        );
-        vm.mockCall(
-            BASE_BTC_USD_FEED,
-            abi.encodeWithSelector(IChainlink.latestRoundData.selector),
-            abi.encode(uint80(1), int256(50000e8), uint256(block.timestamp), uint256(block.timestamp), uint80(1))
-        );
+    vm.startPrank(admin);
+    
+    // Setup BASE chain
+    switchTo("BASE");
+    vm.chainId(8453);
+    
+    // Deploy BASE contracts
+    oracle = new SharePriceRouter(admin, BASE_ETH_USD_FEED, USDC, WBTC, WETH);
+    endpoint = new MaxLzEndpoint(admin, base_LZ_end, address(oracle));
+    
+    // Setup Chainlink adapter for BASE
+    ChainlinkAdapter baseAdapter = new ChainlinkAdapter(
+        admin,
+        address(oracle),
+        address(oracle)
+    );
+    oracle.addAdapter(address(baseAdapter), 1);
+    baseAdapter.grantRole(admin, uint256(baseAdapter.ORACLE_ROLE()));
+    baseAdapter.addAsset(WETH, BASE_ETH_USD_FEED, ETH_HEARTBEAT, true);
+    baseAdapter.addAsset(WBTC, BASE_BTC_USD_FEED, BTC_HEARTBEAT, true);
 
-        vm.startPrank(admin);
-        switchTo("BASE");
-        vm.chainId(8453);
-        oracle = new SharePriceRouter(admin, BASE_ETH_USD_FEED, USDC, WBTC, WETH);
-        endpoint = new MaxLzEndpoint(admin, 0x1a44076050125825900e736c501f859c50fE728c, address(oracle));
+    // Set asset categories for BASE
+    oracle.setAssetCategory(WETH, SharePriceRouter.AssetCategory.ETH_LIKE);
+    oracle.setAssetCategory(WBTC, SharePriceRouter.AssetCategory.BTC_LIKE);
+    oracle.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
+    oracle.grantRole(address(endpoint), oracle.ENDPOINT_ROLE());
 
-        // Deploy and set up Chainlink adapter for BASE
-        ChainlinkAdapter baseAdapter = new ChainlinkAdapter(
-            admin,
-            address(oracle),
-            address(oracle)
-        );
-        oracle.addAdapter(address(baseAdapter), 1);
-        baseAdapter.grantRole(admin, uint256(baseAdapter.ORACLE_ROLE()));
-        baseAdapter.addAsset(WETH, BASE_ETH_USD_FEED, ETH_HEARTBEAT, true);
-        baseAdapter.addAsset(WBTC, BASE_BTC_USD_FEED, BTC_HEARTBEAT, true);
+    // Mock only the necessary vault functions
+    vault = IERC4626(0xA70b9595bad8EdbEfa9F416ee36061b1fA8d1160);
+    vm.mockCall(
+        address(vault),
+        abi.encodeWithSelector(IERC4626.asset.selector),
+        abi.encode(WETH)
+    );
+    vm.mockCall(
+        address(vault),
+        abi.encodeWithSelector(IERC4626.convertToAssets.selector, 1e18),
+        abi.encode(1e18)
+    );
+    vm.makePersistent(address(vault));
 
-        // Set asset categories for BASE oracle
-        oracle.setAssetCategory(WETH, SharePriceRouter.AssetCategory.ETH_LIKE);
-        oracle.setAssetCategory(WBTC, SharePriceRouter.AssetCategory.BTC_LIKE);
-        oracle.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
+    // Setup POLYGON chain
+    switchTo("POLYGON");
+    vm.chainId(137);
+    
+    // Deploy POLYGON contracts
+    oracle_pol = new SharePriceRouter(admin, POLYGON_ETH_USD_FEED, USDC, WBTC, WETH);
+    endpoint_pol = new MaxLzEndpoint(admin, polygon_LZ_end, address(oracle_pol));
+    
+    // Setup Chainlink adapter for POLYGON
+    ChainlinkAdapter polygonAdapter = new ChainlinkAdapter(
+        admin,
+        address(oracle_pol),
+        address(oracle_pol)
+    );
+    oracle_pol.addAdapter(address(polygonAdapter), 1);
+    polygonAdapter.grantRole(admin, uint256(polygonAdapter.ORACLE_ROLE()));
+    polygonAdapter.addAsset(WETH, POLYGON_ETH_USD_FEED, ETH_HEARTBEAT, true);
+    polygonAdapter.addAsset(WBTC, POLYGON_BTC_USD_FEED, BTC_HEARTBEAT, true);
 
-        oracle.grantRole(address(endpoint), oracle.ENDPOINT_ROLE());
-        vault = IERC4626(0xA70b9595bad8EdbEfa9F416ee36061b1fA8d1160);
+    // Set asset categories for POLYGON
+    oracle_pol.setAssetCategory(WETH, SharePriceRouter.AssetCategory.ETH_LIKE);
+    oracle_pol.setAssetCategory(WBTC, SharePriceRouter.AssetCategory.BTC_LIKE);
+    oracle_pol.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
+    oracle_pol.grantRole(address(endpoint_pol), oracle_pol.ENDPOINT_ROLE());
 
-        // Mock vault functions
-        vm.mockCall(
-            address(vault),
-            abi.encodeWithSelector(IERC4626.asset.selector),
-            abi.encode(WETH)
-        );
-        vm.mockCall(
-            address(vault),
-            abi.encodeWithSelector(IERC4626.convertToAssets.selector, 1e18),
-            abi.encode(1e18)  // 1:1 ratio for simplicity
-        );
-        vm.mockCall(
-            address(vault),
-            abi.encodeWithSelector(IERC20Metadata.decimals.selector),
-            abi.encode(18)
-        );
+    // Setup cross-chain communication - IMPORTANT: Order matters here
+    // First set up BASE endpoint peers
+    switchTo("BASE");
+    endpoint.setPeer(30_109, bytes32(uint256(uint160(address(endpoint_pol)))));
+    endpoint.setPeer(30_184, bytes32(uint256(uint160(address(endpoint)))));
 
-        // Mock token decimals for BASE
-        vm.mockCall(
-            WETH,
-            abi.encodeWithSelector(IERC20Metadata.decimals.selector),
-            abi.encode(18)
-        );
-        vm.mockCall(
-            WBTC,
-            abi.encodeWithSelector(IERC20Metadata.decimals.selector),
-            abi.encode(8)
-        );
-        vm.mockCall(
-            USDC,
-            abi.encodeWithSelector(IERC20Metadata.decimals.selector),
-            abi.encode(6)
-        );
+    // Then set up POLYGON endpoint peers
+    switchTo("POLYGON");
+    endpoint_pol.setPeer(30_184, bytes32(uint256(uint160(address(endpoint)))));
+    endpoint_pol.setPeer(30_109, bytes32(uint256(uint160(address(endpoint_pol)))));
+    
+    vm.stopPrank();
 
-        // Mock USD price feed for BASE
-        vm.mockCall(
-            BASE_ETH_USD_FEED,
-            abi.encodeWithSelector(IChainlink.latestRoundData.selector),
-            abi.encode(uint80(1), int256(2000e8), uint256(block.timestamp), uint256(block.timestamp), uint80(1))
-        );
+    // Fund test accounts
+    vm.deal(admin, 1000 ether);
+    vm.deal(user, 1000 ether);
 
-        vm.makePersistent(address(vault));
-        vm.stopPrank();
-
-        // Mock Chainlink price feeds for Polygon
-        vm.mockCall(
-            POLYGON_ETH_USD_FEED,
-            abi.encodeWithSelector(IChainlink.latestRoundData.selector),
-            abi.encode(uint80(1), int256(2000e8), uint256(block.timestamp), uint256(block.timestamp), uint80(1))
-        );
-        vm.mockCall(
-            POLYGON_BTC_USD_FEED,
-            abi.encodeWithSelector(IChainlink.latestRoundData.selector),
-            abi.encode(uint80(1), int256(50000e8), uint256(block.timestamp), uint256(block.timestamp), uint80(1))
-        );
-
-        // Mock token decimals for POLYGON
-        vm.mockCall(
-            WETH,
-            abi.encodeWithSelector(IERC20Metadata.decimals.selector),
-            abi.encode(18)
-        );
-        vm.mockCall(
-            WBTC,
-            abi.encodeWithSelector(IERC20Metadata.decimals.selector),
-            abi.encode(8)
-        );
-        vm.mockCall(
-            USDC,
-            abi.encodeWithSelector(IERC20Metadata.decimals.selector),
-            abi.encode(6)
-        );
-
-        // Mock USD price feed for POLYGON
-        vm.mockCall(
-            POLYGON_ETH_USD_FEED,
-            abi.encodeWithSelector(IChainlink.latestRoundData.selector),
-            abi.encode(uint80(1), int256(2000e8), uint256(block.timestamp), uint256(block.timestamp), uint80(1))
-        );
-
-        vm.startPrank(admin);
-        switchTo("POLYGON");
-        vm.chainId(137);
-        oracle_pol = new SharePriceRouter(admin, POLYGON_ETH_USD_FEED, USDC, WBTC, WETH);
-        endpoint_pol = new MaxLzEndpoint(admin, 0x1a44076050125825900e736c501f859c50fE728c, address(oracle_pol));
-
-        // Deploy and set up Chainlink adapter for POLYGON
-        ChainlinkAdapter polygonAdapter = new ChainlinkAdapter(
-            admin,
-            address(oracle_pol),
-            address(oracle_pol)
-        );
-        oracle_pol.addAdapter(address(polygonAdapter), 1);
-        polygonAdapter.grantRole(admin, uint256(polygonAdapter.ORACLE_ROLE()));
-        polygonAdapter.addAsset(WETH, POLYGON_ETH_USD_FEED, ETH_HEARTBEAT, true);
-        polygonAdapter.addAsset(WBTC, POLYGON_BTC_USD_FEED, BTC_HEARTBEAT, true);
-
-        // Set asset categories for POLYGON oracle
-        oracle_pol.setAssetCategory(WETH, SharePriceRouter.AssetCategory.ETH_LIKE);
-        oracle_pol.setAssetCategory(WBTC, SharePriceRouter.AssetCategory.BTC_LIKE);
-        oracle_pol.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
-
-        vm.stopPrank();
-
-        switchTo("BASE");
-
-        vm.startPrank(admin);
-        endpoint.setPeer(30_109, bytes32(uint256(uint160(address(endpoint_pol)))));
-        endpoint.setPeer(30_184, bytes32(uint256(uint160(address(endpoint)))));
-        oracle.grantRole(address(endpoint), oracle.ENDPOINT_ROLE());
-        vm.stopPrank();
-
-        switchTo("POLYGON");
-        vm.startPrank(admin);
-        endpoint_pol.setPeer(30_184, bytes32(uint256(uint160(address(endpoint)))));
-
-        oracle_pol.grantRole(address(endpoint_pol), oracle_pol.ENDPOINT_ROLE());
-
-        endpoint_pol.setPeer(30_109, bytes32(uint256(uint160(address(endpoint_pol)))));
-        vm.stopPrank();
-
-        vm.deal(admin, 1000 ether);
-        vm.deal(user, 1000 ether);
-    }
+    // Switch back to BASE for the start of tests
+    switchTo("BASE");
+} 
 
     function test_constructor() public {
         switchTo("BASE");
