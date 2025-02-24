@@ -9,7 +9,7 @@ import {
     MessagingReceipt,
     Origin
 } from "./interfaces/ILayerZeroEndpointV2.sol";
-import { ISharePriceOracle, VaultReport } from "./interfaces/ISharePriceOracle.sol";
+import { ISharePriceRouter, VaultReport } from "./interfaces/ISharePriceRouter.sol";
 import { Ownable } from "@solady/auth/Ownable.sol";
 import { MsgCodec } from "./libs/MsgCodec.sol";
 
@@ -31,7 +31,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
     ////////////////////////////////////////////////////////////////
 
     /// @notice Contract immutable state
-    ISharePriceOracle public immutable oracle;
+    ISharePriceRouter public immutable oracle;
 
     /// @notice Contract storage state
     ILayerZeroEndpointV2 public endpoint;
@@ -87,7 +87,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
     constructor(address admin_, address lzEndpoint, address oracle_) {
         if (admin_ == address(0) || oracle_ == address(0)) revert ZeroAddress();
 
-        oracle = ISharePriceOracle(oracle_);
+        oracle = ISharePriceRouter(oracle_);
         endpoint = ILayerZeroEndpointV2(lzEndpoint);
 
         _initializeOwner(admin_);

@@ -65,9 +65,11 @@ contract ChainlinkAdapter is BaseOracleAdapter {
                                 ERRORS
     //////////////////////////////////////////////////////////////*/
 
-    error ChainlinkAdaptor__AssetIsNotSupported();
+    error ChainlinkAdaptor__AssetNotSupported();
     error ChainlinkAdaptor__InvalidHeartbeat();
     error ChainlinkAdaptor__InvalidMinMaxConfig();
+    error ChainlinkAdaptor__InvalidPrice();
+    error ChainlinkAdaptor__SequencerDown();
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -96,7 +98,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
     ) external view override returns (PriceReturnData memory) {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
-            revert ChainlinkAdaptor__AssetIsNotSupported();
+            revert ChainlinkAdaptor__AssetNotSupported();
         }
 
         // Check whether we want the pricing in USD first,
@@ -194,7 +196,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
 
         // Validate that `asset` is currently supported.
         if (!isSupportedAsset[asset]) {
-            revert ChainlinkAdaptor__AssetIsNotSupported();
+            revert ChainlinkAdaptor__AssetNotSupported();
         }
 
         // Notify the adaptor to stop supporting the asset.
@@ -257,8 +259,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
     ) internal view returns (PriceReturnData memory pData) {
         pData.inUSD = inUSD;
         if (!IOracleRouter(ORACLE_ROUTER_ADDRESS).isSequencerValid()) {
-            pData.hadError = true;
-            return pData;
+            revert ChainlinkAdaptor__SequencerDown();
         }
 
         (, int256 price, , uint256 updatedAt, ) = IChainlink(data.aggregator)
@@ -266,8 +267,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
 
         // If we got a price of 0 or less, bubble up an error immediately.
         if (price <= 0) {
-            pData.hadError = true;
-            return pData;
+            revert ChainlinkAdaptor__InvalidPrice();
         }
 
         uint256 newPrice = (uint256(price) * WAD) / (10 ** data.decimals);

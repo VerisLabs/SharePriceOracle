@@ -6,7 +6,7 @@ import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 import {IERC4626} from "./interfaces/IERC4626.sol";
 import {IERC20Metadata} from "./interfaces/IERC20Metadata.sol";
 import {IOracleAdaptor, PriceReturnData} from "./interfaces/IOracleAdaptor.sol";
-import {VaultReport} from "./interfaces/ISharePriceOracle.sol";
+import {VaultReport} from "./interfaces/ISharePriceRouter.sol";
 import {IChainlink} from "./interfaces/chainlink/IChainlink.sol";
 
 /**

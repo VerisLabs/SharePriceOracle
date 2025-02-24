@@ -130,8 +130,8 @@ contract Api3AdapterTest is Test {
             abi.encode(-1, uint32(block.timestamp))
         );
 
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true, false);
-        assertEq(priceData.hadError, true, "Should error on negative price");
+        vm.expectRevert(Api3Adaptor.Api3Adaptor__InvalidPrice.selector);
+        adapter.getPrice(WETH, true, false);
     }
 
     function testPriceError_StaleTimestamp() public {
@@ -159,7 +159,7 @@ contract Api3AdapterTest is Test {
     }
 
     function testRevertGetPrice_AssetNotSupported() public {
-        vm.expectRevert(Api3Adaptor.Api3Adaptor__AssetIsNotSupported.selector);
+        vm.expectRevert(Api3Adaptor.Api3Adaptor__AssetNotSupported.selector);
         adapter.getPrice(USDC, true, false);
     }
 
@@ -173,7 +173,7 @@ contract Api3AdapterTest is Test {
         adapter.removeAsset(WETH);
 
         // Verify it reverts after removal
-        vm.expectRevert(Api3Adaptor.Api3Adaptor__AssetIsNotSupported.selector);
+        vm.expectRevert(Api3Adaptor.Api3Adaptor__AssetNotSupported.selector);
         adapter.getPrice(WETH, true, false);
     }
 
@@ -216,7 +216,7 @@ contract Api3AdapterTest is Test {
     }
 
     function testRevertRemoveAsset_AssetNotSupported() public {
-        vm.expectRevert(Api3Adaptor.Api3Adaptor__AssetIsNotSupported.selector);
+        vm.expectRevert(Api3Adaptor.Api3Adaptor__AssetNotSupported.selector);
         adapter.removeAsset(address(0));
     }
 } 

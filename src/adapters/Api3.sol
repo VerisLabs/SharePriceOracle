@@ -60,9 +60,11 @@ contract Api3Adaptor is BaseOracleAdapter {
 
     /// ERRORS ///
 
-    error Api3Adaptor__AssetIsNotSupported();
-    error Api3Adaptor__DAPINameError();
+    error Api3Adaptor__AssetNotSupported();
     error Api3Adaptor__InvalidHeartbeat();
+    error Api3Adaptor__InvalidMinMaxConfig();
+    error Api3Adaptor__DAPINameError();
+    error Api3Adaptor__InvalidPrice();
 
     /// CONSTRUCTOR ///
 
@@ -92,7 +94,7 @@ contract Api3Adaptor is BaseOracleAdapter {
     ) external view override returns (PriceReturnData memory) {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
-            revert Api3Adaptor__AssetIsNotSupported();
+            revert Api3Adaptor__AssetNotSupported();
         }
 
         if (inUSD) {
@@ -169,7 +171,7 @@ contract Api3Adaptor is BaseOracleAdapter {
 
         // Validate that `asset` is currently supported.
         if (!isSupportedAsset[asset]) {
-            revert Api3Adaptor__AssetIsNotSupported();
+            revert Api3Adaptor__AssetNotSupported();
         }
 
         // Notify the adaptor to stop supporting the asset.
@@ -229,8 +231,7 @@ contract Api3Adaptor is BaseOracleAdapter {
         (int256 price, uint256 updatedAt) = data.proxyFeed.read();
 
         if (price <= 0) {
-            pData.hadError = true;
-            return pData;
+            revert Api3Adaptor__InvalidPrice();
         }
 
         uint256 rawPrice = uint256(price);

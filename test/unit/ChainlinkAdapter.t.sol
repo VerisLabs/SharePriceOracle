@@ -17,6 +17,7 @@ contract ChainlinkAdapterTest is Test {
     // Chainlink price feed addresses on BASE (from priceFeedConfig.json)
     address constant ETH_USD_FEED = 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70;
     address constant BTC_USD_FEED = 0xCCADC697c55bbB68dc5bCdf8d3CBe83CdD4E071E;
+    address constant SEQUENCER_FEED = 0xBCF85224fc0756B9Fa45aA7892530B47e10b6433;
     
     // Heartbeat values from config
     uint256 constant ETH_HEARTBEAT = 1200;  // 20 minutes
@@ -38,6 +39,9 @@ contract ChainlinkAdapterTest is Test {
             WBTC,
             WETH
         );
+
+        // Set sequencer feed
+        router.setSequencer(SEQUENCER_FEED);
 
         // Deploy adapter
         adapter = new ChainlinkAdapter(
@@ -91,15 +95,74 @@ contract ChainlinkAdapterTest is Test {
     }
 
     function testPriceError_StaleTimestamp() public {
-        // Warp to future to make current prices stale
-        vm.warp(block.timestamp + 5 hours);
+        // Mock sequencer to be down (answer = 1 means sequencer is down)
+        vm.mockCall(
+            SEQUENCER_FEED,
+            abi.encodeWithSelector(IChainlink.latestRoundData.selector),
+            abi.encode(
+                92233720368547777, // roundId
+                int256(1),  // 1 = sequencer is down
+                block.timestamp,  // startedAt 
+                block.timestamp,  // updatedAt
+                92233720368547777  // answeredInRound
+            )
+        );
+
+        vm.expectRevert(ChainlinkAdapter.ChainlinkAdaptor__SequencerDown.selector);
+        adapter.getPrice(WETH, true, false);
+    }
+
+    function testPriceError_SequencerGracePeriod() public {
+        // Mock sequencer just came back up but still in grace period
+        vm.mockCall(
+            SEQUENCER_FEED,
+            abi.encodeWithSelector(IChainlink.latestRoundData.selector),
+            abi.encode(
+                92233720368547777, // roundId
+                int256(0),  // 0 = sequencer is up
+                block.timestamp - 30 minutes,  // startedAt (within grace period)
+                block.timestamp,  // updatedAt
+                92233720368547777  // answeredInRound
+            )
+        );
+
+        vm.expectRevert(ChainlinkAdapter.ChainlinkAdaptor__SequencerDown.selector);
+        adapter.getPrice(WETH, true, false);
+    }
+
+    function testPriceError_StalePrice() public {
+        // Mock sequencer to be up and past grace period
+        vm.mockCall(
+            SEQUENCER_FEED,
+            abi.encodeWithSelector(IChainlink.latestRoundData.selector),
+            abi.encode(
+                92233720368547777, // roundId
+                int256(0),  // 0 = sequencer is up
+                block.timestamp - 2 hours,  // startedAt (past grace period)
+                block.timestamp,  // updatedAt
+                92233720368547777  // answeredInRound
+            )
+        );
+
+        // Mock price feed with stale timestamp
+        vm.mockCall(
+            ETH_USD_FEED,
+            abi.encodeWithSelector(IChainlink.latestRoundData.selector),
+            abi.encode(
+                92233720368547777, // roundId
+                int256(2000e8),  // 2000 USD
+                block.timestamp - 5 hours,  // startedAt
+                block.timestamp - 5 hours,  // updatedAt
+                92233720368547777  // answeredInRound
+            )
+        );
 
         PriceReturnData memory priceData = adapter.getPrice(WETH, true, false);
-        assertEq(priceData.hadError, true, "Should error on stale timestamp");
+        assertEq(priceData.hadError, true, "Should error on stale price");
     }
 
     function testRevertGetPrice_AssetNotSupported() public {
-        vm.expectRevert(ChainlinkAdapter.ChainlinkAdaptor__AssetIsNotSupported.selector);
+        vm.expectRevert(ChainlinkAdapter.ChainlinkAdaptor__AssetNotSupported.selector);
         adapter.getPrice(USDC, true, false);
     }
 
@@ -113,7 +176,7 @@ contract ChainlinkAdapterTest is Test {
         adapter.removeAsset(WETH);
 
         // Verify it reverts after removal
-        vm.expectRevert(ChainlinkAdapter.ChainlinkAdaptor__AssetIsNotSupported.selector);
+        vm.expectRevert(ChainlinkAdapter.ChainlinkAdaptor__AssetNotSupported.selector);
         adapter.getPrice(WETH, true, false);
     }
 
@@ -146,7 +209,7 @@ contract ChainlinkAdapterTest is Test {
     }
 
     function testRevertRemoveAsset_AssetNotSupported() public {
-        vm.expectRevert(ChainlinkAdapter.ChainlinkAdaptor__AssetIsNotSupported.selector);
+        vm.expectRevert(ChainlinkAdapter.ChainlinkAdaptor__AssetNotSupported.selector);
         adapter.removeAsset(address(0));
     }
 } 

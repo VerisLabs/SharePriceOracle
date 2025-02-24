@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import { VaultReport } from "../interfaces/ISharePriceOracle.sol";
+import { VaultReport } from "../interfaces/ISharePriceRouter.sol";
 
 library MsgCodec {
-    error InvalidMessageLength();
-    error InvalidMessageSlice();
-    error InvalidOptionFormat();
+    error MsgCodec__InvalidMessageLength();
+    error MsgCodec__InvalidMessageSlice();
+    error MsgCodec__InvalidOptionFormat();
+    error MsgCodec__ZeroVaultAddress();
 
     // Proper ABI encoded sizes
     uint256 private constant VAULT_REPORT_SIZE = 32 * 7; // Each field padded to 32 bytes in ABI encoding
@@ -39,7 +40,7 @@ library MsgCodec {
     {
         // Validate reports
         for (uint256 i = 0; i < _reports.length; i++) {
-            if (_reports[i].vaultAddress == address(0)) revert InvalidMessageLength();
+            if (_reports[i].vaultAddress == address(0)) revert MsgCodec__ZeroVaultAddress();
         }
         return abi.encode(_msgType, _reports, _extraReturnOptions.length, _extraReturnOptions);
     }
@@ -55,7 +56,7 @@ library MsgCodec {
             uint256 extraOptionsLength
         )
     {
-        if (encodedMessage.length < HEADER_SIZE) revert InvalidMessageLength();
+        if (encodedMessage.length < HEADER_SIZE) revert MsgCodec__InvalidMessageLength();
 
         (msgType, message, rewardsDelegate, extraOptionsLength) =
             abi.decode(encodedMessage, (uint16, address[], address, uint256));
@@ -70,7 +71,7 @@ library MsgCodec {
         pure
         returns (uint16 msgType, VaultReport[] memory reports, uint256 extraOptionsStart, uint256 extraOptionsLength)
     {
-        if (encodedMessage.length < HEADER_SIZE) revert InvalidMessageLength();
+        if (encodedMessage.length < HEADER_SIZE) revert MsgCodec__InvalidMessageLength();
 
         (msgType, reports, extraOptionsLength) = abi.decode(encodedMessage, (uint16, VaultReport[], uint256));
 
@@ -80,7 +81,7 @@ library MsgCodec {
     }
 
     function decodeMsgType(bytes calldata encodedMessage) public pure returns (uint16 msgType) {
-        if (encodedMessage.length < MIN_MESSAGE_SIZE) revert InvalidMessageLength();
+        if (encodedMessage.length < MIN_MESSAGE_SIZE) revert MsgCodec__InvalidMessageLength();
 
         assembly {
             let word := calldataload(encodedMessage.offset)

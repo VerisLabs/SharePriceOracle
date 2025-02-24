@@ -6,7 +6,7 @@ import {SharePriceRouter} from "../../src/SharePriceRouter.sol";
 import {ChainlinkAdapter} from "../../src/adapters/Chainlink.sol";
 import {Api3Adaptor} from "../../src/adapters/Api3.sol";
 import {IERC20Metadata} from "../../src/interfaces/IERC20Metadata.sol";
-import {VaultReport} from "../../src/interfaces/ISharePriceOracle.sol";
+import {VaultReport} from "../../src/interfaces/ISharePriceRouter.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
 import {MockVault} from "../mocks/MockVault.sol";
 
