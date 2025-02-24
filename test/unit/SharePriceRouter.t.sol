@@ -399,17 +399,21 @@ contract SharePriceRouterTest is Test {
 
         // Get current ETH/USD price to calculate expected value
         (uint256 ethPrice, , ) = router.getLatestPrice(WETH, true);
+        (uint256 usdcPrice, , ) = router.getLatestPrice(USDC, true);
         console.log("Current ETH/USD price:", ethPrice);
+        console.log("Current USDC/USD price:", usdcPrice);
 
         // Create ETH vault with 1.1 ETH per share
         uint256 sharePrice = 1.1e18; // ETH uses 18 decimals
         console.log("Setting ETH vault share price to:", sharePrice);
-        console.log("WETH decimals:", IERC20Metadata(WETH).decimals());
-        console.log("USDC decimals:", IERC20Metadata(USDC).decimals());
+        uint8 wethDecimals = IERC20Metadata(WETH).decimals();
+        uint8 usdcDecimals = IERC20Metadata(USDC).decimals();
+        console.log("WETH decimals:", wethDecimals);
+        console.log("USDC decimals:", usdcDecimals);
         wethVault = new MockVault(WETH, 18, sharePrice);
 
-        // Calculate expected price: 1.1 * ETH/USD price in USDC decimals
-        uint256 expectedSharePrice = (11 * ethPrice) / 1e19; // 1.1 * ETH/USD price adjusted to USDC decimals
+        uint256 expectedSharePrice = (sharePrice * ethPrice) /
+            (usdcPrice * 10 ** (wethDecimals - usdcDecimals));
         console.log(
             "Expected price (1.1 * ETH/USD in USDC decimals):",
             expectedSharePrice
@@ -495,8 +499,10 @@ contract SharePriceRouterTest is Test {
         // Create ETH vault with 1.1 ETH per share
         uint256 sharePrice = 1.1e18; // ETH uses 18 decimals
         console.log("Setting ETH vault share price to:", sharePrice);
-        console.log("WETH decimals:", IERC20Metadata(WETH).decimals());
-        console.log("WBTC decimals:", IERC20Metadata(WBTC).decimals());
+        uint8 wethDecimals = IERC20Metadata(WETH).decimals();
+        uint8 wbtcDecimals = IERC20Metadata(WBTC).decimals();
+        console.log("WETH decimals:", wethDecimals);
+        console.log("WBTC decimals:", wbtcDecimals);
         wethVault = new MockVault(WETH, 18, sharePrice);
 
         // Get current prices to calculate expected value
@@ -504,7 +510,8 @@ contract SharePriceRouterTest is Test {
         (uint256 btcPrice, , ) = router.getLatestPrice(WBTC, true);
 
         // Calculate expected price: (1.1 * ETH/USD) / (BTC/USD) in BTC decimals
-        uint256 expectedSharePrice = (11 * ethPrice * 1e8) / (btcPrice * 1e19);
+        uint256 expectedSharePrice = (sharePrice * ethPrice) /
+            (btcPrice * 10 ** (wethDecimals - wbtcDecimals));
         console.log("Expected price:", expectedSharePrice);
 
         console.log("Getting share price from router...");
