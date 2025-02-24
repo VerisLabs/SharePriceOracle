@@ -516,7 +516,7 @@ contract SharePriceRouter is OwnableRoles {
         uint32 _srcChain,
         address _vaultAddress,
         address _dstAsset
-    ) external returns (uint256 sharePrice, uint64 timestamp) {
+    ) external view returns (uint256 sharePrice, uint64 timestamp) {
         // For cross-chain vaults, first try to get current price through cross-chain oracles
         if (_srcChain != chainId) {
             VaultReport memory report = sharePrices[getPriceKey(_srcChain, _vaultAddress)];
@@ -571,12 +571,6 @@ contract SharePriceRouter is OwnableRoles {
 
         uint8 dstDecimals = IERC20Metadata(_dstAsset).decimals();
         uint256 fallbackPrice = IERC4626(_dstAsset).convertToAssets(10 ** dstDecimals);
-        emit FallbackPriceUsed(
-            _vaultAddress,
-            _dstAsset,
-            fallbackPrice,
-            "Fallback to same SharePrice"
-        );
         return (fallbackPrice, uint64(block.timestamp));
     }
 
@@ -1034,35 +1028,49 @@ contract SharePriceRouter is OwnableRoles {
         uint8 dstDecimals = _getAssetDecimals(_dstAsset);
         
         if (localEquivalent != address(0)) {
-            // Use local equivalent to convert the share price
-            return this.convertStoredPrice(report.sharePrice, localEquivalent, _dstAsset);
-        } else {
-            // USD pricing fallback
-            (uint256 srcUsdPrice, uint256 srcTimestamp, ) = getLatestPrice(
-                _srcAsset,
-                true
+            // First adjust the share price to local equivalent decimals
+            uint8 localDecimals = _getAssetDecimals(localEquivalent);
+            (uint256 adjustedPrice, uint64 adjustedTime) = _adjustDecimals(
+                report.sharePrice,
+                srcDecimals,
+                localDecimals
             );
-            (uint256 dstUsdPrice, uint256 dstTimestamp, ) = getLatestPrice(
-                _dstAsset,
-                true
-            );
-
-            if (srcUsdPrice > 0 && dstUsdPrice > 0) {
-                uint256 baseAmount = 10 ** srcDecimals;
-                price = FixedPointMathLib.mulDiv(
-                    baseAmount,
-                    srcUsdPrice,
-                    dstUsdPrice
-                );
-                timestamp = uint64(
-                    srcTimestamp < dstTimestamp ? srcTimestamp : dstTimestamp
-                );
-                return (price, timestamp);
-            }
             
-            // Return (0, 0) to let getLatestSharePrice handle the fallback
-            return (0, 0);
+            if (adjustedPrice > 0) {
+                // Then convert from local equivalent to destination asset
+                return this.convertStoredPrice(adjustedPrice, localEquivalent, _dstAsset);
+            }
         }
+
+        // USD pricing fallback
+        (uint256 srcUsdPrice, uint256 srcTimestamp, ) = getLatestPrice(
+            _srcAsset,
+            true
+        );
+        (uint256 dstUsdPrice, uint256 dstTimestamp, ) = getLatestPrice(
+            _dstAsset,
+            true
+        );
+
+        if (srcUsdPrice > 0 && dstUsdPrice > 0) {
+            // Convert using actual share price and handle decimals
+            price = FixedPointMathLib.mulDiv(
+                report.sharePrice,
+                srcUsdPrice,
+                dstUsdPrice
+            );
+            
+            // Adjust decimals from source to destination
+            (price, ) = _adjustDecimals(price, srcDecimals, dstDecimals);
+            
+            timestamp = uint64(
+                srcTimestamp < dstTimestamp ? srcTimestamp : dstTimestamp
+            );
+            return (price, timestamp);
+        }
+        
+        // Return (0, 0) to let getLatestSharePrice handle the fallback
+        return (0, 0);
     }
 
     /**

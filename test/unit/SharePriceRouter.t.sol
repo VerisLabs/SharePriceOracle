@@ -965,16 +965,23 @@ contract SharePriceRouterTest is Test {
         uint256 initialPrice = 1.5e18; // 1.5 units
 
         vm.startPrank(admin);
-        // Set up USDC as local equivalent
+        // Set up USDC as local equivalent and set categories
         router.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
+        router.setAssetCategory(srcAsset, SharePriceRouter.AssetCategory.STABLE);
         router.setCrossChainAssetMapping(srcChain, srcAsset, USDC);
         router.addAdapter(address(chainlinkAdapter), 1);
+        
+        // Grant roles to chainlink adapter
         chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ADMIN_ROLE());
         chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ORACLE_ROLE());
         vm.stopPrank();
 
-        // Add price feed for USDC
+        // Add price feed for USDC with proper heartbeat
         chainlinkAdapter.addAsset(USDC, USDC_USD_FEED, CHAINLINK_HEARTBEAT, true);
+
+        // Update USDC price to ensure it's fresh
+        vm.prank(updater);
+        router.updatePrice(USDC, true);
 
         // Create and store a vault report
         VaultReport[] memory reports = new VaultReport[](1);
@@ -1000,6 +1007,12 @@ contract SharePriceRouterTest is Test {
 
         assertTrue(price > 0, "Should get valid converted price");
         assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
+
+        // Since we're converting 1.5e18 (18 decimals) to USDC (6 decimals),
+        // Expected: 1.5e18 * 1e6 / 1e18 = 1.5e6
+        uint256 expectedPrice = 1.5e6; // 1.5 USDC
+        uint256 tolerance = expectedPrice / 100; // 1% tolerance
+        assertApproxEqAbs(price, expectedPrice, tolerance, "Price should be close to expected value");
     }
 
     // Adapter Management Tests
