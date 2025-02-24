@@ -2,11 +2,12 @@
 pragma solidity ^0.8.19;
 
 import { Test } from "forge-std/Test.sol";
+import "forge-std/console.sol";
 import { Api3Adaptor } from "../../src/adapters/Api3.sol";
 import { IProxy } from "../../src/interfaces/api3/IProxy.sol";
 import { PriceReturnData } from "../../src/interfaces/IOracleAdaptor.sol";
 import { IOracleRouter } from "../../src/interfaces/IOracleRouter.sol";
-import { SharePriceOracle } from "../../src/SharePriceOracle.sol";
+import { SharePriceRouter } from "../../src/SharePriceRouter.sol";
 
 contract MockRouter {
     function notifyFeedRemoval(address) external pure {}
@@ -24,7 +25,7 @@ contract Api3AdapterTest is Test {
 
     // Test contracts
     Api3Adaptor public adapter;
-    SharePriceOracle public oracle;
+    SharePriceRouter public oracle;
     MockRouter public router;
     
     function setUp() public {
@@ -35,7 +36,7 @@ contract Api3AdapterTest is Test {
         router = new MockRouter();
 
         // Deploy oracle
-        oracle = new SharePriceOracle(
+        oracle = new SharePriceRouter(
             address(this),  // admin
             DAPI_PROXY_ETH_USD,  // ETH/USD feed
             USDC,
@@ -88,11 +89,25 @@ contract Api3AdapterTest is Test {
     }
 
     function testReturnsCorrectPrice_ETH_USD() public {
+        // Setup
+        vm.startPrank(address(this));
+        adapter.addAsset(
+            WETH,
+            "ETH/USD",
+            DAPI_PROXY_ETH_USD,
+            4 hours,
+            true
+        );
+        vm.stopPrank();
+
+        // Get price
         PriceReturnData memory priceData = adapter.getPrice(WETH, true, false);
         
-        assertEq(priceData.hadError, false, "Price should not have error");
-        assertGt(priceData.price, 0, "Price should be greater than 0");
-        assertEq(priceData.inUSD, true, "Price should be in USD");
+        assertFalse(priceData.hadError);
+        assertTrue(priceData.inUSD);
+        assertGt(priceData.price, 0);
+
+        console.log("ETH/USD Price:", priceData.price);
     }
 
     function testReturnsCorrectPrice_WBTC_USD() public {
@@ -184,10 +199,11 @@ contract Api3AdapterTest is Test {
         // Get current adapter data
         (
             IProxy proxyFeed,
-            bytes32 dapiName,
+            bytes32 dapiNameHash,
             bool isConfigured,
             uint256 heartbeat,
-            uint256 max
+            uint256 max,
+            uint256 min
         ) = adapter.adaptorDataUSD(WETH);
 
         // Should be able to add the same asset again

@@ -6,7 +6,7 @@ import { ChainlinkAdapter } from "../../src/adapters/Chainlink.sol";
 import { IChainlink } from "../../src/interfaces/chainlink/IChainlink.sol";
 import { PriceReturnData } from "../../src/interfaces/IOracleAdaptor.sol";
 import { IOracleRouter } from "../../src/interfaces/IOracleRouter.sol";
-import { SharePriceOracle } from "../../src/SharePriceOracle.sol";
+import { SharePriceRouter } from "../../src/SharePriceRouter.sol";
 
 contract MockRouter {
     function notifyFeedRemoval(address) external pure {}
@@ -31,7 +31,7 @@ contract ChainlinkAdapterTest is Test {
     
     // Test contracts
     ChainlinkAdapter public adapter;
-    SharePriceOracle public oracle;
+    SharePriceRouter public oracle;
     MockRouter public router;
     
     function setUp() public {
@@ -42,7 +42,7 @@ contract ChainlinkAdapterTest is Test {
         router = new MockRouter();
 
         // Deploy oracle
-        oracle = new SharePriceOracle(
+        oracle = new SharePriceRouter(
             address(this),  // admin
             ETH_USD_FEED,  // ETH/USD feed
             USDC,

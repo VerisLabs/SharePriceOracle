@@ -19,12 +19,15 @@ contract Api3Adaptor is BaseOracleAdapter {
     ///                  0 defaults to using DEFAULT_HEART_BEAT.
     /// @param max The max valid price of the asset.
     ///            0 defaults to use proxy max price reduced by ~10%.
+    /// @param min The min valid price of the asset.
+    ///            0 defaults to use proxy min price increased by ~10%.
     struct AdaptorData {
         IProxy proxyFeed;
         bytes32 dapiName;
         bool isConfigured;
         uint256 heartbeat;
         uint256 max;
+        uint256 min;
     }
 
     /// CONSTANTS ///
@@ -143,24 +146,16 @@ contract Api3Adaptor is BaseOracleAdapter {
             ? heartbeat
             : DEFAULT_HEART_BEAT;
 
-        // Save adaptor data and update mapping that we support `asset` now.
-
-        // Add a ~10% buffer to maximum price allowed from Api3 can stop 
-        // updating its price before/above the min/max price. We use a maximum
-        // buffered price of 2^224 - 1, which could overflow when trying to
-        // save the final value into an uint240.
-        data.max = (uint256(int256(type(int224).max)) * 9) / 10; 
+        // Add a ~10% buffer to maximum and minimum prices
+        data.max = (uint256(int256(type(int224).max)) * 9) / 10;
+        data.min = WAD / 1000; // 0.001 in 18 decimals
         data.dapiName = dapiName;
         data.proxyFeed = IProxy(proxyFeed);
         data.isConfigured = true;
 
-        // Check whether this is new or updated support for `asset`.
-        bool isUpdate;
-        if (isSupportedAsset[asset]) {
-            isUpdate = true;
-        }
-
+        bool isUpdate = isSupportedAsset[asset];
         isSupportedAsset[asset] = true;
+        
         emit Api3AssetAdded(asset, data, isUpdate);
     }
 
@@ -233,27 +228,25 @@ contract Api3Adaptor is BaseOracleAdapter {
     ) internal view returns (PriceReturnData memory pData) {
         (int256 price, uint256 updatedAt) = data.proxyFeed.read();
 
-        // If we got a price of 0 or less, bubble up an error immediately.
         if (price <= 0) {
             pData.hadError = true;
             return pData;
         }
 
-        // Scale down the price if needed to fit in uint240
         uint256 rawPrice = uint256(price);
         
         if (rawPrice > type(uint240).max) {
-            // Scale down by 10^9 (typical for API3 feeds)
             rawPrice = rawPrice / 1e9;
         }
 
         pData.price = uint240(rawPrice);
         pData.hadError = _verifyData(
-                        rawPrice,
-                        updatedAt,
-                        data.max,
-                        data.heartbeat
-                    );
+            rawPrice,
+            updatedAt,
+            data.max,
+            data.min,
+            data.heartbeat
+        );
         pData.inUSD = inUSD;
     }
 
@@ -263,6 +256,7 @@ contract Api3Adaptor is BaseOracleAdapter {
     /// @param value The value that is retrieved from the feed data.
     /// @param timestamp The time at which the value was last updated.
     /// @param max The maximum limit of the value.
+    /// @param min The minimum limit of the value.
     /// @param heartbeat The maximum allowed time difference between
     ///                  current time and 'timestamp'.
     /// @return A boolean indicating whether the feed data had an error
@@ -271,12 +265,20 @@ contract Api3Adaptor is BaseOracleAdapter {
         uint256 value,
         uint256 timestamp,
         uint256 max,
+        uint256 min,
         uint256 heartbeat
     ) internal view returns (bool) {
+        // Check minimum value
+        if (value < min) {
+            return true;
+        }
+
+        // Check maximum value
         if (value > max) {
             return true;
         }
-        
+
+        // Check staleness
         if (block.timestamp - timestamp > heartbeat) {
             return true;
         }
