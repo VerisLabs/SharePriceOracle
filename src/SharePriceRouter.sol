@@ -67,8 +67,6 @@ contract SharePriceRouter is OwnableRoles {
     uint256 public constant PRECISION = 1e18;
     /// @notice Minimum valid price threshold
     uint256 public constant MIN_PRICE_THRESHOLD = 1e2; // 0.0000000001 in 18 decimals
-    /// @notice Maximum price impact allowed for conversions (1% = 10000)
-    uint256 public constant MAX_PRICE_IMPACT = 10000; // 1%
     /// @notice Grace period after sequencer is back up
     uint256 public constant GRACE_PERIOD_TIME = 3600; // 1 hour
 
@@ -123,9 +121,6 @@ contract SharePriceRouter is OwnableRoles {
 
     /// @notice Mapping of vault address to its last stored share price data
     mapping(address => StoredSharePrice) public storedSharePrices;
-
-    /// @notice Cache for asset decimals
-    mapping(address => uint8) private cachedAssetDecimals;
 
     /// @notice Struct to store historical price data
     struct StoredPrice {
@@ -661,7 +656,16 @@ contract SharePriceRouter is OwnableRoles {
     ) external view returns (uint256 price, uint64 timestamp) {
         // If same asset, just adjust decimals if needed
         if (_storedAsset == _dstAsset) {
-            uint8 srcDecimals = _getAssetDecimals(_storedAsset);
+            // Check if this is a cross-chain asset
+            uint32 srcChain = vaultChainIds[_storedAsset];
+            uint8 srcDecimals;
+            if (srcChain != 0 && srcChain != chainId) {
+                // Use stored decimals from VaultReport for cross-chain assets
+                VaultReport memory report = sharePrices[getPriceKey(srcChain, _storedAsset)];
+                srcDecimals = uint8(report.assetDecimals);
+            } else {
+                srcDecimals = _getAssetDecimals(_storedAsset);
+            }
             uint8 dstDecimals = _getAssetDecimals(_dstAsset);
             (price, ) = _adjustDecimals(_storedPrice, srcDecimals, dstDecimals);
             return (price, uint64(block.timestamp));
@@ -728,32 +732,32 @@ contract SharePriceRouter is OwnableRoles {
     }
 
     /**
-     * @notice Gets decimals for an asset with caching
-     * @dev Caches result to save gas on subsequent calls
-     * @param asset The asset address
-     * @return decimals The number of decimals
-     */
-    function _getDecimals(address asset) internal returns (uint8) {
-        uint8 decimals = cachedAssetDecimals[asset];
-        if (decimals == 0) {
-            decimals = _getAssetDecimals(asset);
-            cachedAssetDecimals[asset] = decimals;
-        }
-        return decimals;
-    }
-
-    /**
-     * @notice Gets decimals for an asset (view-only version)
-     * @dev Uses cached value if available, otherwise queries token
+     * @notice Gets decimals for an asset
+     * @dev Queries the token contract directly
      * @param asset The asset address
      * @return decimals The number of decimals
      */
     function _getAssetDecimals(address asset) internal view returns (uint8) {
-        uint8 decimals = cachedAssetDecimals[asset];
-        if (decimals == 0) {
-            decimals = IERC20Metadata(asset).decimals();
+        return IERC20Metadata(asset).decimals();
+    }
+
+     /**
+     * @notice Gets decimals for a potentially cross-chain asset
+     * @dev Returns decimals from VaultReport if cross-chain, otherwise queries token
+     * @param asset The asset address
+     * @param chain The chain ID where the asset exists
+     * @return decimals The number of decimals
+     */
+    function _getAssetDecimalsWithReport(
+        address asset,
+        uint32 chain
+    ) internal view returns (uint8) {
+        if (chain != 0 && chain != chainId) {
+            // Use stored decimals from VaultReport for cross-chain assets
+            VaultReport memory report = sharePrices[getPriceKey(chain, asset)];
+            return uint8(report.assetDecimals);
         }
-        return decimals;
+        return _getAssetDecimals(asset);
     }
 
     function _adjustDecimals(
@@ -885,16 +889,6 @@ contract SharePriceRouter is OwnableRoles {
         return this.convertStoredPrice(rawSharePrice, asset, _dstAsset);
     }
 
-    /**
-     * @notice Internal function to convert prices between assets of the same category
-     * @dev Handles decimal adjustments and uses appropriate price denomination based on category
-     * @param _storedPrice The price to convert
-     * @param _storedAsset The source asset
-     * @param _dstAsset The destination asset
-     * @param _inUSD Whether to use USD prices (true) or not (false)
-     * @return price The converted price
-     * @return timestamp The timestamp of the conversion
-     */
     function _convertSameCategory(
         uint256 _storedPrice,
         address _storedAsset,
@@ -926,47 +920,17 @@ contract SharePriceRouter is OwnableRoles {
         );
 
         // Handle decimal adjustments if needed
-        uint8 srcDecimals = _getAssetDecimals(_storedAsset);
-        uint8 dstDecimals = _getAssetDecimals(_dstAsset);
+        uint32 srcChain = vaultChainIds[_storedAsset];
+        uint32 dstChain = vaultChainIds[_dstAsset];
+
+        uint8 srcDecimals = _getAssetDecimalsWithReport(_storedAsset, srcChain);
+        uint8 dstDecimals = _getAssetDecimalsWithReport(_dstAsset, dstChain);
+
         if (srcDecimals != dstDecimals) {
             (price, ) = _adjustDecimals(price, srcDecimals, dstDecimals);
         }
     }
 
-    function _convertBtcToBtc(
-        uint256 _storedPrice,
-        address _storedAsset,
-        address _dstAsset
-    ) internal view returns (uint256 price, uint64 timestamp) {
-        return _convertSameCategory(_storedPrice, _storedAsset, _dstAsset, false);
-    }
-
-    function _convertEthToEth(
-        uint256 _storedPrice,
-        address _storedAsset,
-        address _dstAsset
-    ) internal view returns (uint256 price, uint64 timestamp) {
-        return _convertSameCategory(_storedPrice, _storedAsset, _dstAsset, false);
-    }
-
-    function _convertStableToStable(
-        uint256 _storedPrice,
-        address _storedAsset,
-        address _dstAsset
-    ) internal view returns (uint256 price, uint64 timestamp) {
-        return _convertSameCategory(_storedPrice, _storedAsset, _dstAsset, true);
-    }
-
-    /**
-     * @notice Converts a price between assets of different categories
-     * @dev Converts through USD as an intermediate step
-     *      Handles decimal adjustments for different asset precisions
-     * @param _storedPrice The price to convert
-     * @param _storedAsset The source asset
-     * @param _dstAsset The destination asset
-     * @return price The converted price
-     * @return timestamp The timestamp of the conversion (earliest of source timestamps)
-     */
     function _convertCrossCategory(
         uint256 _storedPrice,
         address _storedAsset,
@@ -985,8 +949,11 @@ contract SharePriceRouter is OwnableRoles {
         if (srcUsdPrice == 0 || dstUsdPrice == 0) revert NoValidPrice();
 
         // Get decimals
-        uint8 srcDecimals = _getAssetDecimals(_storedAsset);
-        uint8 dstDecimals = _getAssetDecimals(_dstAsset);
+        uint32 srcChain = vaultChainIds[_storedAsset];
+        uint32 dstChain = vaultChainIds[_dstAsset];
+
+        uint8 srcDecimals = _getAssetDecimalsWithReport(_storedAsset, srcChain);
+        uint8 dstDecimals = _getAssetDecimalsWithReport(_dstAsset, dstChain);
 
         // First convert to USD equivalent value
         uint256 usdValue = _storedPrice * srcUsdPrice;

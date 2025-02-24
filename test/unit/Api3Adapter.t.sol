@@ -2,7 +2,6 @@
 pragma solidity ^0.8.19;
 
 import { Test } from "forge-std/Test.sol";
-import "forge-std/console.sol";
 import { Api3Adaptor } from "../../src/adapters/Api3.sol";
 import { IProxy } from "../../src/interfaces/api3/IProxy.sol";
 import { PriceReturnData } from "../../src/interfaces/IOracleAdaptor.sol";
@@ -110,8 +109,6 @@ contract Api3AdapterTest is Test {
         assertFalse(priceData.hadError);
         assertTrue(priceData.inUSD);
         assertGt(priceData.price, 0);
-
-        console.log("ETH/USD Price:", priceData.price);
     }
 
     function testReturnsCorrectPrice_WBTC_USD() public view {
