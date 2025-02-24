@@ -297,7 +297,7 @@ contract SharePriceRouter is OwnableRoles {
             return (storedPrice.price, storedPrice.timestamp, storedPrice.isUSD);
         }
 
-        revert NoValidPrice();
+        revert NoValidPrice(); // TODO SHOULD NEVER REVERT
     }
 
     /**

@@ -6,11 +6,10 @@ import { console } from "forge-std/console.sol";
 import { SharePriceRouter } from "../../src/SharePriceRouter.sol";
 import { ChainlinkAdapter } from "../../src/adapters/Chainlink.sol";
 import { Api3Adaptor } from "../../src/adapters/Api3.sol";
-import { IERC4626 } from "../../src/interfaces/IERC4626.sol";
-import { IERC20 } from "../../src/interfaces/IERC20.sol";
 import { IERC20Metadata } from "../../src/interfaces/IERC20Metadata.sol";
 import { VaultReport } from "../../src/interfaces/ISharePriceOracle.sol";
 import { Ownable } from "solady/auth/Ownable.sol";
+import { MockVault } from "../mocks/MockVault.sol";
 
 // Constants for BASE network
 address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
@@ -31,68 +30,6 @@ address constant API3_BTC_USD_FEED = 0x041a131Fa91Ad61dD85262A42c04975986580d50;
 // Heartbeat values (in seconds)
 uint256 constant CHAINLINK_HEARTBEAT = 86400; // 24 hours
 uint256 constant API3_HEARTBEAT = 14400;      // 4 hours
-
-contract MockVault is IERC4626 {
-    address public immutable override asset;
-    uint8 public immutable override(IERC20, IERC20Metadata) decimals;
-    uint256 public sharePrice;
-    string public constant override(IERC20, IERC20Metadata) name = "Mock Vault";
-    string public constant override(IERC20, IERC20Metadata) symbol = "mVLT";
-    uint256 private _totalSupply;
-
-    constructor(address _asset, uint8 _decimals, uint256 _sharePrice) {
-        asset = _asset;
-        decimals = _decimals;
-        sharePrice = _sharePrice;
-    }
-
-    function convertToAssets(uint256 shares) external view override returns (uint256) {
-        // The share price is already in the asset's decimals
-        // We just need to multiply shares by share price and divide by WAD
-        return (shares * sharePrice) / 1e18;
-    }
-
-    // IERC20 implementation
-    function totalSupply() external view override returns (uint256) {
-        return _totalSupply;
-    }
-
-    function balanceOf(address) external pure override returns (uint256) {
-        return 0;
-    }
-
-    function transfer(address, uint256) external pure override returns (bool) {
-        return false;
-    }
-
-    function allowance(address, address) external pure override returns (uint256) {
-        return 0;
-    }
-
-    function approve(address, uint256) external pure override returns (bool) {
-        return false;
-    }
-
-    function transferFrom(address, address, uint256) external pure override returns (bool) {
-        return false;
-    }
-
-    // Required interface stubs
-    function totalAssets() external pure override returns (uint256) { return 0; }
-    function convertToShares(uint256) external pure override returns (uint256) { return 0; }
-    function maxDeposit(address) external pure override returns (uint256) { return 0; }
-    function previewDeposit(uint256) external pure override returns (uint256) { return 0; }
-    function deposit(uint256, address) external pure override returns (uint256) { return 0; }
-    function maxMint(address) external pure override returns (uint256) { return 0; }
-    function previewMint(uint256) external pure override returns (uint256) { return 0; }
-    function mint(uint256, address) external pure override returns (uint256) { return 0; }
-    function maxWithdraw(address) external pure override returns (uint256) { return 0; }
-    function previewWithdraw(uint256) external pure override returns (uint256) { return 0; }
-    function withdraw(uint256, address, address) external pure override returns (uint256) { return 0; }
-    function maxRedeem(address) external pure override returns (uint256) { return 0; }
-    function previewRedeem(uint256) external pure override returns (uint256) { return 0; }
-    function redeem(uint256, address, address) external pure override returns (uint256) { return 0; }
-}
 
 contract SharePriceRouterTest is Test {
     // Test contracts
@@ -241,7 +178,6 @@ contract SharePriceRouterTest is Test {
         
         assertEq(router.adapterPriorities(address(chainlinkAdapter)), 0, "Adapter should be removed");
     }
-
     function testRevertRemoveAdapter_NotFound() public {
         vm.prank(admin);
         vm.expectRevert(SharePriceRouter.AdapterNotFound.selector);
@@ -303,13 +239,13 @@ contract SharePriceRouterTest is Test {
             USDC
         );
 
-        uint256 expectedPrice = 1.1e6; // 1.1 in USDC decimals
-        console.log("Expected price:", expectedPrice);
+        uint256 expectedSharePrice = 1.1e6; // 1.1 in USDC decimals
+        console.log("Expected price:", expectedSharePrice);
         console.log("Actual price:", actualSharePrice);
 
         // Allow for a small deviation (0.1%) in price
-        uint256 maxDelta = expectedPrice / 1000; // 0.1% of expected price
-        assertApproxEqAbs(actualSharePrice, expectedPrice, maxDelta, "Share price should be close to expected value");
+        uint256 maxDelta = expectedSharePrice / 1000; // 0.1% of expected price
+        assertApproxEqAbs(actualSharePrice, expectedSharePrice, maxDelta, "Share price should be close to expected value");
         assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current block");
     }
 
@@ -349,13 +285,13 @@ contract SharePriceRouterTest is Test {
             USDC
         );
         
-        uint256 expectedPrice = 1.1e6; // 1.1 in USDC decimals
-        console.log("Expected price:", expectedPrice);
+        uint256 expectedSharePrice = 1.1e6; // 1.1 in USDC decimals
+        console.log("Expected price:", expectedSharePrice);
         console.log("Actual price:", actualSharePrice);
         
         // Allow for a small deviation (0.1%) in price due to conversion
-        uint256 maxDelta = expectedPrice / 1000; // 0.1% of expected price
-        assertApproxEqAbs(actualSharePrice, expectedPrice, maxDelta, "Share price should be close to expected value");
+        uint256 maxDelta = expectedSharePrice / 1000; // 0.1% of expected price
+        assertApproxEqAbs(actualSharePrice, expectedSharePrice, maxDelta, "Share price should be close to expected value");
         assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
     }
 
@@ -395,8 +331,8 @@ contract SharePriceRouterTest is Test {
         wethVault = new MockVault(WETH, 18, sharePrice);
         
         // Calculate expected price: 1.1 * ETH/USD price in USDC decimals
-        uint256 expectedPrice = (11 * ethPrice) / 1e19;  // 1.1 * ETH/USD price adjusted to USDC decimals
-        console.log("Expected price (1.1 * ETH/USD in USDC decimals):", expectedPrice);
+        uint256 expectedSharePrice = (11 * ethPrice) / 1e19;  // 1.1 * ETH/USD price adjusted to USDC decimals
+        console.log("Expected price (1.1 * ETH/USD in USDC decimals):", expectedSharePrice);
         
         console.log("Getting share price from router...");
         (uint256 actualSharePrice, uint64 timestamp) = router.getLatestSharePrice(
@@ -404,12 +340,12 @@ contract SharePriceRouterTest is Test {
             USDC
         );
         
-        console.log("Expected price:", expectedPrice);
+        console.log("Expected price:", expectedSharePrice);
         console.log("Actual price:", actualSharePrice);
         
         // Allow for a small deviation (2%) due to cross-category conversion and multiple price sources
-        uint256 maxDelta = expectedPrice * 2 / 100; // 2% of expected price
-        assertApproxEqAbs(actualSharePrice, expectedPrice, maxDelta, "Share price should be close to expected value");
+        uint256 maxDelta = expectedSharePrice * 2 / 100; // 2% of expected price
+        assertApproxEqAbs(actualSharePrice, expectedSharePrice, maxDelta, "Share price should be close to expected value");
         assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
     }
 
@@ -450,8 +386,8 @@ contract SharePriceRouterTest is Test {
         (uint256 btcPrice,,) = router.getLatestPrice(WBTC, true);
         
         // Calculate expected price: (1.1 * ETH/USD) / (BTC/USD) in BTC decimals
-        uint256 expectedPrice = (11 * ethPrice * 1e8) / (btcPrice * 1e19);
-        console.log("Expected price:", expectedPrice);
+        uint256 expectedSharePrice = (11 * ethPrice * 1e8) / (btcPrice * 1e19);
+        console.log("Expected price:", expectedSharePrice);
         
         console.log("Getting share price from router...");
         (uint256 actualSharePrice, uint64 timestamp) = router.getLatestSharePrice(
@@ -459,16 +395,16 @@ contract SharePriceRouterTest is Test {
             WBTC
         );
         
-        console.log("Expected price:", expectedPrice);
+        console.log("Expected price:", expectedSharePrice);
         console.log("Actual price:", actualSharePrice);
         
         // Allow for a larger deviation (1%) due to cross-category conversion and multiple price sources
-        uint256 maxDelta = expectedPrice / 100; // 1% of expected price
-        assertApproxEqAbs(actualSharePrice, expectedPrice, maxDelta, "Share price should be close to expected value");
+        uint256 maxDelta = expectedSharePrice / 100; // 1% of expected price
+        assertApproxEqAbs(actualSharePrice, expectedSharePrice, maxDelta, "Share price should be close to expected value");
         assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
     }
 
-    function testGetLatestSharePrice_CrossCategory_BTC_to_USDC() public {
+    function testGetLatestSharePrice_CrossCategory_BTC_to_USDC_banana() public {
         console.log("\n=== Testing BTC to USDC Share Price (Cross Category) ===");
         
         vm.startPrank(admin);
@@ -495,30 +431,31 @@ contract SharePriceRouterTest is Test {
         // Create BTC vault with 1.1 BTC per share
         uint256 sharePrice = 1.1e8; // BTC uses 8 decimals
         console.log("Setting BTC vault share price to:", sharePrice);
-        console.log("WBTC decimals:", IERC20Metadata(WBTC).decimals());
-        console.log("USDC decimals:", IERC20Metadata(USDC).decimals());
+        uint8 btcDecimals = IERC20Metadata(WBTC).decimals();
+        uint8 usdcDecimals = IERC20Metadata(USDC).decimals();
+        console.log("WBTC decimals:", btcDecimals);
+        console.log("USDC decimals:", usdcDecimals);
         wbtcVault = new MockVault(WBTC, 8, sharePrice);
         
         // Get current BTC/USD price to calculate expected value
         (uint256 btcPrice,,) = router.getLatestPrice(WBTC, true);
+        (uint256 usdcPrice,,) = router.getLatestPrice(USDC, true);
         console.log("Current BTC/USD price:", btcPrice);
-        
-        // Calculate expected price: 1.1 * BTC/USD price in USDC decimals
-        uint256 expectedPrice = (11 * btcPrice) / 1e19;
-        console.log("Expected price:", expectedPrice);
+        console.log("Current USDC/USD price:", usdcPrice);
         
         console.log("Getting share price from router...");
         (uint256 actualSharePrice, uint64 timestamp) = router.getLatestSharePrice(
             address(wbtcVault),
             USDC
         );
-        
-        console.log("Expected price:", expectedPrice);
+       
+        uint256 expectedSharePrice = (sharePrice * btcPrice) / (usdcPrice * 10**(btcDecimals - usdcDecimals));
+        console.log("Expected price:", expectedSharePrice);
         console.log("Actual price:", actualSharePrice);
         
         // Allow for a larger deviation (2%) due to cross-category conversion and multiple price sources
-        uint256 maxDelta = expectedPrice * 2 / 100; // 2% of expected price
-        assertApproxEqAbs(actualSharePrice, expectedPrice, maxDelta, "Share price should be close to expected value");
+        uint256 maxDelta = expectedSharePrice * 2 / 100; // 2% of expected price
+        assertApproxEqAbs(actualSharePrice, expectedSharePrice, maxDelta, "Share price should be close to expected value");
         assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
     }
 
@@ -555,10 +492,10 @@ contract SharePriceRouterTest is Test {
         
         // Get current prices to calculate expected value
         (uint256 btcPrice,,) = router.getLatestPrice(WBTC, true);
+        (uint256 usdcPrice,,) = router.getLatestPrice(USDC, true);
         
-        // Calculate expected price: (1.1 * 1e8) / (BTC/USD) in BTC decimals
-        uint256 expectedPrice = (11 * 1e8) / 10;
-        console.log("Expected price:", expectedPrice);
+        uint256 expectedSharePrice = sharePrice * usdcPrice * 1e8 / btcPrice;
+        console.log("Expected price:", expectedSharePrice);
         
         console.log("Getting share price from router...");
         (uint256 actualSharePrice, uint64 timestamp) = router.getLatestSharePrice(
@@ -566,12 +503,12 @@ contract SharePriceRouterTest is Test {
             WBTC
         );
         
-        console.log("Expected price:", expectedPrice);
+        console.log("Expected price:", expectedSharePrice);
         console.log("Actual price:", actualSharePrice);
         
         // Allow for a larger deviation (1%) due to cross-category conversion and multiple price sources
-        uint256 maxDelta = expectedPrice / 100; // 1% of expected price
-        assertApproxEqAbs(actualSharePrice, expectedPrice, maxDelta, "Share price should be close to expected value");
+        uint256 maxDelta = expectedSharePrice / 100; // 1% of expected price
+        assertApproxEqAbs(actualSharePrice, expectedSharePrice, maxDelta, "Share price should be close to expected value");
         assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
     }
 } 
