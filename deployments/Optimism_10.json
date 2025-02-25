@@ -1,6 +1,8 @@
 {
-  "oracle": "0xA72d30b79f1922D383A95BeD81390c1077426ae1",
-  "endpoint": "0xd79F340A062002aBe6288114B0057Cef45E59c72",
+  "router": "0x1e85DFbcc3817c245423f44dd4ac237bfedD701b",
+  "endpoint": "0x6abFE1172C33CA7CEf879e3c85ad0bcD897F5ac2",
+  "chainlinkAdapter": "0xfcdAA9728e817940E16F3690667F1a713C0Cbc80",
+  "api3Adapter": "0xF0Fe9ef92d25A020A8b82BFcdC8f1E988A5084Bd",
   "admin": "0x429796dAc057E7C15724196367007F1e9Cff82F9",
   "chainId": 10,
   "lzEndpointId": 30111,

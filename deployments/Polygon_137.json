@@ -1,9 +1,0 @@
-{
-  "oracle": "0xd782a72cfAd1c2800e5df51dBf68387347b5ADB5",
-  "endpoint": "0xeb718ab5603df5F5BE5467f3e51807D4B99Fd28d",
-  "admin": "0x429796dAc057E7C15724196367007F1e9Cff82F9",
-  "chainId": 137,
-  "lzEndpointId": 30109,
-  "lzEndpoint": "0x1a44076050125825900e736c501f859c50fE728c",
-  "network": "Polygon"
-}
