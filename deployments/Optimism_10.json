@@ -1,11 +1,1 @@
-{
-  "router": "0x1e85DFbcc3817c245423f44dd4ac237bfedD701b",
-  "endpoint": "0x6abFE1172C33CA7CEf879e3c85ad0bcD897F5ac2",
-  "chainlinkAdapter": "0xfcdAA9728e817940E16F3690667F1a713C0Cbc80",
-  "api3Adapter": "0xF0Fe9ef92d25A020A8b82BFcdC8f1E988A5084Bd",
-  "admin": "0x429796dAc057E7C15724196367007F1e9Cff82F9",
-  "chainId": 10,
-  "lzEndpointId": 30111,
-  "lzEndpoint": "0x1a44076050125825900e736c501f859c50fE728c",
-  "network": "Optimism"
-}
+{"router": "0xF571d6a7E678006CC76592158c001BCc0d660018","endpoint": "0x9286Fc03D6e7A23FC7201EE287a77b942F3c9663","chainlinkAdapter": "0x76e3b8fC232ce390F25852e9aE3ef28acD47697e","api3Adapter": "0xB72C0765ca30A77Ff5E4e8BCe2b30f81bA2EdF76","admin": "0x429796dAc057E7C15724196367007F1e9Cff82F9","chainId": 10,"lzEndpointId": 30111,"lzEndpoint": "0x1a44076050125825900e736c501f859c50fE728c","network": "Optimism"}

@@ -88,7 +88,7 @@ contract ConfigCrossChainCategories is Script {
             return SharePriceRouter.AssetCategory.STABLE;
         }
         
-        // Default to UNKNOWN for any other asset
+        // Default to OTHER for any other asset
         return SharePriceRouter.AssetCategory.UNKNOWN;
     }
 
@@ -116,14 +116,14 @@ contract ConfigCrossChainCategories is Script {
         SharePriceRouter router = SharePriceRouter(deployment.router);
 
         // Define cross-chain assets to set categories for
-        CrossChainAsset[] memory assets = new CrossChainAsset[](1);
+        CrossChainAsset[] memory assets = new CrossChainAsset[](6);
         uint256 assetCount = 0;
         
         // Arbitrum assets
         assets[assetCount++] = CrossChainAsset({
             chain: "arbitrum",
-            symbol: "USDT",
-            tokenAddress: 0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9,
+            symbol: "USDC",
+            tokenAddress: 0xaf88d065e77c8cC2239327C5EDb3A432268e5831,
             category: SharePriceRouter.AssetCategory.STABLE
         });
         
@@ -170,8 +170,8 @@ contract ConfigCrossChainCategories is Script {
             
             // Get the local asset address from the cross-chain mapping
             bytes32 key = keccak256(abi.encodePacked(
-                keccak256(bytes(asset.chain)) == keccak256(bytes("arbitrum")) ? uint32(42161) : 
-                keccak256(bytes(asset.chain)) == keccak256(bytes("optimism")) ? uint32(10) : 
+                equalStrings(asset.chain, "arbitrum") ? uint32(42161) : 
+                equalStrings(asset.chain, "optimism") ? uint32(10) : 
                 uint32(0),
                 asset.tokenAddress
             ));
@@ -199,5 +199,10 @@ contract ConfigCrossChainCategories is Script {
         }
 
         vm.stopBroadcast();
+    }
+    
+    // Helper function to compare strings
+    function equalStrings(string memory a, string memory b) internal pure returns (bool) {
+        return keccak256(bytes(a)) == keccak256(bytes(b));
     }
 } 

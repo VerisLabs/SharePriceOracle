@@ -9,7 +9,7 @@ import "../src/interfaces/ISharePriceRouter.sol";
 contract SimpleValidate is Script {
     function run() external {
         // Router address on Base
-        address routerAddress = 0x366d324370B34c1604b4b867F5D93925245d4464;
+        address routerAddress = 0x5b515c399d5605869f93e9574D73f10E705C5F3a;
         SharePriceRouter router = SharePriceRouter(routerAddress);
         
         console.log("Validating SharePriceRouter at:", routerAddress);
@@ -37,7 +37,7 @@ contract SimpleValidate is Script {
         
         // Test getLatestPrice with Optimism USDC.e directly
         console.log("\nTesting getLatestPrice with Optimism USDC.e directly:");
-        try router.getLatestPrice(optimismUSDC, true) returns (uint256 price, uint256 timestamp, bool isUSD) {
+        try router.getLatestPrice(localEquivalent, true) returns (uint256 price, uint256 timestamp, bool isUSD) {
             console.log("  Price:", price);
             console.log("  Timestamp:", timestamp);
             console.log("  Is USD:", isUSD);
