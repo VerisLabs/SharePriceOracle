@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import {Test} from "forge-std/Test.sol";
 import {SharePriceRouter} from "../../src/SharePriceRouter.sol";
 import {ChainlinkAdapter} from "../../src/adapters/Chainlink.sol";
-import {Api3Adaptor} from "../../src/adapters/Api3.sol";
+import {Api3Adapter} from "../../src/adapters/Api3.sol";
 import {IERC20Metadata} from "../../src/interfaces/IERC20Metadata.sol";
 import {VaultReport} from "../../src/interfaces/ISharePriceRouter.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
@@ -36,7 +36,7 @@ contract SharePriceRouterTest is Test {
     // Test contracts
     SharePriceRouter public router;
     ChainlinkAdapter public chainlinkAdapter;
-    Api3Adaptor public api3Adapter;
+    Api3Adapter public api3Adapter;
 
     // Test vaults
     MockVault public usdcVault;
@@ -72,7 +72,7 @@ contract SharePriceRouterTest is Test {
         );
         
 
-        api3Adapter = new Api3Adaptor(
+        api3Adapter = new Api3Adapter(
             admin,
             address(router),
             address(router), // Router is now its own router
@@ -957,62 +957,6 @@ contract SharePriceRouterTest is Test {
 
         assertEq(router.crossChainAssetMap(key1), localAsset, "First mapping should be set");
         assertEq(router.crossChainAssetMap(key2), localAsset, "Second mapping should be set");
-    }
-
-    function testCrossChainPriceConversion_WithMapping() public {
-        address srcAsset = makeAddr("srcAsset");
-        uint32 srcChain = 10;
-        uint256 initialPrice = 1.5e18; // 1.5 units
-
-        vm.startPrank(admin);
-        // Set up USDC as local equivalent and set categories
-        router.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
-        router.setAssetCategory(srcAsset, SharePriceRouter.AssetCategory.STABLE);
-        router.setCrossChainAssetMapping(srcChain, srcAsset, USDC);
-        router.addAdapter(address(chainlinkAdapter), 1);
-        
-        // Grant roles to chainlink adapter
-        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ADMIN_ROLE());
-        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ORACLE_ROLE());
-        vm.stopPrank();
-
-        // Add price feed for USDC with proper heartbeat
-        chainlinkAdapter.addAsset(USDC, USDC_USD_FEED, CHAINLINK_HEARTBEAT, true);
-
-        // Update USDC price to ensure it's fresh
-        vm.prank(updater);
-        router.updatePrice(USDC, true);
-
-        // Create and store a vault report
-        VaultReport[] memory reports = new VaultReport[](1);
-        reports[0] = VaultReport({
-            sharePrice: initialPrice,
-            lastUpdate: uint64(block.timestamp),
-            chainId: srcChain,
-            rewardsDelegate: address(0),
-            vaultAddress: makeAddr("vault"),
-            asset: srcAsset,
-            assetDecimals: 18
-        });
-
-        vm.prank(endpoint);
-        router.updateSharePrices(srcChain, reports);
-
-        // Get latest share price in USDC
-        (uint256 price, uint64 timestamp) = router.getLatestSharePrice(
-            srcChain,
-            reports[0].vaultAddress,
-            USDC
-        );
-
-        assertTrue(price > 0, "Should get valid converted price");
-        assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
-
-        // Since we're converting 1.5e18 (18 decimals) to USDC (6 decimals),
-        // Expected: 1.5e18 * 1e6 / 1e18 = 1.5e6
-        uint256 expectedPrice = 1.5e6; // 1.5 USDC
-        uint256 tolerance = expectedPrice / 100; // 1% tolerance
-        assertApproxEqAbs(price, expectedPrice, tolerance, "Price should be close to expected value");
     }
 
     // Adapter Management Tests

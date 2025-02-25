@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import { Test } from "forge-std/Test.sol";
-import { Api3Adaptor } from "../../src/adapters/Api3.sol";
+import { Api3Adapter } from "../../src/adapters/Api3.sol";
 import { IProxy } from "../../src/interfaces/api3/IProxy.sol";
 import { ISharePriceRouter, PriceReturnData } from "../../src/interfaces/ISharePriceRouter.sol";
 import { SharePriceRouter } from "../../src/SharePriceRouter.sol";
@@ -18,7 +18,7 @@ contract Api3AdapterTest is Test {
     address constant DAPI_PROXY_WBTC_USD = 0x041a131Fa91Ad61dD85262A42c04975986580d50;
 
     // Test contracts
-    Api3Adaptor public adapter;
+    Api3Adapter public adapter;
     SharePriceRouter public router;
     
     function setUp() public {
@@ -35,7 +35,7 @@ contract Api3AdapterTest is Test {
         );
 
         // Deploy adapter
-        adapter = new Api3Adaptor(
+        adapter = new Api3Adapter(
             address(this),  // admin
             address(router),  // oracle
             address(router),  // router
@@ -126,7 +126,7 @@ contract Api3AdapterTest is Test {
             abi.encode(-1, uint32(block.timestamp))
         );
 
-        vm.expectRevert(Api3Adaptor.Api3Adaptor__InvalidPrice.selector);
+        vm.expectRevert(Api3Adapter.Api3Adapter__InvalidPrice.selector);
         adapter.getPrice(WETH, true);
     }
 
@@ -155,7 +155,7 @@ contract Api3AdapterTest is Test {
     }
 
     function testRevertGetPrice_AssetNotSupported() public {
-        vm.expectRevert(Api3Adaptor.Api3Adaptor__AssetNotSupported.selector);
+        vm.expectRevert(Api3Adapter.Api3Adapter__AssetNotSupported.selector);
         adapter.getPrice(USDC, true);
     }
 
@@ -169,12 +169,12 @@ contract Api3AdapterTest is Test {
         adapter.removeAsset(WETH);
 
         // Verify it reverts after removal
-        vm.expectRevert(Api3Adaptor.Api3Adaptor__AssetNotSupported.selector);
+        vm.expectRevert(Api3Adapter.Api3Adapter__AssetNotSupported.selector);
         adapter.getPrice(WETH, true);
     }
 
     function testRevertAddAsset_InvalidHeartbeat() public {
-        vm.expectRevert(Api3Adaptor.Api3Adaptor__InvalidHeartbeat.selector);
+        vm.expectRevert(Api3Adapter.Api3Adapter__InvalidHeartbeat.selector);
         adapter.addAsset(
             WETH,
             "ETH/USD",
@@ -185,7 +185,7 @@ contract Api3AdapterTest is Test {
     }
 
     function testRevertAddAsset_DAPINameError() public {
-        vm.expectRevert(Api3Adaptor.Api3Adaptor__DAPINameError.selector);
+        vm.expectRevert(Api3Adapter.Api3Adapter__DAPINameError.selector);
         adapter.addAsset(
             WETH,
             "WRONG_TICKER",
@@ -212,7 +212,7 @@ contract Api3AdapterTest is Test {
     }
 
     function testRevertRemoveAsset_AssetNotSupported() public {
-        vm.expectRevert(Api3Adaptor.Api3Adaptor__AssetNotSupported.selector);
+        vm.expectRevert(Api3Adapter.Api3Adapter__AssetNotSupported.selector);
         adapter.removeAsset(address(0));
     }
 } 

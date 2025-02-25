@@ -6,7 +6,7 @@ import { Bytes32Helper } from "../libs/Bytes32Helper.sol";
 import { ISharePriceRouter, PriceReturnData } from "../interfaces/ISharePriceRouter.sol";
 import { IProxy } from "../interfaces/api3/IProxy.sol";
 
-contract Api3Adaptor is BaseOracleAdapter {
+contract Api3Adapter is BaseOracleAdapter {
     /// TYPES ///
 
     /// @notice Stores configuration data for API3 price sources.
@@ -20,7 +20,7 @@ contract Api3Adaptor is BaseOracleAdapter {
     ///            0 defaults to use proxy max price reduced by ~10%.
     /// @param min The min valid price of the asset.
     ///            0 defaults to use proxy min price increased by ~10%.
-    struct AdaptorData {
+    struct AdapterData {
         IProxy proxyFeed;
         bytes32 dapiName;
         bool isConfigured;
@@ -42,28 +42,27 @@ contract Api3Adaptor is BaseOracleAdapter {
 
     /// @notice Adaptor configuration data for pricing an asset.
     /// @dev Api3 Adaptor Data for pricing in gas token.
-    mapping(address => AdaptorData) public adaptorDataNonUSD;
+    mapping(address => AdapterData) public adapterDataNonUSD;
 
     /// @notice Adaptor configuration data for pricing an asset.
     /// @dev Api3 Adaptor Data for pricing in USD.
-    mapping(address => AdaptorData) public adaptorDataUSD;
+    mapping(address => AdapterData) public adapterDataUSD;
 
     /// EVENTS ///
 
     event Api3AssetAdded(
         address asset, 
-        AdaptorData assetConfig, 
+        AdapterData assetConfig, 
         bool isUpdate
     );
     event Api3AssetRemoved(address asset);
 
     /// ERRORS ///
 
-    error Api3Adaptor__AssetNotSupported();
-    error Api3Adaptor__InvalidHeartbeat();
-    error Api3Adaptor__InvalidMinMaxConfig();
-    error Api3Adaptor__DAPINameError();
-    error Api3Adaptor__InvalidPrice();
+    error Api3Adapter__AssetNotSupported();
+    error Api3Adapter__InvalidHeartbeat();
+    error Api3Adapter__DAPINameError();
+    error Api3Adapter__InvalidPrice();
 
     /// CONSTRUCTOR ///
 
@@ -94,7 +93,7 @@ contract Api3Adaptor is BaseOracleAdapter {
     ) external view override returns (PriceReturnData memory) {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
-            revert Api3Adaptor__AssetNotSupported();
+            revert Api3Adapter__AssetNotSupported();
         }
 
         if (inUSD) {
@@ -125,7 +124,7 @@ contract Api3Adaptor is BaseOracleAdapter {
 
         if (heartbeat != 0) {
             if (heartbeat > DEFAULT_HEART_BEAT) {
-                revert Api3Adaptor__InvalidHeartbeat();
+                revert Api3Adapter__InvalidHeartbeat();
             }
         }
 
@@ -133,15 +132,15 @@ contract Api3Adaptor is BaseOracleAdapter {
 
         // Validate that the dAPI name matches the proxyFeed's name
         if (dapiName != IProxy(proxyFeed).dapiName()) {
-            revert Api3Adaptor__DAPINameError();
+            revert Api3Adapter__DAPINameError();
         }
 
-        AdaptorData storage data;
+        AdapterData storage data;
 
         if (inUSD) {
-            data = adaptorDataUSD[asset];
+            data = adapterDataUSD[asset];
         } else {
-            data = adaptorDataNonUSD[asset];
+            data = adapterDataNonUSD[asset];
         }
 
         data.heartbeat = heartbeat != 0
@@ -171,15 +170,15 @@ contract Api3Adaptor is BaseOracleAdapter {
 
         // Validate that `asset` is currently supported.
         if (!isSupportedAsset[asset]) {
-            revert Api3Adaptor__AssetNotSupported();
+            revert Api3Adapter__AssetNotSupported();
         }
 
         // Notify the adaptor to stop supporting the asset.
         delete isSupportedAsset[asset];
 
         // Wipe config mapping entries for a gas refund.
-        delete adaptorDataUSD[asset];
-        delete adaptorDataNonUSD[asset];
+        delete adapterDataUSD[asset];
+        delete adapterDataNonUSD[asset];
 
         // Notify the Oracle Router that we are going to stop supporting the asset.
         ISharePriceRouter(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
@@ -196,11 +195,11 @@ contract Api3Adaptor is BaseOracleAdapter {
     function _getPriceInUSD(
         address asset
     ) internal view returns (PriceReturnData memory) {
-        if (adaptorDataUSD[asset].isConfigured) {
-            return _parseData(adaptorDataUSD[asset], true);
+        if (adapterDataUSD[asset].isConfigured) {
+            return _parseData(adapterDataUSD[asset], true);
         }
 
-        return _parseData(adaptorDataNonUSD[asset], false);
+        return _parseData(adapterDataNonUSD[asset], false);
     }
 
     /// @notice Retrieves the price of a given asset in ETH.
@@ -210,11 +209,11 @@ contract Api3Adaptor is BaseOracleAdapter {
     function _getPriceInETH(
         address asset
     ) internal view returns (PriceReturnData memory) {
-        if (adaptorDataNonUSD[asset].isConfigured) {
-            return _parseData(adaptorDataNonUSD[asset], false);
+        if (adapterDataNonUSD[asset].isConfigured) {
+            return _parseData(adapterDataNonUSD[asset], false);
         }
 
-        return _parseData(adaptorDataUSD[asset], true);
+        return _parseData(adapterDataUSD[asset], true);
     }
 
     /// @notice Parses the api3 feed data for pricing of an asset.
@@ -225,13 +224,13 @@ contract Api3Adaptor is BaseOracleAdapter {
     /// @return pData A structure containing the price, error status,
     ///               and the currency of the price.
     function _parseData(
-        AdaptorData memory data,
+        AdapterData memory data,
         bool inUSD
     ) internal view returns (PriceReturnData memory pData) {
         (int256 price, uint256 updatedAt) = data.proxyFeed.read();
 
         if (price <= 0) {
-            revert Api3Adaptor__InvalidPrice();
+            revert Api3Adapter__InvalidPrice();
         }
 
         uint256 rawPrice = uint256(price);

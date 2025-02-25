@@ -485,15 +485,15 @@ contract SharePriceRouter is OwnableRoles {
             address asset = vault.asset();
             uint8 assetDecimals = _getAssetDecimals(asset);
 
-            // Get latest price in USD
-            (uint256 price, , ) = getLatestPrice(asset, true);
+            // Calculate actual share price - how many assets you get for a normalized amount of shares
+            uint256 sharePrice = vault.convertToAssets(10 ** assetDecimals);
 
             reports[i] = VaultReport({
                 chainId: chainId,
                 vaultAddress: vaultAddress,
                 asset: asset,
                 assetDecimals: assetDecimals,
-                sharePrice: price,
+                sharePrice: sharePrice,
                 lastUpdate: uint64(block.timestamp),
                 rewardsDelegate: rewardsDelegate
             });
