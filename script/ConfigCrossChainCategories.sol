@@ -116,7 +116,7 @@ contract ConfigCrossChainCategories is Script {
         SharePriceRouter router = SharePriceRouter(deployment.router);
 
         // Define cross-chain assets to set categories for
-        CrossChainAsset[] memory assets = new CrossChainAsset[](6);
+        CrossChainAsset[] memory assets = new CrossChainAsset[](1);
         uint256 assetCount = 0;
         
         // Arbitrum assets

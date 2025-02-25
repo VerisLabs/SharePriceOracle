@@ -41,9 +41,7 @@ contract ConfigCrossChainAssets is Script {
             return;
         }
         
-        // Define correct mappings (direct equivalents, not exchange rates)
         // For each source chain asset, map to its same-type equivalent on Base
-        
         // Arbitrum mappings - map to same asset type on Base
         setupMapping("arbitrum", "USDT", "USDT", router, config, priceFeedJson); // Not USDC
         setupMapping("arbitrum", "WETH", "WETH", router, config, priceFeedJson);
@@ -53,6 +51,23 @@ contract ConfigCrossChainAssets is Script {
         setupMapping("optimism", "USDCe", "USDC", router, config, priceFeedJson); // This is correct as USDCe is the USDC equivalent
         setupMapping("optimism", "WETH", "WETH", router, config, priceFeedJson);
         setupMapping("optimism", "WBTC", "WBTC", router, config, priceFeedJson);
+        
+        // Add direct mapping for Optimism USDC.e (bridged USDC)
+        // This is needed because SimpleValidate.sol is using this address directly
+        address optimismUSDCe = 0x7F5c764cBc14f9669B88837ca1490cCa17c31607; // USDC.e (bridged)
+        address baseUSDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913; // Base USDC
+        
+        console.log("Setting up direct mapping for Optimism USDC.e:");
+        console.log("  Optimism USDC.e:", optimismUSDCe);
+        console.log("  Base USDC:", baseUSDC);
+        
+        try router.setCrossChainAssetMapping(10, optimismUSDCe, baseUSDC) {
+            console.log("  Successfully mapped Optimism USDC.e to Base USDC");
+        } catch Error(string memory reason) {
+            console.log("  Failed to set mapping:", reason);
+        } catch {
+            console.log("  Failed to set mapping with unknown error");
+        }
         
         // Polygon mappings - map to same asset type on Base
         setupMapping("polygon", "USDC", "USDC", router, config, priceFeedJson);
