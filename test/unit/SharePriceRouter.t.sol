@@ -712,9 +712,11 @@ contract SharePriceRouterTest is Test {
 
     // Share Price Update Tests
     function testUpdateSharePrices() public {
-        uint32 srcChain = 10;
+        // Use a different chain ID than the current chain ID (which is Base/8453)
+        uint32 srcChain = 10; // Optimism
         address vaultAddr = makeAddr("vault");
         address asset = makeAddr("asset");
+        address localAsset = WETH; // Use a real token that exists on the chain
         uint256 sharePrice = 1e18;
         
         VaultReport[] memory reports = new VaultReport[](1);
@@ -728,35 +730,39 @@ contract SharePriceRouterTest is Test {
             assetDecimals: 18
         });
         
+        // Mock the chain ID to be different from srcChain
+        vm.chainId(8453); // Base chain ID
+        
+        // Set up the cross-chain asset mapping before calling updateSharePrices
+        vm.startPrank(admin);
+        router.setCrossChainAssetMapping(srcChain, asset, localAsset);
+        vm.stopPrank();
+        
         vm.prank(endpoint);
         router.updateSharePrices(srcChain, reports);
         
         VaultReport memory stored = router.getLatestSharePriceReport(srcChain, vaultAddr);
-        assertEq(stored.sharePrice, sharePrice, "Share price should be stored");
-        assertEq(router.vaultChainIds(vaultAddr), srcChain, "Chain ID should be stored");
+        
+        // Verify the stored report matches what we sent
+        assertEq(stored.chainId, srcChain);
+        assertEq(stored.vaultAddress, vaultAddr);
+        assertEq(stored.asset, asset);
+        assertEq(stored.sharePrice, sharePrice);
+        assertEq(stored.assetDecimals, 18);
     }
 
     function testUpdateSharePrices_WithLocalEquivalent() public {
-        uint32 srcChain = 10;
+        // Use a different chain ID than the current chain ID (which is Base/8453)
+        uint32 srcChain = 10; // Optimism
         address vaultAddr = makeAddr("vault");
-        address srcAsset = makeAddr("srcAsset");
-        address localAsset = USDC; // Using USDC as local equivalent
+        address asset = WETH; // Use a real asset that has a local equivalent
         uint256 sharePrice = 1e18;
-
-        // Set up cross-chain mapping
-        vm.prank(admin);
-        router.setCrossChainAssetMapping(srcChain, srcAsset, localAsset);
-
-        // Set up price feeds
+        
+        // Set up cross-chain asset mapping
         vm.startPrank(admin);
-        router.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
-        router.addAdapter(address(chainlinkAdapter), 1);
-        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ADMIN_ROLE());
-        chainlinkAdapter.grantRole(address(this), chainlinkAdapter.ORACLE_ROLE());
+        router.setCrossChainAssetMapping(srcChain, asset, WETH);
         vm.stopPrank();
-
-        chainlinkAdapter.addAsset(USDC, USDC_USD_FEED, CHAINLINK_HEARTBEAT, true);
-
+        
         VaultReport[] memory reports = new VaultReport[](1);
         reports[0] = VaultReport({
             sharePrice: sharePrice,
@@ -764,16 +770,19 @@ contract SharePriceRouterTest is Test {
             chainId: srcChain,
             rewardsDelegate: address(0),
             vaultAddress: vaultAddr,
-            asset: srcAsset,
+            asset: asset,
             assetDecimals: 18
         });
-
+        
+        // Mock the chain ID to be different from srcChain
+        vm.chainId(8453); // Base chain ID
+        
         vm.prank(endpoint);
         router.updateSharePrices(srcChain, reports);
-
-        // Verify stored share price
+        
         VaultReport memory stored = router.getLatestSharePriceReport(srcChain, vaultAddr);
         assertEq(stored.sharePrice, sharePrice, "Share price should be stored");
+        assertEq(router.vaultChainIds(vaultAddr), srcChain, "Chain ID should be stored");
     }
 
     function testRevertUpdateSharePrices_InvalidChainId() public {
@@ -896,7 +905,8 @@ contract SharePriceRouterTest is Test {
     }
 
     function testGetLatestSharePriceReport() public {
-        uint32 srcChain = 10;
+        // Use a different chain ID than the current chain ID (which is Base/8453)
+        uint32 srcChain = 10; // Optimism
         address vaultAddr = makeAddr("vault");
         address asset = makeAddr("asset");
         uint256 sharePrice = 1e18;
@@ -911,6 +921,9 @@ contract SharePriceRouterTest is Test {
             asset: asset,
             assetDecimals: 18
         });
+        
+        // Mock the chain ID to be different from srcChain
+        vm.chainId(8453); // Base chain ID
         
         vm.prank(endpoint);
         router.updateSharePrices(srcChain, reports);

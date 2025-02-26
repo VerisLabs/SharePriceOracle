@@ -42,6 +42,17 @@ contract MaxLzEndpointTest is BaseTest {
 
     address public constant base_LZ_end = 0x1a44076050125825900e736c501f859c50fE728c;
     address public constant polygon_LZ_end = 0x1a44076050125825900e736c501f859c50fE728c;
+    // The LayerZero endpoint contracts that need to be made persistent
+    address public constant lz_endpoint_contract = 0x6c26c61a97006888ea9E4FA36584c7df57Cd9dA3;
+    address public constant lz_dvn_contract1 = 0x23DE2FE932d9043291f870324B74F820e11dc81A;
+    address public constant lz_dvn_contract2 = 0xD56e4eAb23cb81f43168F9F45211Eb027b9aC7cc;
+    address public constant lz_executor_contract = 0xCd3F213AD101472e1713C72B1697E727C803885b;
+    address public constant lz_treasury_contract = 0xECEE8B581960634aF89f467AE624Ff468a9Db14B;
+    address public constant lz_fee_lib_contract = 0x6A6991E0bF27E3CcCDe6B73dE94b7DA6e240FF6E;
+    address public constant lz_price_feed = 0x119C04C4E60158fa69eCf4cdDF629D09719a7572;
+    address public constant lz_price_feed_impl = 0x986B05a8d540bE18c3352Fb50Ff714333f5dCE38;
+    address public constant lz_executor_lib = 0x31F8e74923A738fA489df178E2088885CEb54A9d;
+    address public constant lz_executor_impl = 0x2022D5A3eb01039140F1338504a6dBA0EC2179b8;
 
     // Chainlink price feed addresses on BASE
     address constant BASE_ETH_USD_FEED = 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70;
@@ -60,6 +71,21 @@ contract MaxLzEndpointTest is BaseTest {
 
     admin = makeAddr("admin");
     user = makeAddr("user");
+
+    // Make the LZ endpoints persistent
+    vm.makePersistent(base_LZ_end);
+    vm.makePersistent(polygon_LZ_end);
+    // Make the LayerZero endpoint contracts persistent
+    vm.makePersistent(lz_endpoint_contract);
+    vm.makePersistent(lz_dvn_contract1);
+    vm.makePersistent(lz_dvn_contract2);
+    vm.makePersistent(lz_executor_contract);
+    vm.makePersistent(lz_treasury_contract);
+    vm.makePersistent(lz_fee_lib_contract);
+    vm.makePersistent(lz_price_feed);
+    vm.makePersistent(lz_price_feed_impl);
+    vm.makePersistent(lz_executor_lib);
+    vm.makePersistent(lz_executor_impl);
 
     vm.startPrank(admin);
     
