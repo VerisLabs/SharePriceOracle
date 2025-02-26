@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {console2} from "forge-std/console2.sol";
-
 import {OwnableRoles} from "@solady/auth/OwnableRoles.sol";
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 import {IERC4626} from "./interfaces/IERC4626.sol";
@@ -655,7 +653,7 @@ contract SharePriceRouter is OwnableRoles {
                 report.asset,
                 _srcChainId
             );
-            console2.log("localEquivalent", localEquivalent);
+
             if (localEquivalent != address(0)) {
                 // Store the share price in terms of the local equivalent (e.g. DAI)
                 // First adjust decimals from source asset to local equivalent
