@@ -520,7 +520,10 @@ contract SharePriceRouter is OwnableRoles {
         address _vaultAddress,
         address _dstAsset
     ) external view returns (uint256 sharePrice, uint64 timestamp) {
-        // For cross-chain vaults, first try to get current price through cross-chain oracles
+        if (_vaultAddress == address(0) || _dstAsset == address(0)) {
+            return _getFallbackSharePrice(_dstAsset);
+        }
+
         if (_srcChain != chainId) {
             VaultReport memory report = sharePrices[
                 getPriceKey(_srcChain, _vaultAddress)
@@ -576,17 +579,8 @@ contract SharePriceRouter is OwnableRoles {
             } catch {}
         }
 
-        // Final fallback to prevent reverting
-        try IERC20Metadata(_dstAsset).decimals() returns (uint8 dstDecimals) {
-            try IERC4626(_dstAsset).convertToAssets(10 ** dstDecimals) returns (
-                uint256 fallbackPrice
-            ) {
-                return (fallbackPrice, uint64(block.timestamp));
-            } catch {}
-        } catch {}
-
-        // Ultimate fallback if everything else fails
-        return (0, uint64(block.timestamp));
+        
+        _getFallbackSharePrice(_dstAsset);
     }
 
     /**
@@ -826,17 +820,19 @@ contract SharePriceRouter is OwnableRoles {
      *      - For local assets: Queries the token contract directly
      *      - For cross-chain assets: Retrieves from stored VaultReport
      * @param asset The asset address
-     * @param chain The chain ID where the asset exists
+     * @param chainId_ The chain ID where the asset exists
      * @return decimals The number of decimals
      * @custom:edge-case Returns 0 if cross-chain report doesn't exist
      */
     function _getAssetDecimalsWithReport(
         address asset,
-        uint32 chain
+        uint32 chainId_
     ) internal view returns (uint8) {
-        if (chain != 0 && chain != chainId) {
+        if (chainId_ != 0 && chainId_ != chainId) {
             // Use stored decimals from VaultReport for cross-chain assets
-            VaultReport memory report = sharePrices[getPriceKey(chain, asset)];
+            VaultReport memory report = sharePrices[
+                getPriceKey(chainId_, asset)
+            ];
             return uint8(report.assetDecimals);
         }
         return _getAssetDecimals(asset);
@@ -888,14 +884,43 @@ contract SharePriceRouter is OwnableRoles {
         }
 
         if (srcDecimals > dstDecimals) {
-            // Scale down
-            adjustedAmount = amount / (10 ** (srcDecimals - dstDecimals));
+            uint256 divisor = 10 ** (srcDecimals - dstDecimals);
+            adjustedAmount = FixedPointMathLib.mulDiv(amount, 1, divisor);
         } else {
-            // Scale up
-            adjustedAmount = amount * (10 ** (dstDecimals - srcDecimals));
+            uint256 multiplier = 10 ** (dstDecimals - srcDecimals);
+            adjustedAmount = FixedPointMathLib.mulDiv(amount, multiplier, 1);
         }
 
         return (adjustedAmount, uint64(block.timestamp));
+    }
+
+    /**
+     * @notice Provides a fallback price for invalid inputs
+     * @dev Used when input parameters are invalid (zero addresses)
+     * @param _dstAsset The destination asset (may be zero)
+     * @return price A fallback price (may be zero)
+     * @return timestamp The current timestamp
+     */
+    function _getFallbackSharePrice(
+        address _dstAsset
+    ) internal view returns (uint256 price, uint64 timestamp) {
+        // For safety with invalid inputs, we'll return 0 rather than a potentially disruptive value
+        // This is safer as consuming contracts should already handle zero price cases
+
+        // Only if the destination asset is a valid ERC4626 vault, try to get its share price
+        if (_dstAsset != address(0)) {
+            try IERC20Metadata(_dstAsset).decimals() returns (
+                uint8 dstDecimals
+            ) {
+                try
+                    IERC4626(msg.sender).convertToAssets(10 ** dstDecimals)
+                returns (uint256 fallbackPrice) {
+                    return (fallbackPrice, uint64(block.timestamp));
+                } catch {}
+            } catch {}
+        }
+
+        return (0, uint64(block.timestamp));
     }
 
     /**
@@ -1364,4 +1389,3 @@ contract SharePriceRouter is OwnableRoles {
         _removeAdapter(msg.sender);
     }
 }
-
