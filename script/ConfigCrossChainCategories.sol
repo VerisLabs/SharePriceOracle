@@ -57,37 +57,30 @@ contract ConfigCrossChainCategories is Script {
 
     function getAssetCategory(string memory symbol) internal pure returns (SharePriceRouter.AssetCategory) {
         bytes32 symbolHash = keccak256(bytes(symbol));
-        
+
         // BTC-like assets
         if (
-            symbolHash == keccak256(bytes("WBTC")) ||
-            symbolHash == keccak256(bytes("BTC")) ||
-            symbolHash == keccak256(bytes("BTCB"))
+            symbolHash == keccak256(bytes("WBTC")) || symbolHash == keccak256(bytes("BTC"))
+                || symbolHash == keccak256(bytes("BTCB"))
         ) {
             return SharePriceRouter.AssetCategory.BTC_LIKE;
         }
-        
+
         // ETH-like assets
-        if (
-            symbolHash == keccak256(bytes("WETH")) ||
-            symbolHash == keccak256(bytes("ETH"))
-        ) {
+        if (symbolHash == keccak256(bytes("WETH")) || symbolHash == keccak256(bytes("ETH"))) {
             return SharePriceRouter.AssetCategory.ETH_LIKE;
         }
-        
+
         // Stablecoins
         if (
-            symbolHash == keccak256(bytes("USDC")) ||
-            symbolHash == keccak256(bytes("USDT")) ||
-            symbolHash == keccak256(bytes("DAI")) ||
-            symbolHash == keccak256(bytes("BUSD")) ||
-            symbolHash == keccak256(bytes("TUSD")) ||
-            symbolHash == keccak256(bytes("USDP")) ||
-            symbolHash == keccak256(bytes("USDD"))
+            symbolHash == keccak256(bytes("USDC")) || symbolHash == keccak256(bytes("USDT"))
+                || symbolHash == keccak256(bytes("DAI")) || symbolHash == keccak256(bytes("BUSD"))
+                || symbolHash == keccak256(bytes("TUSD")) || symbolHash == keccak256(bytes("USDP"))
+                || symbolHash == keccak256(bytes("USDD"))
         ) {
             return SharePriceRouter.AssetCategory.STABLE;
         }
-        
+
         // Default to OTHER for any other asset
         return SharePriceRouter.AssetCategory.UNKNOWN;
     }
@@ -118,7 +111,7 @@ contract ConfigCrossChainCategories is Script {
         // Define cross-chain assets to set categories for
         CrossChainAsset[] memory assets = new CrossChainAsset[](6);
         uint256 assetCount = 0;
-        
+
         // Arbitrum assets
         assets[assetCount++] = CrossChainAsset({
             chain: "arbitrum",
@@ -126,21 +119,21 @@ contract ConfigCrossChainCategories is Script {
             tokenAddress: 0xaf88d065e77c8cC2239327C5EDb3A432268e5831,
             category: SharePriceRouter.AssetCategory.STABLE
         });
-        
+
         assets[assetCount++] = CrossChainAsset({
             chain: "arbitrum",
             symbol: "WETH",
             tokenAddress: 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1,
             category: SharePriceRouter.AssetCategory.ETH_LIKE
         });
-        
+
         assets[assetCount++] = CrossChainAsset({
             chain: "arbitrum",
             symbol: "WBTC",
             tokenAddress: 0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f,
             category: SharePriceRouter.AssetCategory.BTC_LIKE
         });
-        
+
         // Optimism assets
         assets[assetCount++] = CrossChainAsset({
             chain: "optimism",
@@ -148,48 +141,47 @@ contract ConfigCrossChainCategories is Script {
             tokenAddress: 0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85,
             category: SharePriceRouter.AssetCategory.STABLE
         });
-        
+
         assets[assetCount++] = CrossChainAsset({
             chain: "optimism",
             symbol: "WETH",
             tokenAddress: 0x4200000000000000000000000000000000000006,
             category: SharePriceRouter.AssetCategory.ETH_LIKE
         });
-        
+
         assets[assetCount++] = CrossChainAsset({
             chain: "optimism",
             symbol: "WBTC",
             tokenAddress: 0x68f180fcCe6836688e9084f035309E29Bf0A2095,
             category: SharePriceRouter.AssetCategory.BTC_LIKE
         });
-        
+
         // Process each asset
         for (uint256 i = 0; i < assetCount; i++) {
             CrossChainAsset memory asset = assets[i];
             console.log("Setting category for", asset.chain, asset.symbol);
-            
+
             // Get the local asset address from the cross-chain mapping
-            bytes32 key = keccak256(abi.encodePacked(
-                equalStrings(asset.chain, "arbitrum") ? uint32(42161) : 
-                equalStrings(asset.chain, "optimism") ? uint32(10) : 
-                uint32(0),
-                asset.tokenAddress
-            ));
-            
+            bytes32 key = keccak256(
+                abi.encodePacked(
+                    equalStrings(asset.chain, "arbitrum")
+                        ? uint32(42_161)
+                        : equalStrings(asset.chain, "optimism") ? uint32(10) : uint32(0),
+                    asset.tokenAddress
+                )
+            );
+
             address localAsset = router.crossChainAssetMap(key);
-            
+
             if (localAsset == address(0)) {
                 console.log("No cross-chain mapping found for", asset.chain, asset.symbol);
                 continue;
             }
-            
+
             console.log("Local asset address:", localAsset);
-            
+
             // Set the asset category for the cross-chain asset
-            try router.setAssetCategory(
-                asset.tokenAddress,
-                asset.category
-            ) {
+            try router.setAssetCategory(asset.tokenAddress, asset.category) {
                 console.log("Successfully set asset category for", asset.chain, asset.symbol);
             } catch Error(string memory reason) {
                 console.log("Failed to set asset category:", reason);
@@ -200,9 +192,9 @@ contract ConfigCrossChainCategories is Script {
 
         vm.stopBroadcast();
     }
-    
+
     // Helper function to compare strings
     function equalStrings(string memory a, string memory b) internal pure returns (bool) {
         return keccak256(bytes(a)) == keccak256(bytes(b));
     }
-} 
+}

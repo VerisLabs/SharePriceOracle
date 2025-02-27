@@ -1,0 +1,135 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - lcov.info - src/libs/Bytes32Helper.sol</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="title">LCOV - code coverage report</td></tr>
+            <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+            <tr>
+              <td width="100%">
+                <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="10%" class="headerValue"><a href="../../index.html" title="Click to go to top-level">top level</a> - <a href="index.html" title="Click to go to directory src/libs">src/libs</a> - Bytes32Helper.sol<span style="font-size: 80%;"> (source / <a href="Bytes32Helper.sol.func-c.html" title="Click to go to function table">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="5%"></td>
+            <td width="5%" class="headerCovTableHead">Coverage</td>
+            <td width="5%" class="headerCovTableHead" title="Covered + Uncovered code">Total</td>
+            <td width="5%" class="headerCovTableHead" title="Exercised code only">Hit</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">lcov.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntryLo">25.0&nbsp;%</td>
+            <td class="headerCovTableEntry">16</td>
+            <td class="headerCovTableEntry">4</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test Date:</td>
+            <td class="headerValue">2025-02-27 12:45:50</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntryLo">20.0&nbsp;%</td>
+            <td class="headerCovTableEntry">5</td>
+            <td class="headerCovTableEntry">1</td>
+          </tr>
+                  <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+          </table>
+
+          <table cellpadding=0 cellspacing=0 border=0>
+            <tr>
+              <td><br></td>
+            </tr>
+            <tr>
+              <td>
+<pre class="sourceHeading">            Line data    Source code</pre>
+<pre class="source">
+<span id="L1"><span class="lineNum">       1</span>              : // SPDX-License-Identifier: MIT</span>
+<span id="L2"><span class="lineNum">       2</span>              : pragma solidity ^0.8.17;</span>
+<span id="L3"><span class="lineNum">       3</span>              : </span>
+<span id="L4"><span class="lineNum">       4</span>              : import { IERC20 } from &quot;../interfaces/IERC20.sol&quot;;</span>
+<span id="L5"><span class="lineNum">       5</span>              : </span>
+<span id="L6"><span class="lineNum">       6</span>              : library Bytes32Helper {</span>
+<span id="L7"><span class="lineNum">       7</span>              :     /// ERRORS ///</span>
+<span id="L8"><span class="lineNum">       8</span>              : </span>
+<span id="L9"><span class="lineNum">       9</span>              :     error Bytes32Helper__ZeroLengthString();</span>
+<span id="L10"><span class="lineNum">      10</span>              : </span>
+<span id="L11"><span class="lineNum">      11</span>              :     /// PUBLIC FUNCTIONS ///</span>
+<span id="L12"><span class="lineNum">      12</span>              : </span>
+<span id="L13"><span class="lineNum">      13</span>              :     /// @notice Converts `stringData`, a string memory value, to bytes32 form.</span>
+<span id="L14"><span class="lineNum">      14</span>              :     /// @dev This will trim the output value to 32 bytes,</span>
+<span id="L15"><span class="lineNum">      15</span>              :     ///      even if the bytes value is &gt; 32 bytes.</span>
+<span id="L16"><span class="lineNum">      16</span>              :     /// @return result The bytes32 converted form of `stringData`.</span>
+<span id="L17"><span class="lineNum">      17</span> <span class="tlaGNC tlaBgGNC">          32 :     function stringToBytes32(string memory stringData) public pure returns (bytes32 result) {</span></span>
+<span id="L18"><span class="lineNum">      18</span> <span class="tlaGNC">          32 :         bytes memory bytesData = bytes(stringData);</span></span>
+<span id="L19"><span class="lineNum">      19</span> <span class="tlaGNC">          32 :         if (bytesData.length == 0) {</span></span>
+<span id="L20"><span class="lineNum">      20</span> <span class="tlaUNC tlaBgUNC">           0 :             revert Bytes32Helper__ZeroLengthString();</span></span>
+<span id="L21"><span class="lineNum">      21</span>              :         }</span>
+<span id="L22"><span class="lineNum">      22</span>              : </span>
+<span id="L23"><span class="lineNum">      23</span>              :         /// @solidity memory-safe-assembly</span>
+<span id="L24"><span class="lineNum">      24</span>              :         assembly {</span>
+<span id="L25"><span class="lineNum">      25</span> <span class="tlaGNC tlaBgGNC">          32 :             result := mload(add(stringData, 32))</span></span>
+<span id="L26"><span class="lineNum">      26</span>              :         }</span>
+<span id="L27"><span class="lineNum">      27</span>              :     }</span>
+<span id="L28"><span class="lineNum">      28</span>              : </span>
+<span id="L29"><span class="lineNum">      29</span>              :     /// INTERNAL FUNCTIONS ///</span>
+<span id="L30"><span class="lineNum">      30</span>              : </span>
+<span id="L31"><span class="lineNum">      31</span>              :     /// @notice Converts `tokenAddress` to bytes32 based on its ERC20 symbol.</span>
+<span id="L32"><span class="lineNum">      32</span>              :     /// @param tokenAddress Address of desired token to pull ERC20 symbol from.</span>
+<span id="L33"><span class="lineNum">      33</span> <span class="tlaUNC tlaBgUNC">           0 :     function _toBytes32(address tokenAddress) internal view returns (bytes32) {</span></span>
+<span id="L34"><span class="lineNum">      34</span> <span class="tlaUNC">           0 :         string memory concatString = string.concat(_getSymbol(tokenAddress));</span></span>
+<span id="L35"><span class="lineNum">      35</span> <span class="tlaUNC">           0 :         return stringToBytes32(concatString);</span></span>
+<span id="L36"><span class="lineNum">      36</span>              :     }</span>
+<span id="L37"><span class="lineNum">      37</span>              : </span>
+<span id="L38"><span class="lineNum">      38</span>              :     /// @notice Converts `tokenAddress` to bytes32 based on its ERC20 symbol,</span>
+<span id="L39"><span class="lineNum">      39</span>              :     ///         and &quot;/ETH&quot; appended.</span>
+<span id="L40"><span class="lineNum">      40</span>              :     /// @param tokenAddress Address of desired token to pull ERC20 symbol from.</span>
+<span id="L41"><span class="lineNum">      41</span> <span class="tlaUNC">           0 :     function _toBytes32WithETH(address tokenAddress) internal view returns (bytes32) {</span></span>
+<span id="L42"><span class="lineNum">      42</span> <span class="tlaUNC">           0 :         string memory concatString = string.concat(_getSymbol(tokenAddress), &quot;/ETH&quot;);</span></span>
+<span id="L43"><span class="lineNum">      43</span> <span class="tlaUNC">           0 :         return stringToBytes32(concatString);</span></span>
+<span id="L44"><span class="lineNum">      44</span>              :     }</span>
+<span id="L45"><span class="lineNum">      45</span>              : </span>
+<span id="L46"><span class="lineNum">      46</span>              :     /// @notice Converts `tokenAddress` to bytes32 based on its ERC20 symbol,</span>
+<span id="L47"><span class="lineNum">      47</span>              :     ///         and &quot;/USD&quot; appended.</span>
+<span id="L48"><span class="lineNum">      48</span>              :     /// @param tokenAddress Address of desired token to pull ERC20 symbol from.</span>
+<span id="L49"><span class="lineNum">      49</span> <span class="tlaUNC">           0 :     function _toBytes32WithUSD(address tokenAddress) internal view returns (bytes32) {</span></span>
+<span id="L50"><span class="lineNum">      50</span> <span class="tlaUNC">           0 :         string memory concatString = string.concat(_getSymbol(tokenAddress), &quot;/USD&quot;);</span></span>
+<span id="L51"><span class="lineNum">      51</span> <span class="tlaUNC">           0 :         return stringToBytes32(concatString);</span></span>
+<span id="L52"><span class="lineNum">      52</span>              :     }</span>
+<span id="L53"><span class="lineNum">      53</span>              : </span>
+<span id="L54"><span class="lineNum">      54</span>              :     /// @notice Returns `tokenAddress`'s ERC20 symbol as a string.</span>
+<span id="L55"><span class="lineNum">      55</span>              :     /// @param tokenAddress Address of desired token to pull ERC20 symbol from.</span>
+<span id="L56"><span class="lineNum">      56</span> <span class="tlaUNC">           0 :     function _getSymbol(address tokenAddress) internal view returns (string memory) {</span></span>
+<span id="L57"><span class="lineNum">      57</span> <span class="tlaUNC">           0 :         return IERC20(tokenAddress).symbol();</span></span>
+<span id="L58"><span class="lineNum">      58</span>              :     }</span>
+<span id="L59"><span class="lineNum">      59</span>              : }</span>
+        </pre>
+              </td>
+            </tr>
+          </table>
+          <br>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+            <tr><td class="versionInfo">Generated by: <a href="https://github.com//linux-test-project/lcov" target="_parent">LCOV version 2.1-1</a></td></tr>
+          </table>
+          <br>
+
+</body>
+</html>

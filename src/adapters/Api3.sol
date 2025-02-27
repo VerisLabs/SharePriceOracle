@@ -50,11 +50,7 @@ contract Api3Adapter is BaseOracleAdapter {
 
     /// EVENTS ///
 
-    event Api3AssetAdded(
-        address asset, 
-        AdapterData assetConfig, 
-        bool isUpdate
-    );
+    event Api3AssetAdded(address asset, AdapterData assetConfig, bool isUpdate);
     event Api3AssetRemoved(address asset);
 
     /// ERRORS ///
@@ -71,10 +67,12 @@ contract Api3Adapter is BaseOracleAdapter {
         address _oracle,
         address _oracleRouter,
         address _weth
-    ) BaseOracleAdapter(_admin, _oracle, _oracleRouter) {
+    )
+        BaseOracleAdapter(_admin, _oracle, _oracleRouter)
+    {
         WETH = _weth;
     }
-    
+
     /// EXTERNAL FUNCTIONS ///
 
     /**
@@ -87,10 +85,7 @@ contract Api3Adapter is BaseOracleAdapter {
      * @return A structure containing the price, error status,
      *         and the quote format of the price.
      */
-    function getPrice(
-        address asset,
-        bool inUSD
-    ) external view override returns (PriceReturnData memory) {
+    function getPrice(address asset, bool inUSD) external view override returns (PriceReturnData memory) {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
             revert Api3Adapter__AssetNotSupported();
@@ -113,13 +108,7 @@ contract Api3Adapter is BaseOracleAdapter {
     ///                  for `asset`. 0 = `DEFAULT_HEART_BEAT`.
     /// @param inUSD Whether the price feed is in USD (inUSD = true)
     ///              or ETH (inUSD = false).
-    function addAsset(
-        address asset,
-        string memory ticker, 
-        address proxyFeed, 
-        uint256 heartbeat, 
-        bool inUSD
-    ) external {
+    function addAsset(address asset, string memory ticker, address proxyFeed, uint256 heartbeat, bool inUSD) external {
         _checkOraclePermissions();
 
         if (heartbeat != 0) {
@@ -143,9 +132,7 @@ contract Api3Adapter is BaseOracleAdapter {
             data = adapterDataNonUSD[asset];
         }
 
-        data.heartbeat = heartbeat != 0
-            ? heartbeat
-            : DEFAULT_HEART_BEAT;
+        data.heartbeat = heartbeat != 0 ? heartbeat : DEFAULT_HEART_BEAT;
 
         // Add a ~10% buffer to maximum and minimum prices
         data.max = (uint256(int256(type(int224).max)) * 9) / 10;
@@ -156,7 +143,7 @@ contract Api3Adapter is BaseOracleAdapter {
 
         bool isUpdate = isSupportedAsset[asset];
         isSupportedAsset[asset] = true;
-        
+
         emit Api3AssetAdded(asset, data, isUpdate);
     }
 
@@ -182,7 +169,7 @@ contract Api3Adapter is BaseOracleAdapter {
 
         // Notify the Oracle Router that we are going to stop supporting the asset.
         ISharePriceRouter(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
-        
+
         emit Api3AssetRemoved(asset);
     }
 
@@ -192,9 +179,7 @@ contract Api3Adapter is BaseOracleAdapter {
     /// @param asset The address of the asset for which the price is needed.
     /// @return A structure containing the price, error status,
     ///         and the quote format of the price (USD).
-    function _getPriceInUSD(
-        address asset
-    ) internal view returns (PriceReturnData memory) {
+    function _getPriceInUSD(address asset) internal view returns (PriceReturnData memory) {
         if (adapterDataUSD[asset].isConfigured) {
             return _parseData(adapterDataUSD[asset], true);
         }
@@ -206,9 +191,7 @@ contract Api3Adapter is BaseOracleAdapter {
     /// @param asset The address of the asset for which the price is needed.
     /// @return A structure containing the price, error status,
     ///         and the quote format of the price (ETH).
-    function _getPriceInETH(
-        address asset
-    ) internal view returns (PriceReturnData memory) {
+    function _getPriceInETH(address asset) internal view returns (PriceReturnData memory) {
         if (adapterDataNonUSD[asset].isConfigured) {
             return _parseData(adapterDataNonUSD[asset], false);
         }
@@ -223,10 +206,7 @@ contract Api3Adapter is BaseOracleAdapter {
     /// @param inUSD A boolean to denote if the price is in USD.
     /// @return pData A structure containing the price, error status,
     ///               and the currency of the price.
-    function _parseData(
-        AdapterData memory data,
-        bool inUSD
-    ) internal view returns (PriceReturnData memory pData) {
+    function _parseData(AdapterData memory data, bool inUSD) internal view returns (PriceReturnData memory pData) {
         (int256 price, uint256 updatedAt) = data.proxyFeed.read();
 
         if (price <= 0) {
@@ -234,19 +214,13 @@ contract Api3Adapter is BaseOracleAdapter {
         }
 
         uint256 rawPrice = uint256(price);
-        
+
         if (rawPrice > type(uint240).max) {
             rawPrice = rawPrice / 1e9;
         }
 
         pData.price = uint240(rawPrice);
-        pData.hadError = _verifyData(
-            rawPrice,
-            updatedAt,
-            data.max,
-            data.min,
-            data.heartbeat
-        );
+        pData.hadError = _verifyData(rawPrice, updatedAt, data.max, data.min, data.heartbeat);
         pData.inUSD = inUSD;
     }
 
@@ -267,7 +241,11 @@ contract Api3Adapter is BaseOracleAdapter {
         uint256 max,
         uint256 min,
         uint256 heartbeat
-    ) internal view returns (bool) {
+    )
+        internal
+        view
+        returns (bool)
+    {
         // Check minimum value
         if (value < min) {
             return true;

@@ -12,7 +12,7 @@ contract Api3AdapterTest is Test {
     address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
     address constant WETH = 0x4200000000000000000000000000000000000006;
     address constant WBTC = 0x0555E30da8f98308EdB960aa94C0Db47230d2B9c;
-    
+
     // API3 price feed addresses on BASE
     address constant DAPI_PROXY_ETH_USD = 0x5b0cf2b36a65a6BB085D501B971e4c102B9Cd473;
     address constant DAPI_PROXY_WBTC_USD = 0x041a131Fa91Ad61dD85262A42c04975986580d50;
@@ -20,15 +20,15 @@ contract Api3AdapterTest is Test {
     // Test contracts
     Api3Adapter public adapter;
     SharePriceRouter public router;
-    
+
     function setUp() public {
         string memory baseRpcUrl = vm.envString("BASE_RPC_URL");
         vm.createSelectFork(baseRpcUrl);
 
         // Deploy router
         router = new SharePriceRouter(
-            address(this),  // admin
-            DAPI_PROXY_ETH_USD,  // ETH/USD feed
+            address(this), // admin
+            DAPI_PROXY_ETH_USD, // ETH/USD feed
             USDC,
             WBTC,
             WETH
@@ -36,10 +36,10 @@ contract Api3AdapterTest is Test {
 
         // Deploy adapter
         adapter = new Api3Adapter(
-            address(this),  // admin
-            address(router),  // oracle
-            address(router),  // router
-            WETH  // WETH address
+            address(this), // admin
+            address(router), // oracle
+            address(router), // router
+            WETH // WETH address
         );
 
         // Add adapter to router
@@ -50,9 +50,7 @@ contract Api3AdapterTest is Test {
 
         // Mock the API3 proxy data for ETH/USD
         vm.mockCall(
-            DAPI_PROXY_ETH_USD,
-            abi.encodeWithSelector(IProxy.dapiName.selector),
-            abi.encode(bytes32("ETH/USD"))
+            DAPI_PROXY_ETH_USD, abi.encodeWithSelector(IProxy.dapiName.selector), abi.encode(bytes32("ETH/USD"))
         );
         vm.mockCall(
             DAPI_PROXY_ETH_USD,
@@ -62,49 +60,29 @@ contract Api3AdapterTest is Test {
 
         // Mock the API3 proxy data for WBTC/USD
         vm.mockCall(
-            DAPI_PROXY_WBTC_USD,
-            abi.encodeWithSelector(IProxy.dapiName.selector),
-            abi.encode(bytes32("WBTC/USD"))
+            DAPI_PROXY_WBTC_USD, abi.encodeWithSelector(IProxy.dapiName.selector), abi.encode(bytes32("WBTC/USD"))
         );
         vm.mockCall(
             DAPI_PROXY_WBTC_USD,
             abi.encodeWithSelector(IProxy.read.selector),
-            abi.encode(int224(42000 * 1e18), uint32(block.timestamp - 1 hours))
+            abi.encode(int224(42_000 * 1e18), uint32(block.timestamp - 1 hours))
         );
 
         // Add assets
-        adapter.addAsset(
-            WETH,
-            "ETH/USD",
-            DAPI_PROXY_ETH_USD,
-            4 hours,
-            true
-        );
+        adapter.addAsset(WETH, "ETH/USD", DAPI_PROXY_ETH_USD, 4 hours, true);
 
-        adapter.addAsset(
-            WBTC,
-            "WBTC/USD",
-            DAPI_PROXY_WBTC_USD,
-            4 hours,
-            true
-        );
+        adapter.addAsset(WBTC, "WBTC/USD", DAPI_PROXY_WBTC_USD, 4 hours, true);
     }
 
     function testReturnsCorrectPrice_ETH_USD() public {
         // Setup
         vm.startPrank(address(this));
-        adapter.addAsset(
-            WETH,
-            "ETH/USD",
-            DAPI_PROXY_ETH_USD,
-            4 hours,
-            true
-        );
+        adapter.addAsset(WETH, "ETH/USD", DAPI_PROXY_ETH_USD, 4 hours, true);
         vm.stopPrank();
 
         // Get price
         PriceReturnData memory priceData = adapter.getPrice(WETH, true);
-        
+
         assertFalse(priceData.hadError);
         assertTrue(priceData.inUSD);
         assertGt(priceData.price, 0);
@@ -112,7 +90,7 @@ contract Api3AdapterTest is Test {
 
     function testReturnsCorrectPrice_WBTC_USD() public view {
         PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
-        
+
         assertEq(priceData.hadError, false, "Price should not have error");
         assertGt(priceData.price, 0, "Price should be greater than 0");
         assertEq(priceData.inUSD, true, "Price should be in USD");
@@ -121,9 +99,7 @@ contract Api3AdapterTest is Test {
     function testPriceError_NegativePrice() public {
         // Create a test proxy with negative price
         vm.mockCall(
-            DAPI_PROXY_ETH_USD,
-            abi.encodeWithSelector(IProxy.read.selector),
-            abi.encode(-1, uint32(block.timestamp))
+            DAPI_PROXY_ETH_USD, abi.encodeWithSelector(IProxy.read.selector), abi.encode(-1, uint32(block.timestamp))
         );
 
         vm.expectRevert(Api3Adapter.Api3Adapter__InvalidPrice.selector);
@@ -186,24 +162,12 @@ contract Api3AdapterTest is Test {
 
     function testRevertAddAsset_DAPINameError() public {
         vm.expectRevert(Api3Adapter.Api3Adapter__DAPINameError.selector);
-        adapter.addAsset(
-            WETH,
-            "WRONG_TICKER",
-            DAPI_PROXY_ETH_USD,
-            1 hours,
-            true
-        );
+        adapter.addAsset(WETH, "WRONG_TICKER", DAPI_PROXY_ETH_USD, 1 hours, true);
     }
 
     function testCanAddSameAsset() public {
         // Should be able to add the same asset again
-        adapter.addAsset(
-            WETH,
-            "ETH/USD",
-            DAPI_PROXY_ETH_USD,
-            1 hours,
-            true
-        );
+        adapter.addAsset(WETH, "ETH/USD", DAPI_PROXY_ETH_USD, 1 hours, true);
 
         // Verify it still works
         PriceReturnData memory priceData = adapter.getPrice(WETH, true);
@@ -215,4 +179,4 @@ contract Api3AdapterTest is Test {
         vm.expectRevert(Api3Adapter.Api3Adapter__AssetNotSupported.selector);
         adapter.removeAsset(address(0));
     }
-} 
+}

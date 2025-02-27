@@ -15,12 +15,8 @@ fs_permissions = [
     { access = "read-write", path = "./deployments" },
     { access = "read", path = "./script/config" },
 ]
-coverage_exclude = ["test/**/*", "script/**/*", "**/Mock*.sol", "lib/**/*"]
-coverage = [
-    "src/SharePriceOracle/SharePriceOracle.sol",
-    "src/libs/MsgCodec.sol",
-    "src/lzEndpoint/LzEndpoint.sol",
-]
+coverage_exclude = ["test/**/*.sol", "script/**/*.sol", "lib/**/*.sol"]
+
 
 [fmt]
 bracket_spacing = true

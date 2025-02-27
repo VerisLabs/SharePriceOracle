@@ -22,7 +22,11 @@ contract DeploySharePriceRouter is Script {
     function createDeploymentJson(
         ChainConfig.Config memory config,
         DeploymentData memory data
-    ) internal pure returns (string memory) {
+    )
+        internal
+        pure
+        returns (string memory)
+    {
         return string(
             abi.encodePacked(
                 "{",
@@ -50,9 +54,17 @@ contract DeploySharePriceRouter is Script {
     }
 
     // Helper function to create JSON key-value pair for numbers - moved to internal function with underscore prefix
-    function _jsonPairNum(string memory key, string memory value, bool addComma) internal pure returns (string memory) {
+    function _jsonPairNum(
+        string memory key,
+        string memory value,
+        bool addComma
+    )
+        internal
+        pure
+        returns (string memory)
+    {
         if (addComma) {
-            return string.concat('"', key, '": ', value, ',');
+            return string.concat('"', key, '": ', value, ",");
         } else {
             return string.concat('"', key, '": ', value);
         }
@@ -60,19 +72,23 @@ contract DeploySharePriceRouter is Script {
 
     // Helper function to get token addresses for the current chain
     function getTokenAddresses(uint256 chainId) internal pure returns (address usdc, address wbtc, address weth) {
-        if (chainId == 8453) { // Base
+        if (chainId == 8453) {
+            // Base
             usdc = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
             wbtc = 0x0555E30da8f98308EdB960aa94C0Db47230d2B9c;
             weth = 0x4200000000000000000000000000000000000006;
-        } else if (chainId == 42161) { // Arbitrum
+        } else if (chainId == 42_161) {
+            // Arbitrum
             usdc = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831;
             wbtc = 0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f;
             weth = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
-        } else if (chainId == 10) { // Optimism
+        } else if (chainId == 10) {
+            // Optimism
             usdc = 0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85;
             wbtc = 0x68f180fcCe6836688e9084f035309E29Bf0A2095;
             weth = 0x4200000000000000000000000000000000000006;
-        } else if (chainId == 137) { // Polygon
+        } else if (chainId == 137) {
+            // Polygon
             usdc = 0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359;
             wbtc = 0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6;
             weth = 0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619;
@@ -85,11 +101,7 @@ contract DeploySharePriceRouter is Script {
     }
 
     // Helper function to log deployment details
-    function logDeployment(
-        string memory networkName,
-        uint256 chainId,
-        DeploymentData memory data
-    ) internal view {
+    function logDeployment(string memory networkName, uint256 chainId, DeploymentData memory data) internal view {
         console.log("Deployment Summary:");
         console.log("==================");
         console.log("Network:", networkName);
@@ -102,18 +114,10 @@ contract DeploySharePriceRouter is Script {
     }
 
     // Save deployment data to file - simplified to reduce stack depth
-    function saveDeployment(
-        ChainConfig.Config memory config,
-        DeploymentData memory data
-    ) internal {
-        string memory deploymentPath = string.concat(
-            "deployments/", 
-            config.name, 
-            "_", 
-            vm.toString(config.chainId), 
-            ".json"
-        );
-        
+    function saveDeployment(ChainConfig.Config memory config, DeploymentData memory data) internal {
+        string memory deploymentPath =
+            string.concat("deployments/", config.name, "_", vm.toString(config.chainId), ".json");
+
         string memory jsonContent = createDeploymentJson(config, data);
         vm.writeFile(deploymentPath, jsonContent);
         console.log("Deployment saved to:", deploymentPath);
@@ -142,35 +146,16 @@ contract DeploySharePriceRouter is Script {
         deploymentData.admin = admin;
 
         // Deploy contracts
-        SharePriceRouter router = new SharePriceRouter(
-            admin,
-            config.ethUsdFeed,
-            usdc,
-            wbtc,
-            weth
-        );
+        SharePriceRouter router = new SharePriceRouter(admin, config.ethUsdFeed, usdc, wbtc, weth);
         deploymentData.router = address(router);
 
-        ChainlinkAdapter chainlinkAdapter = new ChainlinkAdapter(
-            admin,
-            oracle,
-            address(router)
-        );
+        ChainlinkAdapter chainlinkAdapter = new ChainlinkAdapter(admin, oracle, address(router));
         deploymentData.chainlinkAdapter = address(chainlinkAdapter);
 
-        Api3Adapter api3Adapter = new Api3Adapter(
-            admin,
-            oracle,
-            address(router),
-            weth
-        );
+        Api3Adapter api3Adapter = new Api3Adapter(admin, oracle, address(router), weth);
         deploymentData.api3Adapter = address(api3Adapter);
 
-        MaxLzEndpoint endpoint = new MaxLzEndpoint(
-            admin,
-            config.lzEndpoint,
-            address(router)
-        );
+        MaxLzEndpoint endpoint = new MaxLzEndpoint(admin, config.lzEndpoint, address(router));
         deploymentData.endpoint = address(endpoint);
 
         // Setup permissions if flag is set
@@ -183,11 +168,7 @@ contract DeploySharePriceRouter is Script {
         vm.stopBroadcast();
 
         // Log deployment details
-        logDeployment(
-            config.name,
-            config.chainId,
-            deploymentData
-        );
+        logDeployment(config.name, config.chainId, deploymentData);
 
         // Save deployment details
         saveDeployment(config, deploymentData);

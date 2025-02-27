@@ -16,7 +16,7 @@ contract MaxLzEndpointTest is BaseTest {
     address constant USDC = USDCE_BASE;
     address constant WETH = 0x4200000000000000000000000000000000000006;
     address constant WBTC = 0x0555E30da8f98308EdB960aa94C0Db47230d2B9c;
-    
+
     MaxLzEndpoint public endpoint;
     SharePriceRouter public oracle;
     IERC4626 public vault;
@@ -57,122 +57,106 @@ contract MaxLzEndpointTest is BaseTest {
     // Chainlink price feed addresses on BASE
     address constant BASE_ETH_USD_FEED = 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70;
     address constant BASE_BTC_USD_FEED = 0xCCADC697c55bbB68dc5bCdf8d3CBe83CdD4E071E;
-    
+
     // Chainlink price feed addresses on POLYGON
     address constant POLYGON_ETH_USD_FEED = 0xF9680D99D6C9589e2a93a78A04A279e509205945;
     address constant POLYGON_BTC_USD_FEED = 0xc907E116054Ad103354f2D350FD2514433D57F6f;
-    
+
     // Heartbeat values
-    uint256 constant ETH_HEARTBEAT = 1200;  // 20 minutes
-    uint256 constant BTC_HEARTBEAT = 1200;  // 20 minutes
+    uint256 constant ETH_HEARTBEAT = 1200; // 20 minutes
+    uint256 constant BTC_HEARTBEAT = 1200; // 20 minutes
 
     function setUp() public {
-    _setUp(CHAINS, FORK_BLOCKS);
+        _setUp(CHAINS, FORK_BLOCKS);
 
-    admin = makeAddr("admin");
-    user = makeAddr("user");
+        admin = makeAddr("admin");
+        user = makeAddr("user");
 
-    // Make the LZ endpoints persistent
-    vm.makePersistent(base_LZ_end);
-    vm.makePersistent(polygon_LZ_end);
-    // Make the LayerZero endpoint contracts persistent
-    vm.makePersistent(lz_endpoint_contract);
-    vm.makePersistent(lz_dvn_contract1);
-    vm.makePersistent(lz_dvn_contract2);
-    vm.makePersistent(lz_executor_contract);
-    vm.makePersistent(lz_treasury_contract);
-    vm.makePersistent(lz_fee_lib_contract);
-    vm.makePersistent(lz_price_feed);
-    vm.makePersistent(lz_price_feed_impl);
-    vm.makePersistent(lz_executor_lib);
-    vm.makePersistent(lz_executor_impl);
+        // Make the LZ endpoints persistent
+        vm.makePersistent(base_LZ_end);
+        vm.makePersistent(polygon_LZ_end);
+        // Make the LayerZero endpoint contracts persistent
+        vm.makePersistent(lz_endpoint_contract);
+        vm.makePersistent(lz_dvn_contract1);
+        vm.makePersistent(lz_dvn_contract2);
+        vm.makePersistent(lz_executor_contract);
+        vm.makePersistent(lz_treasury_contract);
+        vm.makePersistent(lz_fee_lib_contract);
+        vm.makePersistent(lz_price_feed);
+        vm.makePersistent(lz_price_feed_impl);
+        vm.makePersistent(lz_executor_lib);
+        vm.makePersistent(lz_executor_impl);
 
-    vm.startPrank(admin);
-    
-    // Setup BASE chain
-    switchTo("BASE");
-    vm.chainId(8453);
-    
-    // Deploy BASE contracts
-    oracle = new SharePriceRouter(admin, BASE_ETH_USD_FEED, USDC, WBTC, WETH);
-    endpoint = new MaxLzEndpoint(admin, base_LZ_end, address(oracle));
-    
-    // Setup Chainlink adapter for BASE
-    ChainlinkAdapter baseAdapter = new ChainlinkAdapter(
-        admin,
-        address(oracle),
-        address(oracle)
-    );
-    oracle.addAdapter(address(baseAdapter), 1);
-    baseAdapter.grantRole(admin, uint256(baseAdapter.ORACLE_ROLE()));
-    baseAdapter.addAsset(WETH, BASE_ETH_USD_FEED, ETH_HEARTBEAT, true);
-    baseAdapter.addAsset(WBTC, BASE_BTC_USD_FEED, BTC_HEARTBEAT, true);
+        vm.startPrank(admin);
 
-    // Set asset categories for BASE
-    oracle.setAssetCategory(WETH, SharePriceRouter.AssetCategory.ETH_LIKE);
-    oracle.setAssetCategory(WBTC, SharePriceRouter.AssetCategory.BTC_LIKE);
-    oracle.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
-    oracle.grantRole(address(endpoint), oracle.ENDPOINT_ROLE());
+        // Setup BASE chain
+        switchTo("BASE");
+        vm.chainId(8453);
 
-    // Mock only the necessary vault functions
-    vault = IERC4626(0xA70b9595bad8EdbEfa9F416ee36061b1fA8d1160);
-    vm.mockCall(
-        address(vault),
-        abi.encodeWithSelector(IERC4626.asset.selector),
-        abi.encode(WETH)
-    );
-    vm.mockCall(
-        address(vault),
-        abi.encodeWithSelector(IERC4626.convertToAssets.selector, 1e18),
-        abi.encode(1e18)
-    );
-    vm.makePersistent(address(vault));
+        // Deploy BASE contracts
+        oracle = new SharePriceRouter(admin, BASE_ETH_USD_FEED, USDC, WBTC, WETH);
+        endpoint = new MaxLzEndpoint(admin, base_LZ_end, address(oracle));
 
-    // Setup POLYGON chain
-    switchTo("POLYGON");
-    vm.chainId(137);
-    
-    // Deploy POLYGON contracts
-    oracle_pol = new SharePriceRouter(admin, POLYGON_ETH_USD_FEED, USDC, WBTC, WETH);
-    endpoint_pol = new MaxLzEndpoint(admin, polygon_LZ_end, address(oracle_pol));
-    
-    // Setup Chainlink adapter for POLYGON
-    ChainlinkAdapter polygonAdapter = new ChainlinkAdapter(
-        admin,
-        address(oracle_pol),
-        address(oracle_pol)
-    );
-    oracle_pol.addAdapter(address(polygonAdapter), 1);
-    polygonAdapter.grantRole(admin, uint256(polygonAdapter.ORACLE_ROLE()));
-    polygonAdapter.addAsset(WETH, POLYGON_ETH_USD_FEED, ETH_HEARTBEAT, true);
-    polygonAdapter.addAsset(WBTC, POLYGON_BTC_USD_FEED, BTC_HEARTBEAT, true);
+        // Setup Chainlink adapter for BASE
+        ChainlinkAdapter baseAdapter = new ChainlinkAdapter(admin, address(oracle), address(oracle));
+        oracle.addAdapter(address(baseAdapter), 1);
+        baseAdapter.grantRole(admin, uint256(baseAdapter.ORACLE_ROLE()));
+        baseAdapter.addAsset(WETH, BASE_ETH_USD_FEED, ETH_HEARTBEAT, true);
+        baseAdapter.addAsset(WBTC, BASE_BTC_USD_FEED, BTC_HEARTBEAT, true);
 
-    // Set asset categories for POLYGON
-    oracle_pol.setAssetCategory(WETH, SharePriceRouter.AssetCategory.ETH_LIKE);
-    oracle_pol.setAssetCategory(WBTC, SharePriceRouter.AssetCategory.BTC_LIKE);
-    oracle_pol.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
-    oracle_pol.grantRole(address(endpoint_pol), oracle_pol.ENDPOINT_ROLE());
+        // Set asset categories for BASE
+        oracle.setAssetCategory(WETH, SharePriceRouter.AssetCategory.ETH_LIKE);
+        oracle.setAssetCategory(WBTC, SharePriceRouter.AssetCategory.BTC_LIKE);
+        oracle.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
+        oracle.grantRole(address(endpoint), oracle.ENDPOINT_ROLE());
 
-    // Setup cross-chain communication - IMPORTANT: Order matters here
-    // First set up BASE endpoint peers
-    switchTo("BASE");
-    endpoint.setPeer(30_109, bytes32(uint256(uint160(address(endpoint_pol)))));
-    endpoint.setPeer(30_184, bytes32(uint256(uint160(address(endpoint)))));
+        // Mock only the necessary vault functions
+        vault = IERC4626(0xA70b9595bad8EdbEfa9F416ee36061b1fA8d1160);
+        vm.mockCall(address(vault), abi.encodeWithSelector(IERC4626.asset.selector), abi.encode(WETH));
+        vm.mockCall(address(vault), abi.encodeWithSelector(IERC4626.convertToAssets.selector, 1e18), abi.encode(1e18));
+        vm.makePersistent(address(vault));
 
-    // Then set up POLYGON endpoint peers
-    switchTo("POLYGON");
-    endpoint_pol.setPeer(30_184, bytes32(uint256(uint160(address(endpoint)))));
-    endpoint_pol.setPeer(30_109, bytes32(uint256(uint160(address(endpoint_pol)))));
-    
-    vm.stopPrank();
+        // Setup POLYGON chain
+        switchTo("POLYGON");
+        vm.chainId(137);
 
-    // Fund test accounts
-    vm.deal(admin, 1000 ether);
-    vm.deal(user, 1000 ether);
+        // Deploy POLYGON contracts
+        oracle_pol = new SharePriceRouter(admin, POLYGON_ETH_USD_FEED, USDC, WBTC, WETH);
+        endpoint_pol = new MaxLzEndpoint(admin, polygon_LZ_end, address(oracle_pol));
 
-    // Switch back to BASE for the start of tests
-    switchTo("BASE");
-} 
+        // Setup Chainlink adapter for POLYGON
+        ChainlinkAdapter polygonAdapter = new ChainlinkAdapter(admin, address(oracle_pol), address(oracle_pol));
+        oracle_pol.addAdapter(address(polygonAdapter), 1);
+        polygonAdapter.grantRole(admin, uint256(polygonAdapter.ORACLE_ROLE()));
+        polygonAdapter.addAsset(WETH, POLYGON_ETH_USD_FEED, ETH_HEARTBEAT, true);
+        polygonAdapter.addAsset(WBTC, POLYGON_BTC_USD_FEED, BTC_HEARTBEAT, true);
+
+        // Set asset categories for POLYGON
+        oracle_pol.setAssetCategory(WETH, SharePriceRouter.AssetCategory.ETH_LIKE);
+        oracle_pol.setAssetCategory(WBTC, SharePriceRouter.AssetCategory.BTC_LIKE);
+        oracle_pol.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
+        oracle_pol.grantRole(address(endpoint_pol), oracle_pol.ENDPOINT_ROLE());
+
+        // Setup cross-chain communication - IMPORTANT: Order matters here
+        // First set up BASE endpoint peers
+        switchTo("BASE");
+        endpoint.setPeer(30_109, bytes32(uint256(uint160(address(endpoint_pol)))));
+        endpoint.setPeer(30_184, bytes32(uint256(uint160(address(endpoint)))));
+
+        // Then set up POLYGON endpoint peers
+        switchTo("POLYGON");
+        endpoint_pol.setPeer(30_184, bytes32(uint256(uint160(address(endpoint)))));
+        endpoint_pol.setPeer(30_109, bytes32(uint256(uint160(address(endpoint_pol)))));
+
+        vm.stopPrank();
+
+        // Fund test accounts
+        vm.deal(admin, 1000 ether);
+        vm.deal(user, 1000 ether);
+
+        // Switch back to BASE for the start of tests
+        switchTo("BASE");
+    }
 
     function test_constructor() public {
         switchTo("BASE");
@@ -476,5 +460,137 @@ contract MaxLzEndpointTest is BaseTest {
         vm.prank(admin);
         vm.expectRevert();
         endpoint.refundETH(2 ether, user);
+    }
+
+    function test_setEnforcedOptions() public {
+        switchTo("BASE");
+        vm.startPrank(admin);
+
+        MaxLzEndpoint.EnforcedOptionParam[] memory params = new MaxLzEndpoint.EnforcedOptionParam[](1);
+        params[0] = MaxLzEndpoint.EnforcedOptionParam({
+            eid: 30_109,
+            msgType: 1,
+            options: endpoint.addExecutorLzReceiveOption(endpoint.newOptions(), 200_000, 0)
+        });
+
+        endpoint.setEnforcedOptions(params);
+
+        bytes memory storedOptions = endpoint.enforcedOptions(30_109, 1);
+        assertEq(storedOptions, params[0].options);
+
+        vm.stopPrank();
+    }
+
+    function test_revertWhen_setEnforcedOptionsWithInvalidType() public {
+        switchTo("BASE");
+        vm.startPrank(admin);
+
+        MaxLzEndpoint.EnforcedOptionParam[] memory params = new MaxLzEndpoint.EnforcedOptionParam[](1);
+        params[0] = MaxLzEndpoint.EnforcedOptionParam({ eid: 30_109, msgType: 1, options: hex"0102" });
+
+        vm.expectRevert();
+        endpoint.setEnforcedOptions(params);
+
+        vm.stopPrank();
+    }
+
+    function test_revertWhen_setEnforcedOptionsNonOwner() public {
+        switchTo("BASE");
+        vm.startPrank(user);
+
+        MaxLzEndpoint.EnforcedOptionParam[] memory params = new MaxLzEndpoint.EnforcedOptionParam[](1);
+        params[0] = MaxLzEndpoint.EnforcedOptionParam({
+            eid: 30_109,
+            msgType: 1,
+            options: endpoint.addExecutorLzReceiveOption(endpoint.newOptions(), 200_000, 0)
+        });
+
+        vm.expectRevert();
+        endpoint.setEnforcedOptions(params);
+
+        vm.stopPrank();
+    }
+
+    function test_getCombinedOptions() public {
+        switchTo("BASE");
+        vm.startPrank(admin);
+
+        bytes memory userOptions = endpoint.addExecutorLzReceiveOption(endpoint.newOptions(), 200_000, 0);
+
+        MaxLzEndpoint.EnforcedOptionParam[] memory params = new MaxLzEndpoint.EnforcedOptionParam[](1);
+        params[0] = MaxLzEndpoint.EnforcedOptionParam({
+            eid: 30_109,
+            msgType: 1,
+            options: endpoint.addExecutorLzReceiveOption(endpoint.newOptions(), 300_000, 0)
+        });
+
+        endpoint.setEnforcedOptions(params);
+
+        address[] memory vaults = new address[](1);
+        vaults[0] = address(vault);
+
+        uint256 fee = endpoint.estimateFees(30_109, 1, abi.encode(1, vaults, user), userOptions);
+        assertGt(fee, 0);
+
+        vm.stopPrank();
+    }
+
+    function test_allowInitializePath() public {
+        switchTo("BASE");
+
+        Origin memory validOrigin = Origin(30_109, bytes32(uint256(uint160(address(endpoint_pol)))), 0);
+        Origin memory invalidOrigin = Origin(30_109, bytes32(uint256(uint160(address(0x1)))), 0);
+
+        assertTrue(endpoint.allowInitializePath(validOrigin));
+        assertFalse(endpoint.allowInitializePath(invalidOrigin));
+    }
+
+    function test_nextNonce() public {
+        switchTo("BASE");
+
+        assertEq(endpoint.nextNonce(0, bytes32(0)), 0);
+    }
+
+    function test_receive() public {
+        switchTo("BASE");
+
+        uint256 initialBalance = address(endpoint).balance;
+        vm.deal(user, 1 ether);
+
+        vm.prank(user);
+        (bool success,) = address(endpoint).call{ value: 1 ether }("");
+
+        assertTrue(success);
+        assertEq(address(endpoint).balance, initialBalance + 1 ether);
+    }
+
+    function test_revertWhen_invalidOptionsType() public {
+        switchTo("BASE");
+        vm.startPrank(user);
+
+        address[] memory vaults = new address[](1);
+        vaults[0] = address(vault);
+
+        bytes memory invalidOptions = hex"0102";
+
+        vm.expectRevert();
+        endpoint.sendSharePrices(30_109, vaults, invalidOptions, user);
+
+        vm.stopPrank();
+    }
+
+    function test_revertWhen_lzReceiveInvalidMsgType() public {
+        switchTo("BASE");
+        vm.startPrank(base_LZ_end);
+
+        Origin memory origin = Origin(30_109, bytes32(uint256(uint160(address(endpoint_pol)))), 0);
+        bytes32 guid = keccak256(abi.encodePacked(block.timestamp, msg.sender));
+
+        bytes memory invalidMessage = abi.encodePacked(uint16(99));
+
+        vm.expectRevert();
+        endpoint.lzReceive(origin, guid, invalidMessage, address(0), bytes(""));
+
+        vm.stopPrank();
     }
 }
