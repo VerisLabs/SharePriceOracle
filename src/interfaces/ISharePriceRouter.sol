@@ -140,18 +140,8 @@ interface ISharePriceRouter {
     /// @notice Set the sequencer uptime feed address
     function setSequencer(address _sequencer) external;
 
-    /// @notice Update price for an asset
-    function updatePrice(address asset, bool inUSD) external;
-
     /// @notice Update share prices from another chain
     function updateSharePrices(uint32 _srcChainId, VaultReport[] calldata _reports) external;
-
-    /// @notice Convert a stored price to a different denomination
-    function convertStoredPrice(
-        uint256 _storedPrice,
-        address _storedAsset,
-        address _dstAsset
-    ) external view returns (uint256 price, uint64 timestamp);
 
     /// @notice Notify router of feed removal
     function notifyFeedRemoval(address asset) external;
