@@ -94,7 +94,7 @@ contract MaxLzEndpointTest is BaseTest {
     vm.chainId(8453);
     
     // Deploy BASE contracts
-    oracle = new SharePriceRouter(admin, BASE_ETH_USD_FEED, USDC, WBTC, WETH);
+    oracle = new SharePriceRouter(admin);
     endpoint = new MaxLzEndpoint(admin, base_LZ_end, address(oracle));
     
     // Setup Chainlink adapter for BASE
@@ -103,15 +103,17 @@ contract MaxLzEndpointTest is BaseTest {
         address(oracle),
         address(oracle)
     );
-    oracle.addAdapter(address(baseAdapter), 1);
+
+    // Configure price feeds in router
+    oracle.setLocalAssetConfig(WETH, 0, BASE_ETH_USD_FEED, true);
+    oracle.setLocalAssetConfig(WBTC, 0, BASE_BTC_USD_FEED, true);
+
+    // Setup adapter
     baseAdapter.grantRole(admin, uint256(baseAdapter.ORACLE_ROLE()));
     baseAdapter.addAsset(WETH, BASE_ETH_USD_FEED, ETH_HEARTBEAT, true);
     baseAdapter.addAsset(WBTC, BASE_BTC_USD_FEED, BTC_HEARTBEAT, true);
 
-    // Set asset categories for BASE
-    oracle.setAssetCategory(WETH, SharePriceRouter.AssetCategory.ETH_LIKE);
-    oracle.setAssetCategory(WBTC, SharePriceRouter.AssetCategory.BTC_LIKE);
-    oracle.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
+    // Grant endpoint role
     oracle.grantRole(address(endpoint), oracle.ENDPOINT_ROLE());
 
     // Mock only the necessary vault functions
@@ -133,7 +135,7 @@ contract MaxLzEndpointTest is BaseTest {
     vm.chainId(137);
     
     // Deploy POLYGON contracts
-    oracle_pol = new SharePriceRouter(admin, POLYGON_ETH_USD_FEED, USDC, WBTC, WETH);
+    oracle_pol = new SharePriceRouter(admin);
     endpoint_pol = new MaxLzEndpoint(admin, polygon_LZ_end, address(oracle_pol));
     
     // Setup Chainlink adapter for POLYGON
@@ -142,15 +144,17 @@ contract MaxLzEndpointTest is BaseTest {
         address(oracle_pol),
         address(oracle_pol)
     );
-    oracle_pol.addAdapter(address(polygonAdapter), 1);
+
+    // Configure price feeds in router
+    oracle_pol.setLocalAssetConfig(WETH, 0, POLYGON_ETH_USD_FEED, true);
+    oracle_pol.setLocalAssetConfig(WBTC, 0, POLYGON_BTC_USD_FEED, true);
+
+    // Setup adapter
     polygonAdapter.grantRole(admin, uint256(polygonAdapter.ORACLE_ROLE()));
     polygonAdapter.addAsset(WETH, POLYGON_ETH_USD_FEED, ETH_HEARTBEAT, true);
     polygonAdapter.addAsset(WBTC, POLYGON_BTC_USD_FEED, BTC_HEARTBEAT, true);
 
-    // Set asset categories for POLYGON
-    oracle_pol.setAssetCategory(WETH, SharePriceRouter.AssetCategory.ETH_LIKE);
-    oracle_pol.setAssetCategory(WBTC, SharePriceRouter.AssetCategory.BTC_LIKE);
-    oracle_pol.setAssetCategory(USDC, SharePriceRouter.AssetCategory.STABLE);
+    // Grant endpoint role
     oracle_pol.grantRole(address(endpoint_pol), oracle_pol.ENDPOINT_ROLE());
 
     // Setup cross-chain communication - IMPORTANT: Order matters here
@@ -159,10 +163,20 @@ contract MaxLzEndpointTest is BaseTest {
     endpoint.setPeer(30_109, bytes32(uint256(uint160(address(endpoint_pol)))));
     endpoint.setPeer(30_184, bytes32(uint256(uint160(address(endpoint)))));
 
+    // Set up cross-chain asset mappings for BASE
+    oracle.setCrossChainAssetMapping(137, USDCE_POLYGON, USDC);
+    oracle.setCrossChainAssetMapping(137, WETH, WETH);
+    oracle.setCrossChainAssetMapping(137, WBTC, WBTC);
+
     // Then set up POLYGON endpoint peers
     switchTo("POLYGON");
     endpoint_pol.setPeer(30_184, bytes32(uint256(uint160(address(endpoint)))));
     endpoint_pol.setPeer(30_109, bytes32(uint256(uint160(address(endpoint_pol)))));
+
+    // Set up cross-chain asset mappings for POLYGON
+    oracle_pol.setCrossChainAssetMapping(8453, USDC, USDCE_POLYGON);
+    oracle_pol.setCrossChainAssetMapping(8453, WETH, WETH);
+    oracle_pol.setCrossChainAssetMapping(8453, WBTC, WBTC);
     
     vm.stopPrank();
 

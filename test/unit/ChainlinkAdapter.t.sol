@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { Test } from "forge-std/Test.sol";
-import { ChainlinkAdapter } from "../../src/adapters/Chainlink.sol";
+import "forge-std/Test.sol";
+import "../../src/adapters/Chainlink.sol";
+import "../../src/SharePriceRouter.sol";
+import "../helpers/Tokens.sol";
+import "../base/BaseTest.t.sol";
+import { USDCE_BASE } from "../utils/AddressBook.sol";
+import { BaseOracleAdapter } from "../../src/libs/base/BaseOracleAdapter.sol";
 import { IChainlink } from "../../src/interfaces/chainlink/IChainlink.sol";
 import { ISharePriceRouter, PriceReturnData } from "../../src/interfaces/ISharePriceRouter.sol";
-import { SharePriceRouter } from "../../src/SharePriceRouter.sol";
 
 contract ChainlinkAdapterTest is Test {
     // Constants for BASE network
@@ -23,23 +27,19 @@ contract ChainlinkAdapterTest is Test {
     uint256 constant BTC_HEARTBEAT = 1200;  // 20 minutes
     
     // Test contracts
+    address public admin;
     ChainlinkAdapter public adapter;
     SharePriceRouter public router;
     
     function setUp() public {
+        admin = makeAddr("admin");
         string memory baseRpcUrl = vm.envString("BASE_RPC_URL");
         vm.createSelectFork(baseRpcUrl);
 
-        // Deploy router
-        router = new SharePriceRouter(
-            address(this),  // admin
-            ETH_USD_FEED,  // ETH/USD feed
-            USDC,
-            WBTC,
-            WETH
-        );
+        // Deploy router with admin
+        router = new SharePriceRouter(address(this));
 
-        // Set sequencer feed
+        // Set sequencer
         router.setSequencer(SEQUENCER_FEED);
 
         // Deploy adapter
@@ -49,13 +49,14 @@ contract ChainlinkAdapterTest is Test {
             address(router)  // router
         );
 
-        // Add adapter to router
-        router.addAdapter(address(adapter), 1);
+        // Configure price feeds in router
+        router.setLocalAssetConfig(WETH, 0, ETH_USD_FEED, true);
+        router.setLocalAssetConfig(WBTC, 0, BTC_USD_FEED, true);
 
         // Grant ORACLE_ROLE to test contract
         adapter.grantRole(address(this), uint256(adapter.ORACLE_ROLE()));
 
-        // Add assets
+        // Add assets to adapter
         adapter.addAsset(
             WETH,
             ETH_USD_FEED,
@@ -69,14 +70,99 @@ contract ChainlinkAdapterTest is Test {
             BTC_HEARTBEAT,
             true  // USD feed
         );
+
+        // Mock sequencer to be up and past grace period
+        vm.mockCall(
+            SEQUENCER_FEED,
+            abi.encodeWithSelector(IChainlink.latestRoundData.selector),
+            abi.encode(
+                92233720368547777, // roundId
+                int256(0),  // 0 = sequencer is up
+                block.timestamp - 2 hours,  // startedAt (past grace period)
+                block.timestamp,  // updatedAt
+                92233720368547777  // answeredInRound
+            )
+        );
+
+        // Mock ETH/USD price feed
+        vm.mockCall(
+            ETH_USD_FEED,
+            abi.encodeWithSelector(IChainlink.latestRoundData.selector),
+            abi.encode(
+                92233720368547777, // roundId
+                int256(2000e8),  // 2000 USD
+                block.timestamp,  // startedAt
+                block.timestamp,  // updatedAt
+                92233720368547777  // answeredInRound
+            )
+        );
+
+        // Mock BTC/USD price feed
+        vm.mockCall(
+            BTC_USD_FEED,
+            abi.encodeWithSelector(IChainlink.latestRoundData.selector),
+            abi.encode(
+                92233720368547777, // roundId
+                int256(42000e8),  // 42000 USD
+                block.timestamp,  // startedAt
+                block.timestamp,  // updatedAt
+                92233720368547777  // answeredInRound
+            )
+        );
+
+        // Mock aggregator functions for both feeds
+        vm.mockCall(
+            ETH_USD_FEED,
+            abi.encodeWithSelector(IChainlink.aggregator.selector),
+            abi.encode(ETH_USD_FEED)
+        );
+        vm.mockCall(
+            BTC_USD_FEED,
+            abi.encodeWithSelector(IChainlink.aggregator.selector),
+            abi.encode(BTC_USD_FEED)
+        );
+
+        // Mock decimals for both feeds
+        vm.mockCall(
+            ETH_USD_FEED,
+            abi.encodeWithSelector(IChainlink.decimals.selector),
+            abi.encode(8)
+        );
+        vm.mockCall(
+            BTC_USD_FEED,
+            abi.encodeWithSelector(IChainlink.decimals.selector),
+            abi.encode(8)
+        );
+
+        // Mock min/max answers for both feeds
+        vm.mockCall(
+            ETH_USD_FEED,
+            abi.encodeWithSelector(IChainlink.minAnswer.selector),
+            abi.encode(int192(1e8))  // $1
+        );
+        vm.mockCall(
+            ETH_USD_FEED,
+            abi.encodeWithSelector(IChainlink.maxAnswer.selector),
+            abi.encode(int192(1e12))  // $10000
+        );
+        vm.mockCall(
+            BTC_USD_FEED,
+            abi.encodeWithSelector(IChainlink.minAnswer.selector),
+            abi.encode(int192(1e8))  // $1
+        );
+        vm.mockCall(
+            BTC_USD_FEED,
+            abi.encodeWithSelector(IChainlink.maxAnswer.selector),
+            abi.encode(int192(1e12))  // $10000
+        );
     }
 
     function testReturnsCorrectPrice_ETH_USD() public {
         PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         
-        assertEq(priceData.hadError, false, "Price should not have error");
+        assertFalse(priceData.hadError, "Price should not have error");
+        assertTrue(priceData.inUSD, "Price should be in USD");
         assertGt(priceData.price, 0, "Price should be greater than 0");
-        assertEq(priceData.inUSD, true, "Price should be in USD");
 
         // Log the actual price for verification
         emit log_named_uint("ETH/USD Price", priceData.price);
@@ -85,9 +171,9 @@ contract ChainlinkAdapterTest is Test {
     function testReturnsCorrectPrice_WBTC_USD() public {
         PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
         
-        assertEq(priceData.hadError, false, "Price should not have error");
+        assertFalse(priceData.hadError, "Price should not have error");
+        assertTrue(priceData.inUSD, "Price should be in USD");
         assertGt(priceData.price, 0, "Price should be greater than 0");
-        assertEq(priceData.inUSD, true, "Price should be in USD");
 
         // Log the actual price for verification
         emit log_named_uint("BTC/USD Price", priceData.price);
@@ -129,20 +215,7 @@ contract ChainlinkAdapterTest is Test {
         adapter.getPrice(WETH, true);
     }
 
-    function testPriceError_StalePrice() public {
-        // Mock sequencer to be up and past grace period
-        vm.mockCall(
-            SEQUENCER_FEED,
-            abi.encodeWithSelector(IChainlink.latestRoundData.selector),
-            abi.encode(
-                92233720368547777, // roundId
-                int256(0),  // 0 = sequencer is up
-                block.timestamp - 2 hours,  // startedAt (past grace period)
-                block.timestamp,  // updatedAt
-                92233720368547777  // answeredInRound
-            )
-        );
-
+    function testPriceError_StalePriceFeed() public {
         // Mock price feed with stale timestamp
         vm.mockCall(
             ETH_USD_FEED,
@@ -157,7 +230,7 @@ contract ChainlinkAdapterTest is Test {
         );
 
         PriceReturnData memory priceData = adapter.getPrice(WETH, true);
-        assertEq(priceData.hadError, true, "Should error on stale price");
+        assertTrue(priceData.hadError, "Should error on stale price");
     }
 
     function testRevertGetPrice_AssetNotSupported() public {
@@ -166,17 +239,18 @@ contract ChainlinkAdapterTest is Test {
     }
 
     function testRevertAfterAssetRemove() public {
-        // Get price before removal to ensure it works
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
-        assertEq(priceData.hadError, false, "Price should not have error before removal");
-        assertGt(priceData.price, 0, "Price should be greater than 0 before removal");
+        // First verify we can get a price
+        PriceReturnData memory priceData = adapter.getPrice(USDC, true);
+        assertFalse(priceData.hadError);
+        assertGt(priceData.price, 0);
 
-        // Remove the asset
-        adapter.removeAsset(WETH);
+        // Remove the asset config by setting an invalid price feed
+        vm.prank(admin);
+        router.setLocalAssetConfig(USDC, 0, address(0), true);
 
-        // Verify it reverts after removal
+        // Now price fetching should revert
         vm.expectRevert(ChainlinkAdapter.ChainlinkAdaptor__AssetNotSupported.selector);
-        adapter.getPrice(WETH, true);
+        adapter.getPrice(USDC, true);
     }
 
     function testRevertAddAsset_InvalidHeartbeat() public {
@@ -200,7 +274,7 @@ contract ChainlinkAdapterTest is Test {
 
         // Verify it still works
         PriceReturnData memory priceData = adapter.getPrice(WETH, true);
-        assertEq(priceData.hadError, false, "Price should not have error");
+        assertFalse(priceData.hadError, "Price should not have error");
         assertGt(priceData.price, 0, "Price should be greater than 0");
 
         // Log the actual price for verification
