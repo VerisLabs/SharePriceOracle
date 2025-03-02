@@ -50,26 +50,11 @@ contract ChainlinkAdapterTest is Test {
         );
 
         // Configure price feeds in router
-        router.setLocalAssetConfig(WETH, 0, ETH_USD_FEED, true);
-        router.setLocalAssetConfig(WBTC, 0, BTC_USD_FEED, true);
+        router.setLocalAssetConfig(WETH, address(adapter), ETH_USD_FEED, 0, true);
+        router.setLocalAssetConfig(WBTC, address(adapter), BTC_USD_FEED, 0, true);
 
         // Grant ORACLE_ROLE to test contract
         adapter.grantRole(address(this), uint256(adapter.ORACLE_ROLE()));
-
-        // Add assets to adapter
-        adapter.addAsset(
-            WETH,
-            ETH_USD_FEED,
-            ETH_HEARTBEAT,
-            true  // USD feed
-        );
-
-        adapter.addAsset(
-            WBTC,
-            BTC_USD_FEED,
-            BTC_HEARTBEAT,
-            true  // USD feed
-        );
 
         // Mock sequencer to be up and past grace period
         vm.mockCall(
@@ -153,7 +138,22 @@ contract ChainlinkAdapterTest is Test {
         vm.mockCall(
             BTC_USD_FEED,
             abi.encodeWithSelector(IChainlink.maxAnswer.selector),
-            abi.encode(int192(1e12))  // $10000
+            abi.encode(int192(5e12))  // $50000
+        );
+
+        // Add assets to adapter
+        adapter.addAsset(
+            WETH,
+            ETH_USD_FEED,
+            ETH_HEARTBEAT,
+            true  // USD feed
+        );
+
+        adapter.addAsset(
+            WBTC,
+            BTC_USD_FEED,
+            BTC_HEARTBEAT,
+            true  // USD feed
         );
     }
 
@@ -168,15 +168,12 @@ contract ChainlinkAdapterTest is Test {
         emit log_named_uint("ETH/USD Price", priceData.price);
     }
 
-    function testReturnsCorrectPrice_WBTC_USD() public {
+    function testReturnsCorrectPrice_WBTC_USD() public view {
         PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
         
         assertFalse(priceData.hadError, "Price should not have error");
         assertTrue(priceData.inUSD, "Price should be in USD");
         assertGt(priceData.price, 0, "Price should be greater than 0");
-
-        // Log the actual price for verification
-        emit log_named_uint("BTC/USD Price", priceData.price);
     }
 
     function testPriceError_StaleTimestamp() public {
@@ -240,15 +237,14 @@ contract ChainlinkAdapterTest is Test {
 
     function testRevertAfterAssetRemove() public {
         // First verify we can get a price
-        PriceReturnData memory priceData = adapter.getPrice(USDC, true);
-        assertFalse(priceData.hadError);
-        assertGt(priceData.price, 0);
+        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        assertEq(priceData.hadError, false, "Price should not have error before removal");
+        assertGt(priceData.price, 0, "Price should be greater than 0 before removal");
 
-        // Remove the asset config by setting an invalid price feed
-        vm.prank(admin);
-        router.setLocalAssetConfig(USDC, 0, address(0), true);
+        // Remove the asset 
+        adapter.removeAsset(WETH); 
 
-        // Now price fetching should revert
+        // Verify it reverts after removal
         vm.expectRevert(ChainlinkAdapter.ChainlinkAdaptor__AssetNotSupported.selector);
         adapter.getPrice(USDC, true);
     }

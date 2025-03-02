@@ -73,7 +73,9 @@ contract SharePriceRouter is OwnableRoles {
     /// @notice Role identifier for admin capabilities
     uint256 public constant ADMIN_ROLE = _ROLE_0;
     /// @notice Role identifier for endpoint capabilities
-    uint256 public constant ENDPOINT_ROLE = _ROLE_2;
+    uint256 public constant ENDPOINT_ROLE = _ROLE_1;
+    /// @notice Role identifier for feed capabilities
+    uint256 public constant ADAPTER_ROLE = _ROLE_2;
     /// @notice Maximum number of reports that can be processed in a single update
     uint256 public constant MAX_REPORTS = 10;
     /// @notice Maximum staleness for stored prices
@@ -151,6 +153,12 @@ contract SharePriceRouter is OwnableRoles {
         _;
     }
 
+    /// @notice Restricts function access to admin role
+    modifier onlyAdapter() {
+        _checkOwnerOrRoles(ADAPTER_ROLE);
+        _;
+    }
+
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -175,8 +183,9 @@ contract SharePriceRouter is OwnableRoles {
      */
     function setLocalAssetConfig(
         address _localAsset,
-        uint8 _priority,
+        address adapter,
         address _priceFeed,
+        uint8 _priority,
         bool _isUSD
     ) external onlyAdmin {
         if (_localAsset == address(0)) revert ZeroAddress();
@@ -191,6 +200,8 @@ contract SharePriceRouter is OwnableRoles {
         if (_priority > assetAdapterPriority[_localAsset]) {
             assetAdapterPriority[_localAsset] = _priority;
         }
+
+        _grantRoles(adapter, ADAPTER_ROLE);
 
         emit LocalAssetConfigured(_localAsset, _priority, _priceFeed, _isUSD);
     }
@@ -254,6 +265,24 @@ contract SharePriceRouter is OwnableRoles {
         crossChainAssetMap[key] = _localAsset;
 
         emit CrossChainAssetMapped(_srcChainId, _srcAsset, _localAsset);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           ADAPTER FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Notifies the router that a feed has been removed
+     * @param _asset The asset whose feed was removed
+     */
+    function notifyFeedRemoval(address _asset) external onlyAdapter {
+        uint8 assetPriority = assetAdapterPriority[_asset];
+
+        for (uint8 i = 0; i <= assetPriority; i++) {
+            delete localAssetConfigs[_asset][i];
+        }
+
+        emit LocalAssetRemoved(_asset);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -459,21 +488,6 @@ contract SharePriceRouter is OwnableRoles {
         }
     }
 
-    /**
-     * @notice Notifies the router that a feed has been removed
-     * @param _asset The asset whose feed was removed
-     */
-    function notifyFeedRemoval(address _asset) external {
-        uint8 assetPriority = assetAdapterPriority[_asset];
-        if (assetPriority == 0) revert AssetNotConfigured(_asset);
-
-        for (uint8 i = 0; i <= assetPriority; i++) {
-            delete localAssetConfigs[_asset][i];
-        }
-
-        emit LocalAssetRemoved(_asset);
-    }
-
     /*//////////////////////////////////////////////////////////////
                           INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/ 
@@ -661,7 +675,7 @@ contract SharePriceRouter is OwnableRoles {
         // Answer == 0: Sequencer is up
         // Check that the sequencer is up or the grace period has passed
         if (answer != 0 || block.timestamp < startedAt + GRACE_PERIOD_TIME) {
-            revert SequencerUnavailable();
+            return false;
         }
 
         return true;

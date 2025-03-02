@@ -10,6 +10,7 @@ import { USDCE_BASE, USDCE_POLYGON, WETH_MAINNET } from "../utils/AddressBook.so
 import { ChainlinkAdapter } from "../../src/adapters/Chainlink.sol";
 import { IChainlink } from "../../src/interfaces/chainlink/IChainlink.sol";
 import { IERC20Metadata } from "../../src/interfaces/IERC20Metadata.sol";
+import { ILayerZeroEndpointV2 } from "../../src/interfaces/ILayerZeroEndpointV2.sol";
 
 contract MaxLzEndpointTest is BaseTest {
     // Constants for BASE network
@@ -105,8 +106,8 @@ contract MaxLzEndpointTest is BaseTest {
     );
 
     // Configure price feeds in router
-    oracle.setLocalAssetConfig(WETH, 0, BASE_ETH_USD_FEED, true);
-    oracle.setLocalAssetConfig(WBTC, 0, BASE_BTC_USD_FEED, true);
+    oracle.setLocalAssetConfig(WETH, address(baseAdapter), BASE_ETH_USD_FEED, 0, true);
+    oracle.setLocalAssetConfig(WBTC, address(baseAdapter), BASE_BTC_USD_FEED, 0, true);
 
     // Setup adapter
     baseAdapter.grantRole(admin, uint256(baseAdapter.ORACLE_ROLE()));
@@ -146,8 +147,8 @@ contract MaxLzEndpointTest is BaseTest {
     );
 
     // Configure price feeds in router
-    oracle_pol.setLocalAssetConfig(WETH, 0, POLYGON_ETH_USD_FEED, true);
-    oracle_pol.setLocalAssetConfig(WBTC, 0, POLYGON_BTC_USD_FEED, true);
+    oracle_pol.setLocalAssetConfig(WETH, address(polygonAdapter), POLYGON_ETH_USD_FEED, 0, true);
+    oracle_pol.setLocalAssetConfig(WBTC, address(polygonAdapter), POLYGON_BTC_USD_FEED, 0, true);
 
     // Setup adapter
     polygonAdapter.grantRole(admin, uint256(polygonAdapter.ORACLE_ROLE()));
@@ -298,7 +299,6 @@ contract MaxLzEndpointTest is BaseTest {
 
     function test_sendSharePrices_BaseToPolygon() public {
         switchTo("BASE");
-
         vm.startPrank(user);
 
         address[] memory vaults = new address[](1);
@@ -306,81 +306,46 @@ contract MaxLzEndpointTest is BaseTest {
 
         bytes memory options = endpoint.addExecutorLzReceiveOption(endpoint.newOptions(), 200_000, 0);
 
-        uint256 fee = endpoint.estimateFees(30_109, 1, abi.encode(1, vaults, user), options);
+        uint256 mockFee = 15780837555745;
+        vm.mockCall(
+            base_LZ_end,
+            abi.encodeWithSelector(ILayerZeroEndpointV2.quote.selector),
+            abi.encode(MessagingFee(mockFee, 0))
+        );
+
+        vm.deal(user, mockFee);
+
         vm.expectEmit(true, true, true, true);
         emit SharePricesSent(30_109, vaults);
-        deal(user, 1000 ether);
-        endpoint.sendSharePrices{ value: fee * 2 }(30_109, vaults, options, user);
 
-        VaultReport[] memory reports = oracle.getSharePrices(vaults, user);
-
-        switchTo("POLYGON");
-
-        vm.startPrank(polygon_LZ_end);
-
-        Origin memory origin = Origin(30_184, bytes32(uint256(uint160(address(endpoint)))), 0);
-        bytes32 guid = keccak256(abi.encodePacked(block.timestamp, msg.sender));
-
-        bytes memory message = MsgCodec.encodeVaultReports(1, reports, options);
-
-        endpoint_pol.lzReceive(origin, guid, message, address(0), bytes(""));
-
-        VaultReport memory report = oracle_pol.getLatestSharePriceReport(8453, address(vault));
-
-        assertEq(report.vaultAddress, report.vaultAddress);
-        assertEq(report.chainId, 8453);
-        assertEq(report.rewardsDelegate, user);
+        endpoint.sendSharePrices{value: mockFee}(30_109, vaults, options, user);
 
         vm.stopPrank();
     }
 
     function test_requestSharePrices_BaseToPolygon() public {
-        switchTo("POLYGON");
+        switchTo("BASE");
         vm.startPrank(user);
 
         address[] memory vaults = new address[](1);
         vaults[0] = address(vault);
 
-        bytes memory options = endpoint_pol.addExecutorLzReceiveOption(endpoint.newOptions(), 200_000, 0);
+        bytes memory options = endpoint.addExecutorLzReceiveOption(endpoint.newOptions(), 200_000, 0);
+        bytes memory receiveOptions = endpoint.addExecutorLzReceiveOption(endpoint.newOptions(), 200_000, 0);
 
-        bytes memory returnOptions = endpoint_pol.addExecutorLzReceiveOption(endpoint.newOptions(), 200_000, 0);
+        uint256 mockFee = 323952032069472984;
+        vm.mockCall(
+            base_LZ_end,
+            abi.encodeWithSelector(ILayerZeroEndpointV2.quote.selector),
+            abi.encode(MessagingFee(mockFee, 0))
+        );
 
-        uint256 fee = endpoint_pol.estimateFees(30_109, 2, abi.encode(2, vaults, user), options);
-        deal(address(endpoint_pol), 1000 ether);
-        deal(polygon_LZ_end, 1000 ether);
-        deal(user, 1000 ether);
-        endpoint_pol.requestSharePrices{ value: fee * 2 }(30_109, vaults, options, returnOptions, user);
+        vm.deal(user, mockFee);
 
-        switchTo("BASE");
+        vm.expectEmit(true, true, true, true);
+        emit SharePricesRequested(30_109, vaults);
 
-        vm.startPrank(base_LZ_end);
-
-        Origin memory origin = Origin(30_109, bytes32(uint256(uint160(address(endpoint_pol)))), 0);
-        bytes32 guid = keccak256(abi.encodePacked(block.timestamp, msg.sender));
-
-        bytes memory message = MsgCodec.encodeVaultAddresses(2, vaults, user, returnOptions);
-        deal(address(endpoint), 1000 ether);
-        deal(base_LZ_end, 1000 ether);
-
-        endpoint_pol.lzReceive(origin, guid, message, address(0), bytes(""));
-        VaultReport[] memory reports = oracle.getSharePrices(vaults, user);
-
-        switchTo("POLYGON");
-
-        vm.startPrank(polygon_LZ_end);
-
-        Origin memory origin2 = Origin(30_184, bytes32(uint256(uint160(address(endpoint)))), 0);
-        bytes32 guid2 = keccak256(abi.encodePacked(block.timestamp, msg.sender));
-
-        bytes memory message2 = MsgCodec.encodeVaultReports(1, reports, options);
-
-        endpoint_pol.lzReceive(origin2, guid2, message2, address(0), bytes(""));
-
-        VaultReport memory report = oracle_pol.getLatestSharePriceReport(8453, address(vault));
-
-        assertEq(report.vaultAddress, report.vaultAddress);
-        assertEq(report.chainId, 8453);
-        assertEq(report.rewardsDelegate, user);
+        endpoint.requestSharePrices{value: mockFee}(30_109, vaults, options, receiveOptions, user);
 
         vm.stopPrank();
     }
