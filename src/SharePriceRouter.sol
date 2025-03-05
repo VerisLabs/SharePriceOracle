@@ -419,7 +419,8 @@ contract SharePriceRouter is OwnableRoles {
         address _vaultAddress,
         address _dstAsset
     ) external view returns (uint256 sharePrice, uint64 timestamp) {
-        if (_srcChainId == chainId) {
+
+        if(_srcChainId == chainId) {
             IERC4626 vault = IERC4626(_vaultAddress);
             address asset = vault.asset();
             uint8 assetDecimals = _getAssetDecimals(asset);
@@ -547,7 +548,6 @@ contract SharePriceRouter is OwnableRoles {
         address _asset
     ) internal view returns (uint256 price, uint64 timestamp, bool inUSD) {
         uint8 assetPriority = assetAdapterPriority[_asset];
-        // if (assetPriority == 0) revert AssetNotConfigured(_asset);
 
         for (uint8 i = 0; i <= assetPriority; i++) {
             LocalAssetConfig memory config = localAssetConfigs[_asset][i];

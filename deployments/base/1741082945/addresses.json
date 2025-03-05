@@ -1,0 +1,11 @@
+{
+  "timestamp": 1741082945,
+  "chainId": 8453,
+  "deployer": "0x429796dac057e7c15724196367007f1e9cff82f9",
+  "contracts": {
+    "router": "0x3e3d846273bd7b8ae8be33c06a956731616310e8",
+    "maxLzEndpoint": "0x8fca5b55f28d642268e77ed04bb3d4ab8879a05c",
+    "chainlinkAdapter": "0x98c0a4d434d0fbf8b7506671604ac99f61dc3fb0",
+    "api3Adapter": "0x55481007c43e4950c8b640a31b994bf5733a87a1"
+  }
+}

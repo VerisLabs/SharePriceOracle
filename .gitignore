@@ -34,3 +34,11 @@ Thumbs.db
 **/.DS_Store
 .AppleDouble
 .LSOverride
+
+# Keep deployment records
+!deployments/
+deployments/*
+!deployments/base/
+!deployments/optimism/
+!deployments/arbitrum/
+!deployments/polygon/

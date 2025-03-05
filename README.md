@@ -257,3 +257,91 @@ enum AssetCategory {
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+# SharePriceOracle Deployment Guide
+
+This guide explains how to deploy and configure the SharePriceOracle protocol.
+
+## Prerequisites
+
+1. Install Foundry
+2. Set up environment variables in a `.env` file:
+```bash
+PRIVATE_KEY=your_private_key
+ADMIN_ADDRESS=admin_wallet_address
+ROUTER_ADDRESS=deployed_router_address          # Required for configuration
+CHAINLINK_ADAPTER_ADDRESS=deployed_adapter_address  # Required for configuration
+BASE_RPC_URL=base_rpc_url
+```
+
+## Deployment Process
+
+The deployment is split into two main scripts:
+
+1. `Deploy.s.sol`: Deploys the core contracts
+2. `Configure.s.sol`: Configures assets, price feeds, and cross-chain mappings
+
+### Step 1: Deploy Core Contracts
+
+The deployment script will automatically detect which chain you're on and deploy the appropriate contracts:
+
+- On Base chain:
+  - SharePriceRouter
+  - ChainlinkAdapter
+  - Api3Adapter
+  - MaxLzEndpoint
+
+- On other chains:
+  - Only MaxLzEndpoint
+
+To deploy:
+```bash
+forge script script/Deploy.s.sol:Deploy --rpc-url $RPC_URL --broadcast --verify
+```
+
+### Step 2: Configure Protocol (Base Chain Only)
+
+After deployment, configure the protocol on Base chain:
+
+```bash
+forge script script/Configure.s.sol:Configure --rpc-url $BASE_RPC_URL --broadcast
+```
+
+This will:
+1. Configure Chainlink price feeds for:
+   - Stablecoins (USDC, USDT)
+   - ETH assets (WETH, stETH)
+   - BTC assets (WBTC, tBTC)
+
+2. Set up cross-chain asset mappings for:
+   - Optimism (Chain ID: 10)
+   - Arbitrum (Chain ID: 42161)
+   - Polygon (Chain ID: 137)
+
+## Contract Addresses
+
+After deployment, save the contract addresses in a safe place. You'll need them for configuration and integration.
+
+## Verification
+
+All contracts will be automatically verified if you included the `--verify` flag during deployment. If verification fails, you can manually verify using:
+
+```bash
+forge verify-contract <CONTRACT_ADDRESS> <CONTRACT_NAME> --chain base
+```
+
+## Security Considerations
+
+1. The admin address should be a secure multisig wallet
+2. Double-check all price feed addresses and configurations
+3. Verify cross-chain asset mappings are correct
+4. Ensure proper roles are assigned to contracts
+
+## Troubleshooting
+
+If you encounter issues:
+
+1. Ensure all environment variables are set correctly
+2. Verify you have sufficient ETH for deployment
+3. Check that you're using the correct RPC URL
+4. Confirm contract addresses in configuration match deployed contracts
