@@ -109,7 +109,7 @@ contract BalancerAdapterTest is Test {
         adapter.addAsset(
             WETH_cbETH_BPT,
             WETH_cbETH_POOL,
-            25 hours /
+            25 hours
         );
     }
 

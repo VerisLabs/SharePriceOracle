@@ -99,7 +99,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
         if (inUSD) {
             return _getPriceInUSD(asset);
         }
-
+        
         return _getPriceInETH(asset);
     }
 
