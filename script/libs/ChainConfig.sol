@@ -32,8 +32,8 @@ library ChainConfig {
             return getConfig(10); // Optimism
         } else if (lzEndpointId == 30_109) {
             return getConfig(137); // Polygon
-        } else if (lzEndpointId == 31337) {
-            return getConfig(31337); // Local Anvil chain for testing
+        } else if (lzEndpointId == 31_337) {
+            return getConfig(31_337); // Local Anvil chain for testing
         }
         /*
         else if (lzEndpointId == 30243) {
@@ -77,13 +77,13 @@ library ChainConfig {
                 lzEndpoint: 0x1a44076050125825900e736c501f859c50fE728c,
                 name: "Base"
             });
-        } else if (chainId == 31337) {
+        } else if (chainId == 31_337) {
             // Local Anvil chain for testing
             return Config({
-                chainId: 31337,
-                lzEndpointId: 31337,
-                ethUsdFeed: address(0x1),  // Placeholder
-                lzEndpoint: address(0x2),  // Placeholder
+                chainId: 31_337,
+                lzEndpointId: 31_337,
+                ethUsdFeed: address(0x1), // Placeholder
+                lzEndpoint: address(0x2), // Placeholder
                 name: "Anvil"
             });
         } else if (chainId == 56) {

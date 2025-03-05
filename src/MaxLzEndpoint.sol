@@ -30,8 +30,8 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
     ///                      STATE VARIABLES                      ///
     ////////////////////////////////////////////////////////////////
 
-    /// @notice Contract immutable state
-    ISharePriceRouter public immutable oracle;
+    /// @notice Contract state
+    ISharePriceRouter public oracle;
 
     /// @notice Contract storage state
     ILayerZeroEndpointV2 public endpoint;
@@ -52,6 +52,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
     event VaultReportsSent(uint32 indexed dstEid, VaultReport[] reports);
     event RoleGranted(address indexed account, uint256 indexed role);
     event RoleRevoked(address indexed account, uint256 indexed role);
+    event OracleUpdated(address indexed oldOracle, address indexed newOracle);
 
     ////////////////////////////////////////////////////////////////
     ///                          ERRORS                           ///
@@ -108,6 +109,12 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
         if (peer_ == bytes32(0)) revert InvalidInput();
         peers[eid_] = peer_;
         emit PeerSet(eid_, peer_);
+    }
+
+    function setOracle(address oracle_) external onlyOwner {
+        if (oracle_ == address(0)) revert InvalidInput();
+        emit OracleUpdated(address(oracle), address(oracle_));
+        oracle = ISharePriceRouter(oracle_);
     }
 
     function setEnforcedOptions(EnforcedOptionParam[] calldata params) external onlyOwner {

@@ -4,20 +4,17 @@ pragma solidity ^0.8.17;
 import { IERC20 } from "../interfaces/IERC20.sol";
 
 library Bytes32Helper {
-
     /// ERRORS ///
 
     error Bytes32Helper__ZeroLengthString();
 
     /// PUBLIC FUNCTIONS ///
 
-    /// @notice Converts `stringData`, a string memory value, to bytes32 form. 
+    /// @notice Converts `stringData`, a string memory value, to bytes32 form.
     /// @dev This will trim the output value to 32 bytes,
     ///      even if the bytes value is > 32 bytes.
     /// @return result The bytes32 converted form of `stringData`.
-    function stringToBytes32(
-        string memory stringData
-    ) public pure returns (bytes32 result) {
+    function stringToBytes32(string memory stringData) public pure returns (bytes32 result) {
         bytes memory bytesData = bytes(stringData);
         if (bytesData.length == 0) {
             revert Bytes32Helper__ZeroLengthString();
@@ -59,5 +56,4 @@ library Bytes32Helper {
     function _getSymbol(address tokenAddress) internal view returns (string memory) {
         return IERC20(tokenAddress).symbol();
     }
-
 }

@@ -67,7 +67,7 @@ library MsgCodec {
     {
         // Cache array length for gas optimization
         uint256 reportsLength = _reports.length;
-        
+
         // Validate reports
         for (uint256 i; i < reportsLength; ++i) {
             if (_reports[i].vaultAddress == address(0)) {

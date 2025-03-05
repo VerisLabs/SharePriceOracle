@@ -14,6 +14,7 @@ import {IChainlink} from "./interfaces/chainlink/IChainlink.sol";
  * @notice A multi-adapter oracle system that supports multiple price feeds and fallback mechanisms
  * @dev This contract manages multiple oracle adapters and provides unified price conversion
  */
+
 contract SharePriceRouter is OwnableRoles {
     using FixedPointMathLib for uint256;
 
@@ -100,6 +101,7 @@ contract SharePriceRouter is OwnableRoles {
     struct LocalAssetConfig {
         address priceFeed; // Priority-ordered price feeds
         bool inUSD; // Whether price should be in USD
+        address adaptor; // Adapter address
     }
 
     /// @notice Enhanced stored share price data
@@ -193,14 +195,14 @@ contract SharePriceRouter is OwnableRoles {
 
         localAssetConfigs[_localAsset][_priority] = LocalAssetConfig({
             priceFeed: _priceFeed,
-            inUSD: _isUSD
+            inUSD: _isUSD,
+            adaptor: adapter
         });
 
         // Update highest priority if needed
         if (_priority > assetAdapterPriority[_localAsset]) {
             assetAdapterPriority[_localAsset] = _priority;
         }
-
         _grantRoles(adapter, ADAPTER_ROLE);
 
         emit LocalAssetConfigured(_localAsset, _priority, _priceFeed, _isUSD);
@@ -258,8 +260,9 @@ contract SharePriceRouter is OwnableRoles {
         address _localAsset
     ) external onlyAdmin {
         if (_srcChainId == chainId) revert InvalidChainId();
-        if (_srcAsset == address(0) || _localAsset == address(0))
+        if (_srcAsset == address(0) || _localAsset == address(0)) {
             revert ZeroAddress();
+        }
 
         bytes32 key = keccak256(abi.encodePacked(_srcChainId, _srcAsset));
         crossChainAssetMap[key] = _localAsset;
@@ -313,10 +316,36 @@ contract SharePriceRouter is OwnableRoles {
     }
     
     /**
-     * @notice Gets the local asset and its decimals for a cross-chain asset mapped  
+     * @notice Gets the latest price for an asset
+     * @param _asset The asset address
+     * @return price The latest price
+     * @return timestamp The timestamp of the price
+     * @return inUSD Whether the price is in USD
+     */
+    function getLatestAssetPrice(
+        address _asset
+    ) external view returns (uint256 price, uint64 timestamp, bool inUSD) {
+        (price, timestamp, inUSD) = _getPrice(_asset);
+
+        if (price == 0) {
+            StoredAssetPrice memory storedPrice = storedAssetPrices[_asset];
+            price = storedPrice.price;
+            timestamp = storedPrice.timestamp;
+            inUSD = storedPrice.inUSD;
+
+            return (
+                storedPrice.price,
+                storedPrice.timestamp,
+                storedPrice.inUSD
+            );
+        }
+    }
+
+    /**
+     * @notice Gets the local asset and its decimals for a cross-chain asset mapped
      * @param _srcChainId The source chain id
      * @param _srcAsset The source asset address
-     * @return localAsset The local asset address 
+     * @return localAsset The local asset address
      * @return localDecimals The local asset decimals
      */
     function getLocalAsset(
@@ -390,6 +419,21 @@ contract SharePriceRouter is OwnableRoles {
         address _vaultAddress,
         address _dstAsset
     ) external view returns (uint256 sharePrice, uint64 timestamp) {
+        if (_srcChainId == chainId) {
+            IERC4626 vault = IERC4626(_vaultAddress);
+            address asset = vault.asset();
+            uint8 assetDecimals = _getAssetDecimals(asset);
+            sharePrice = vault.convertToAssets(10 ** assetDecimals);
+
+            (sharePrice, timestamp) = _convertPrice(
+                sharePrice,
+                asset,
+                _dstAsset,
+                assetDecimals,
+                _getAssetDecimals(_dstAsset)
+            );
+        }
+
         // Get stored share price data
         StoredSharePrice memory stored = storedSharePrices[_vaultAddress];
         // no need for sharePrice > 0 already cheched on updateSharePrices
@@ -421,9 +465,9 @@ contract SharePriceRouter is OwnableRoles {
     }
 
     /**
-     * @notice Updates the price for the given assets 
-     * @param assets An array assets to update the prices for 
-     * @return bool if the prices were updated 
+     * @notice Updates the price for the given assets
+     * @param assets An array assets to update the prices for
+     * @return bool if the prices were updated
      */
     function batchUpdatePrices(
         address[] calldata assets
@@ -469,8 +513,9 @@ contract SharePriceRouter is OwnableRoles {
             StoredAssetPrice memory storedPrice = storedAssetPrices[localAsset];
 
             // Check if we have a valid stored price
-            if (storedPrice.price == 0 || _isStale(storedPrice.timestamp))
+            if (storedPrice.price == 0 || _isStale(storedPrice.timestamp)) {
                 revert NoValidPrice();
+            }
 
             storedSharePrices[report.vaultAddress] = StoredSharePrice({
                 sharePrice: uint248(report.sharePrice),
@@ -490,7 +535,7 @@ contract SharePriceRouter is OwnableRoles {
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/ 
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Get the price for an asset from configured price feeds
@@ -502,25 +547,14 @@ contract SharePriceRouter is OwnableRoles {
         address _asset
     ) internal view returns (uint256 price, uint64 timestamp, bool inUSD) {
         uint8 assetPriority = assetAdapterPriority[_asset];
-        if (assetPriority == 0) revert AssetNotConfigured(_asset);
+        // if (assetPriority == 0) revert AssetNotConfigured(_asset);
 
-        // Try each configuration by priority
         for (uint8 i = 0; i <= assetPriority; i++) {
             LocalAssetConfig memory config = localAssetConfigs[_asset][i];
-            try
-                BaseOracleAdapter(config.priceFeed).getPrice(
-                    _asset,
-                    config.inUSD
-                )
-            returns (PriceReturnData memory priceData) {
-                if (!priceData.hadError && priceData.price > 0) {
-                    return (
-                        priceData.price,
-                        uint64(block.timestamp),
-                        config.inUSD
-                    );
-                }
-            } catch {}
+            PriceReturnData memory priceData = BaseOracleAdapter(config.adaptor)
+                .getPrice(_asset, config.inUSD);
+
+            return (priceData.price, uint64(block.timestamp), config.inUSD);
         }
     }
 
@@ -541,7 +575,6 @@ contract SharePriceRouter is OwnableRoles {
     }
 
     /**
-     * @notice Converts a price from one asset to another using stored prices
      * @param _price Price to convert
      * @param _srcAsset Source asset address
      * @param _dstAsset Destination asset address
@@ -594,7 +627,7 @@ contract SharePriceRouter is OwnableRoles {
             // Need to divide by destination price (USD/ETH)
             convertedPrice = FixedPointMathLib.mulDiv(
                 normalizedPrice,
-                1,
+                1e18,
                 dstPrice
             );
         } else if (!srcIsUsd && dstIsUsd) {
@@ -603,7 +636,7 @@ contract SharePriceRouter is OwnableRoles {
             convertedPrice = FixedPointMathLib.mulDiv(
                 normalizedPrice,
                 srcPrice,
-                1
+                1e18
             );
         } else {
             // USD to USD or non-USD to non-USD
@@ -662,7 +695,8 @@ contract SharePriceRouter is OwnableRoles {
     /**
      * @notice Internal function to check sequencer status
      * @dev Checks if sequencer is up and grace period has passed
-     * @return isValid True if sequencer is up and grace period has passed, or if no sequencer check is needed (e.g. on L1)
+     * @return isValid True if sequencer is up and grace period has passed, or if no sequencer check is needed (e.g. on
+     * L1)
      */
     function _isSequencerValid() internal view returns (bool isValid) {
         if (sequencer == address(0)) {

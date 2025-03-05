@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {BaseOracleAdapter} from "../libs/base/BaseOracleAdapter.sol";
-import {ISharePriceRouter, PriceReturnData} from "../interfaces/ISharePriceRouter.sol";
-import {IChainlink} from "../interfaces/chainlink/IChainlink.sol";
+import { BaseOracleAdapter } from "../libs/base/BaseOracleAdapter.sol";
+import { ISharePriceRouter, PriceReturnData } from "../interfaces/ISharePriceRouter.sol";
+import { IChainlink } from "../interfaces/chainlink/IChainlink.sol";
 
 /**
  * @title ChainlinkAdapter
@@ -53,11 +53,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    event ChainlinkAssetAdded(
-        address asset,
-        AdapterData assetConfig,
-        bool isUpdate
-    );
+    event ChainlinkAssetAdded(address asset, AdapterData assetConfig, bool isUpdate);
     event ChainlinkAssetRemoved(address asset);
 
     /*//////////////////////////////////////////////////////////////
@@ -78,7 +74,9 @@ contract ChainlinkAdapter is BaseOracleAdapter {
         address _admin,
         address _oracle,
         address _oracleRouter
-    ) BaseOracleAdapter(_admin, _oracle, _oracleRouter) {}
+    )
+        BaseOracleAdapter(_admin, _oracle, _oracleRouter)
+    { }
 
     /*//////////////////////////////////////////////////////////////
                             EXTERNAL FUNCTIONS
@@ -90,10 +88,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
      * @param inUSD Whether to return the price in USD (true) or ETH (false)
      * @return PriceReturnData Structure containing price, error status, and denomination
      */
-    function getPrice(
-        address asset,
-        bool inUSD
-    ) external view override returns (PriceReturnData memory) {
+    function getPrice(address asset, bool inUSD) external view override returns (PriceReturnData memory) {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
             revert ChainlinkAdaptor__AssetNotSupported();
@@ -104,7 +99,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
         if (inUSD) {
             return _getPriceInUSD(asset);
         }
-
+        
         return _getPriceInETH(asset);
     }
 
@@ -115,12 +110,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
      * @param heartbeat Maximum allowed time between updates (0 = DEFAULT_HEART_BEAT)
      * @param inUSD Whether feed provides USD prices (true) or ETH prices (false)
      */
-    function addAsset(
-        address asset,
-        address aggregator,
-        uint256 heartbeat,
-        bool inUSD
-    ) external {
+    function addAsset(address asset, address aggregator, uint256 heartbeat, bool inUSD) external {
         _checkOraclePermissions();
 
         if (heartbeat != 0) {
@@ -130,15 +120,11 @@ contract ChainlinkAdapter is BaseOracleAdapter {
         }
 
         // Use Chainlink to get the min and max of the asset.
-        IChainlink feedAggregator = IChainlink(
-            IChainlink(aggregator).aggregator()
-        );
+        IChainlink feedAggregator = IChainlink(IChainlink(aggregator).aggregator());
 
         // Query Max and Min feed prices from Chainlink aggregator.
         uint256 maxFromChainlink = uint256(uint192(feedAggregator.maxAnswer()));
-        uint256 minFromChainklink = uint256(
-            uint192(feedAggregator.minAnswer())
-        );
+        uint256 minFromChainklink = uint256(uint192(feedAggregator.minAnswer()));
 
         // Add a ~10% buffer to minimum and maximum price from Chainlink
         // because Chainlink can stop updating its price before/above
@@ -219,9 +205,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
      * @param asset Address of the asset to price
      * @return PriceReturnData Structure containing price, error status, and denomination in USD
      */
-    function _getPriceInUSD(
-        address asset
-    ) internal view returns (PriceReturnData memory) {
+    function _getPriceInUSD(address asset) internal view returns (PriceReturnData memory) {
         if (adaptorDataUSD[asset].isConfigured) {
             return _parseData(adaptorDataUSD[asset], true);
         }
@@ -234,9 +218,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
      * @param asset Address of the asset to price
      * @return PriceReturnData Structure containing price, error status, and denomination in ETH
      */
-    function _getPriceInETH(
-        address asset
-    ) internal view returns (PriceReturnData memory) {
+    function _getPriceInETH(address asset) internal view returns (PriceReturnData memory) {
         if (adaptorDataNonUSD[asset].isConfigured) {
             return _parseData(adaptorDataNonUSD[asset], false);
         }
@@ -251,17 +233,13 @@ contract ChainlinkAdapter is BaseOracleAdapter {
      * @param inUSD Whether price is in USD (true) or ETH (false)
      * @return pData Structure containing normalized price and status
      */
-    function _parseData(
-        AdapterData memory data,
-        bool inUSD
-    ) internal view returns (PriceReturnData memory pData) {
+    function _parseData(AdapterData memory data, bool inUSD) internal view returns (PriceReturnData memory pData) {
         pData.inUSD = inUSD;
         if (!ISharePriceRouter(ORACLE_ROUTER_ADDRESS).isSequencerValid()) {
             revert ChainlinkAdaptor__SequencerDown();
         }
 
-        (, int256 price, , uint256 updatedAt, ) = IChainlink(data.aggregator)
-            .latestRoundData();
+        (, int256 price,, uint256 updatedAt,) = IChainlink(data.aggregator).latestRoundData();
 
         // If we got a price of 0 or less, bubble up an error immediately.
         if (price <= 0) {
@@ -271,13 +249,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
         uint256 newPrice = (uint256(price) * WAD) / (10 ** data.decimals);
 
         pData.price = uint240(newPrice);
-        pData.hadError = _verifyData(
-            uint256(price),
-            updatedAt,
-            data.max,
-            data.min,
-            data.heartbeat
-        );
+        pData.hadError = _verifyData(uint256(price), updatedAt, data.max, data.min, data.heartbeat);
     }
 
     /**
@@ -296,7 +268,11 @@ contract ChainlinkAdapter is BaseOracleAdapter {
         uint256 max,
         uint256 min,
         uint256 heartbeat
-    ) internal view returns (bool) {
+    )
+        internal
+        view
+        returns (bool)
+    {
         // Validate `value` is not below the buffered min value allowed.
         if (value < min) {
             return true;

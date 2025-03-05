@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import {IERC4626} from "../../src/interfaces/IERC4626.sol";
-import {IERC20} from "../../src/interfaces/IERC20.sol";
-import {IERC20Metadata} from "../../src/interfaces/IERC20Metadata.sol";
+import { IERC4626 } from "../../src/interfaces/IERC4626.sol";
+import { IERC20 } from "../../src/interfaces/IERC20.sol";
+import { IERC20Metadata } from "../../src/interfaces/IERC20Metadata.sol";
 
 contract MockVault is IERC4626 {
     address public immutable override asset;
@@ -19,9 +19,7 @@ contract MockVault is IERC4626 {
         sharePrice = _sharePrice;
     }
 
-    function convertToAssets(
-        uint256 shares
-    ) external view override returns (uint256) {
+    function convertToAssets(uint256 shares) external view override returns (uint256) {
         // Calculate based on the asset's actual decimals
         uint256 assetUnit = 10 ** decimals;
         return (shares * sharePrice) / assetUnit;
@@ -40,10 +38,7 @@ contract MockVault is IERC4626 {
         return false;
     }
 
-    function allowance(
-        address,
-        address
-    ) external pure override returns (uint256) {
+    function allowance(address, address) external pure override returns (uint256) {
         return 0;
     }
 
@@ -51,11 +46,7 @@ contract MockVault is IERC4626 {
         return false;
     }
 
-    function transferFrom(
-        address,
-        address,
-        uint256
-    ) external pure override returns (bool) {
+    function transferFrom(address, address, uint256) external pure override returns (bool) {
         return false;
     }
 
@@ -76,10 +67,7 @@ contract MockVault is IERC4626 {
         return 0;
     }
 
-    function deposit(
-        uint256,
-        address
-    ) external pure override returns (uint256) {
+    function deposit(uint256, address) external pure override returns (uint256) {
         return 0;
     }
 
@@ -103,11 +91,7 @@ contract MockVault is IERC4626 {
         return 0;
     }
 
-    function withdraw(
-        uint256,
-        address,
-        address
-    ) external pure override returns (uint256) {
+    function withdraw(uint256, address, address) external pure override returns (uint256) {
         return 0;
     }
 
@@ -119,11 +103,7 @@ contract MockVault is IERC4626 {
         return 0;
     }
 
-    function redeem(
-        uint256,
-        address,
-        address
-    ) external pure override returns (uint256) {
+    function redeem(uint256, address, address) external pure override returns (uint256) {
         return 0;
     }
 }

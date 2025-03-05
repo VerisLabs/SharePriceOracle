@@ -11,9 +11,9 @@ import { MessagingFee } from "./ILayerZeroEndpointV2.sol";
  * @param inUSD Whether price is denominated in USD
  */
 struct PriceReturnData {
-    uint240 price;        // Price normalized to WAD (1e18)
-    bool hadError;        // Error flag - keeping consistent with your existing naming
-    bool inUSD;           // Price denomination
+    uint240 price; // Price normalized to WAD (1e18)
+    bool hadError; // Error flag - keeping consistent with your existing naming
+    bool inUSD; // Price denomination
 }
 
 /**
@@ -52,12 +52,7 @@ interface ISharePriceRouter {
     event PriceStored(address indexed asset, uint256 price, uint256 timestamp);
     event RoleGranted(address indexed account, uint256 indexed role);
     event RoleRevoked(address indexed account, uint256 indexed role);
-    event SharePriceUpdated(
-        uint32 indexed chainId,
-        address indexed vault,
-        uint256 sharePrice,
-        address rewardsDelegate
-    );
+    event SharePriceUpdated(uint32 indexed chainId, address indexed vault, uint256 sharePrice, address rewardsDelegate);
     event SequencerUpdated(address oldSequencer, address newSequencer);
 
     /*//////////////////////////////////////////////////////////////
@@ -83,40 +78,51 @@ interface ISharePriceRouter {
     function getPriceKey(uint32 _chainId, address _vault) external pure returns (bytes32);
 
     /// @notice Get the price for an asset from the best available adapter
-    function getPrice(
-        address asset,
-        bool inUSD
-    ) external view returns (uint256 price, uint256 errorCode);
+    function getPrice(address asset, bool inUSD) external view returns (uint256 price, uint256 errorCode);
 
     /// @notice Get the latest price from all adapters
     function getLatestPrice(
         address asset,
         bool inUSD
-    ) external view returns (uint256 price, uint256 timestamp, bool isUSD);
+    )
+        external
+        view
+        returns (uint256 price, uint256 timestamp, bool isUSD);
 
     /// @notice Get current share prices for multiple vaults
     function getSharePrices(
         address[] calldata vaultAddresses,
         address rewardsDelegate
-    ) external view returns (VaultReport[] memory);
+    )
+        external
+        view
+        returns (VaultReport[] memory);
 
     /// @notice Get latest share price for a specific vault
     function getLatestSharePrice(
         address _vaultAddress,
         address _dstAsset
-    ) external returns (uint256 sharePrice, uint64 timestamp);
+    )
+        external
+        returns (uint256 sharePrice, uint64 timestamp);
 
     /// @notice Get latest share price report for a specific vault
     function getLatestSharePriceReport(
         uint32 _srcChainId,
         address _vaultAddress
-    ) external view returns (VaultReport memory);
+    )
+        external
+        view
+        returns (VaultReport memory);
 
     /// @notice Calculate share price for a vault in terms of a destination asset
     function calculateSharePrice(
         address _vaultAddress,
         address _dstAsset
-    ) external view returns (uint256 sharePrice, uint64 timestamp);
+    )
+        external
+        view
+        returns (uint256 sharePrice, uint64 timestamp);
 
     /*//////////////////////////////////////////////////////////////
                         EXTERNAL FUNCTIONS
@@ -145,4 +151,4 @@ interface ISharePriceRouter {
 
     /// @notice Notify router of feed removal
     function notifyFeedRemoval(address asset) external;
-} 
+}

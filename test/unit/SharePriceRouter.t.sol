@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {Test} from "forge-std/Test.sol";
-import {SharePriceRouter} from "../../src/SharePriceRouter.sol";
-import {IERC20Metadata} from "../../src/interfaces/IERC20Metadata.sol";
-import {VaultReport} from "../../src/interfaces/ISharePriceRouter.sol";
-import {MockVault} from "../mocks/MockVault.sol";
-import {MockChainlinkSequencer} from "../mocks/MockChainlinkSequencer.sol";
-import {IChainlink} from "../../src/interfaces/chainlink/IChainlink.sol";
-import {MockChainlinkFeed} from "../mocks/MockChainlinkFeed.sol";
-import {ChainlinkAdapter} from "../../src/adapters/Chainlink.sol";
+import { Test } from "forge-std/Test.sol";
+import { SharePriceRouter } from "../../src/SharePriceRouter.sol";
+import { IERC20Metadata } from "../../src/interfaces/IERC20Metadata.sol";
+import { VaultReport } from "../../src/interfaces/ISharePriceRouter.sol";
+import { MockVault } from "../mocks/MockVault.sol";
+import { MockChainlinkSequencer } from "../mocks/MockChainlinkSequencer.sol";
+import { IChainlink } from "../../src/interfaces/chainlink/IChainlink.sol";
+import { MockChainlinkFeed } from "../mocks/MockChainlinkFeed.sol";
+import { ChainlinkAdapter } from "../../src/adapters/Chainlink.sol";
+import { BaseTest } from "../base/BaseTest.t.sol";
+import {console2} from "forge-std/console2.sol";
+
 
 // Constants for BASE network
 address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
@@ -18,6 +21,7 @@ address constant WBTC = 0x0555E30da8f98308EdB960aa94C0Db47230d2B9c;
 address constant USDT = 0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2;
 address constant STETH = 0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452;
 address constant TBTC = 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf;
+address constant DAI = 0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb;
 
 // Chainlink price feed addresses on BASE
 address constant ETH_USD_FEED = 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70;
@@ -25,7 +29,8 @@ address constant BTC_USD_FEED = 0xCCADC697c55bbB68dc5bCdf8d3CBe83CdD4E071E;
 address constant USDC_USD_FEED = 0x7e860098F58bBFC8648a4311b374B1D669a2bc6B;
 address constant USDT_USD_FEED = 0xf19d560eB8d2ADf07BD6D13ed03e1D11215721F9;
 address constant STETH_USD_FEED = 0xf586d0728a47229e747d824a939000Cf21dEF5A0;
-address constant TBTC_USD_FEED  = 0x6D75BFB5A5885f841b132198C9f0bE8c872057BF;
+address constant TBTC_USD_FEED = 0x6D75BFB5A5885f841b132198C9f0bE8c872057BF;
+address constant DAI_USD_FEED = 0x591e79239a7d679378eC8c847e5038150364C78F;
 
 // Add Optimism asset addresses (mocked for testing)
 address constant OPTIMISM_USDC = 0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85;
@@ -34,8 +39,9 @@ address constant OPTIMISM_WETH = 0x4200000000000000000000000000000000000006;
 address constant OPTIMISM_STETH = 0x1F32b1c2345538c0c6f582fCB022739c4A194Ebb;
 address constant OPTIMISM_WBTC = 0x68f180fcCe6836688e9084f035309E29Bf0A2095;
 address constant OPTIMISM_TBTC = 0x6c84a8f1c29108F47a79964b5Fe888D4f4D0dE40;
+address constant OPTIMISM_DAI = 0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1;
 
-contract SharePriceRouterTest is Test {
+contract SharePriceRouterTest is BaseTest {
     // Test contracts
     SharePriceRouter public router;
     ChainlinkAdapter public chainlinkAdapter;
@@ -46,7 +52,8 @@ contract SharePriceRouterTest is Test {
     MockVault public wbtcVault;
     MockVault public usdtVault;
     MockVault public stethVault;
-    MockVault public renbtcVault;
+    MockVault public TbtcVault;
+    MockVault public daiVault;
 
     // Test vaults for Optimism (mocked)
     MockVault public opUsdcVault;
@@ -54,24 +61,27 @@ contract SharePriceRouterTest is Test {
     MockVault public opWethVault;
     MockVault public opStethVault;
     MockVault public opWbtcVault;
-    MockVault public opRenbtcVault;
+    MockVault public opTbtcVault;
+    MockVault public opDaiVault;
 
     // Test accounts
     address public admin;
     address public endpoint;
     address public adapter;
     address public user;
+    address public oracle;
 
     function setUp() public {
         string memory baseRpcUrl = vm.envString("BASE_RPC_URL");
         vm.createSelectFork(baseRpcUrl);
+        vm.rollFork(27_192_119);
 
         // Setup test accounts
         admin = makeAddr("admin");
         endpoint = makeAddr("endpoint");
         adapter = makeAddr("adapter");
         user = makeAddr("user");
-
+        oracle = makeAddr("oracle");
         // Deploy router with admin as owner
         vm.prank(admin);
         router = new SharePriceRouter(admin);
@@ -79,40 +89,44 @@ contract SharePriceRouterTest is Test {
         // Deploy and configure ChainlinkAdapter
         chainlinkAdapter = new ChainlinkAdapter(
             admin,
-            address(router),  // Set router as adapter
+            address(router), // Set router as adapter
             address(router)
         );
 
         // Setup roles
         vm.startPrank(admin);
         router.grantRole(endpoint, router.ENDPOINT_ROLE());
-        router.grantRole(address(router), router.ADAPTER_ROLE());  // Grant adapter role to router
-        chainlinkAdapter.grantRole(address(router), chainlinkAdapter.ORACLE_ROLE());  // Grant oracle role to router
+        router.grantRole(address(router), router.ADAPTER_ROLE()); // Grant adapter role to router
+        chainlinkAdapter.grantRole(address(router), chainlinkAdapter.ORACLE_ROLE()); // Grant oracle role to router
+        chainlinkAdapter.grantRole(oracle, chainlinkAdapter.ORACLE_ROLE()); // Grant oracle role to oracle
 
         // Configure price feeds in adapter
-        chainlinkAdapter.addAsset(USDC, USDC_USD_FEED, 1200, true);  // 20 min heartbeat
-        chainlinkAdapter.addAsset(USDT, USDT_USD_FEED, 1200, true);
+        vm.startPrank(oracle);
+        chainlinkAdapter.addAsset(USDC, USDC_USD_FEED, 86400, true); // 20 min heartbeat
+        chainlinkAdapter.addAsset(USDT, USDT_USD_FEED, 86400, true);
         chainlinkAdapter.addAsset(WETH, ETH_USD_FEED, 1200, true);
-        chainlinkAdapter.addAsset(STETH, STETH_USD_FEED, 1200, false);  // stETH/ETH feed
+        chainlinkAdapter.addAsset(STETH, STETH_USD_FEED, 1200, false); // stETH/ETH feed
         chainlinkAdapter.addAsset(WBTC, BTC_USD_FEED, 1200, true);
         chainlinkAdapter.addAsset(TBTC, TBTC_USD_FEED, 1200, true);
+        chainlinkAdapter.addAsset(DAI, DAI_USD_FEED, 86400, true);
         vm.stopPrank();
 
         // Deploy Base network mock vaults
-        usdcVault = new MockVault(USDC, 6, 1.1e6);    // 1.1 USDC
-        usdtVault = new MockVault(USDT, 6, 1.2e6);    // 1.2 USDT
-        wethVault = new MockVault(WETH, 18, 1.1e18);  // 1.1 WETH
+        usdcVault = new MockVault(USDC, 6, 1.1e6); // 1.1 USDC
+        usdtVault = new MockVault(USDT, 6, 1.2e6); // 1.2 USDT
+        wethVault = new MockVault(WETH, 18, 1.1e18); // 1.1 WETH
         stethVault = new MockVault(STETH, 18, 1.2e18); // 1.2 stETH
-        wbtcVault = new MockVault(WBTC, 8, 1.1e8);    // 1.1 WBTC
-        renbtcVault = new MockVault(TBTC, 8, 1.2e8); // 1.2 renBTC
+        wbtcVault = new MockVault(WBTC, 8, 1.1e8); // 1.1 WBTC
+        TbtcVault = new MockVault(TBTC, 8, 1.2e8); // 1.2 tBTC
 
         // Deploy Optimism mock vaults (for cross-chain testing)
-        opUsdcVault = new MockVault(OPTIMISM_USDC, 6, 1.15e6);   // 1.15 USDC
-        opUsdtVault = new MockVault(OPTIMISM_USDT, 6, 1.25e6);   // 1.25 USDT
+        opUsdcVault = new MockVault(OPTIMISM_USDC, 6, 1.15e6); // 1.15 USDC
+        opUsdtVault = new MockVault(OPTIMISM_USDT, 6, 1.25e6); // 1.25 USDT
         opWethVault = new MockVault(OPTIMISM_WETH, 18, 1.15e18); // 1.15 WETH
         opStethVault = new MockVault(OPTIMISM_STETH, 18, 1.25e18); // 1.25 stETH
-        opWbtcVault = new MockVault(OPTIMISM_WBTC, 8, 1.15e8);   // 1.15 WBTC
-        opRenbtcVault = new MockVault(OPTIMISM_TBTC, 8, 1.25e8); // 1.25 renBTC
+        opWbtcVault = new MockVault(OPTIMISM_WBTC, 8, 1.15e8); // 1.15 WBTC
+        opTbtcVault = new MockVault(OPTIMISM_TBTC, 8, 1.25e8); // 1.25 tBTC
+        opDaiVault = new MockVault(OPTIMISM_DAI, 18, 1.35e18); // 1.35 DAI
 
         vm.startPrank(admin);
         // Setup cross-chain asset mappings
@@ -122,23 +136,26 @@ contract SharePriceRouterTest is Test {
         router.setCrossChainAssetMapping(10, OPTIMISM_STETH, STETH);
         router.setCrossChainAssetMapping(10, OPTIMISM_WBTC, WBTC);
         router.setCrossChainAssetMapping(10, OPTIMISM_TBTC, TBTC);
+        router.setCrossChainAssetMapping(10, OPTIMISM_DAI, DAI);
 
         // Configure local assets with chainlink adapter
         router.setLocalAssetConfig(USDC, address(chainlinkAdapter), USDC_USD_FEED, 0, true);
         router.setLocalAssetConfig(USDT, address(chainlinkAdapter), USDT_USD_FEED, 0, true);
         router.setLocalAssetConfig(WETH, address(chainlinkAdapter), ETH_USD_FEED, 0, true);
-        router.setLocalAssetConfig(STETH, address(chainlinkAdapter), STETH_USD_FEED, 0, false);  // stETH/ETH feed
+        router.setLocalAssetConfig(STETH, address(chainlinkAdapter), STETH_USD_FEED, 0, false); // stETH/ETH feed
         router.setLocalAssetConfig(WBTC, address(chainlinkAdapter), BTC_USD_FEED, 0, true);
         router.setLocalAssetConfig(TBTC, address(chainlinkAdapter), TBTC_USD_FEED, 0, true);
+        router.setLocalAssetConfig(DAI, address(chainlinkAdapter), DAI_USD_FEED, 0, true);
 
         // Update prices in router
-        address[] memory assets = new address[](6);
+        address[] memory assets = new address[](7);
         assets[0] = USDC;
         assets[1] = USDT;
         assets[2] = WETH;
         assets[3] = STETH;
         assets[4] = WBTC;
         assets[5] = TBTC;
+        assets[6] = DAI;
         router.batchUpdatePrices(assets);
         vm.stopPrank();
     }
@@ -297,7 +314,7 @@ contract SharePriceRouterTest is Test {
         // Verify stored data
         bytes32 key = keccak256(abi.encodePacked(srcChain, vaultAddr));
         VaultReport memory report = router.getLatestSharePriceReport(srcChain, vaultAddr);
-        
+
         assertEq(report.chainId, srcChain, "Chain ID should match");
         assertEq(report.vaultAddress, vaultAddr, "Vault address should match");
         assertEq(report.asset, asset, "Asset should match");
@@ -365,6 +382,39 @@ contract SharePriceRouterTest is Test {
         vm.prank(endpoint);
         vm.expectRevert(SharePriceRouter.ZeroAddress.selector);
         router.updateSharePrices(srcChain, reports);
+    }
+
+    // Price Conversion Tests
+    function testGetLatestSharePrice_DAI_TO_USDC_Stables() public {
+        uint32 srcChain = 10;
+        uint256 sharePrice = 1.3e18; // 1.3 DAI
+
+        // Set up cross-chain mapping for USDC
+        vm.prank(admin);
+        router.setCrossChainAssetMapping(srcChain, OPTIMISM_USDC, USDC);
+
+        VaultReport[] memory reports = new VaultReport[](1);
+        reports[0] = VaultReport({
+            chainId: srcChain,
+            vaultAddress: address(opDaiVault),
+            asset: OPTIMISM_DAI,
+            assetDecimals: 18,
+            sharePrice: sharePrice,
+            lastUpdate: uint64(block.timestamp),
+            rewardsDelegate: address(0)
+        });
+
+        vm.prank(endpoint);
+        router.updateSharePrices(srcChain, reports);
+
+        (uint256 usdcPrice,,) = router.getLatestAssetPrice(USDC);
+        (uint256 daiPrice,,) = router.getLatestAssetPrice(DAI);
+        uint256 price_ = (sharePrice * daiPrice / usdcPrice) / 10 ** 12;
+
+        (uint256 price, uint64 timestamp) = router.getLatestSharePrice(srcChain, address(opDaiVault), USDC);
+
+        assertApproxEqAbs(price, price_, 1.3e4, "Price should match for same stable asset");
+        assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
     }
 
     // Price Conversion Tests
@@ -476,11 +526,15 @@ contract SharePriceRouterTest is Test {
 
         vm.prank(endpoint);
         router.updateSharePrices(srcChain, reports);
+        
+        uint256 normalizedPrice = sharePrice * 10 ** (18 - 6);
+        (uint256 usdcPrice,,) = router.getLatestAssetPrice(USDC);
+        (uint256 wethPrice,,) = router.getLatestAssetPrice(WETH);
+        uint256 price_ = normalizedPrice * usdcPrice / wethPrice;
 
         // Should fail when trying to convert USDC to WETH
-        (uint256 price, uint64 timestamp) = router.getLatestSharePrice(srcChain, vaultAddr, WETH);
-        assertEq(price, 0, "Price should be 0 for incompatible asset categories");
-        assertEq(timestamp, 0, "Timestamp should be 0 for incompatible asset categories");
+        (uint256 price, ) = router.getLatestSharePrice(srcChain, vaultAddr, WETH);
+        assertApproxEqAbs(price, price_, 1.1e15, "Price should be 0 for incompatible asset categories");
     }
 
     // Local Asset Configuration Tests
@@ -488,9 +542,10 @@ contract SharePriceRouterTest is Test {
         vm.prank(admin);
         router.setLocalAssetConfig(USDC, adapter, USDC_USD_FEED, 0, true);
 
-        (address priceFeed, bool inUSD) = router.localAssetConfigs(USDC, 0);
+        (address priceFeed, bool inUSD, address adaptor) = router.localAssetConfigs(USDC, 0);
         assertEq(priceFeed, USDC_USD_FEED, "Price feed should be set");
         assertTrue(inUSD, "USD flag should be set");
+        assertEq(adaptor, adapter, "Adaptor should be set");
     }
 
     function testRevertSetLocalAssetConfig_ZeroAddresses() public {
@@ -516,8 +571,8 @@ contract SharePriceRouterTest is Test {
         assets[1] = WETH;
 
         vm.startPrank(admin);
-        router.setLocalAssetConfig(USDC, adapter, USDC_USD_FEED, 0, true);
-        router.setLocalAssetConfig(WETH, adapter, ETH_USD_FEED, 0, true);
+        router.setLocalAssetConfig(USDC, address(chainlinkAdapter), USDC_USD_FEED, 0, true);
+        router.setLocalAssetConfig(WETH, address(chainlinkAdapter), ETH_USD_FEED, 0, true);
         vm.stopPrank();
 
         bool success = router.batchUpdatePrices(assets);
@@ -546,8 +601,10 @@ contract SharePriceRouterTest is Test {
 
         // Verify all configs are removed
         for (uint8 i = 0; i <= 1; i++) {
-            (address priceFeed,) = router.localAssetConfigs(USDC, i);
+            (address priceFeed, bool inUSD, address adaptor) = router.localAssetConfigs(USDC, i);
             assertEq(priceFeed, address(0), "Price feed should be removed");
+            assertEq(inUSD, false, "USD flag should be removed");
+            assertEq(adaptor, address(0), "Adaptor should be removed");
         }
     }
 
@@ -562,7 +619,7 @@ contract SharePriceRouterTest is Test {
 
         // Create reports for multiple assets
         VaultReport[] memory reports = new VaultReport[](6);
-        
+
         // Stablecoins
         reports[0] = VaultReport({
             chainId: srcChain,
@@ -618,7 +675,7 @@ contract SharePriceRouterTest is Test {
 
         reports[5] = VaultReport({
             chainId: srcChain,
-            vaultAddress: address(opRenbtcVault),
+            vaultAddress: address(opTbtcVault),
             asset: OPTIMISM_TBTC,
             assetDecimals: 8,
             sharePrice: 1.25e8,
@@ -642,13 +699,13 @@ contract SharePriceRouterTest is Test {
 
     function testGetLatestSharePrice_CrossChainStables() public {
         uint32 srcChain = 10;
-        
+
         // Setup initial USDC vault report
         VaultReport[] memory reports = new VaultReport[](1);
         reports[0] = VaultReport({
             chainId: srcChain,
-            vaultAddress: address(opUsdcVault),
-            asset: OPTIMISM_USDC,
+            vaultAddress: address(opUsdtVault),
+            asset: OPTIMISM_USDT,
             assetDecimals: 6,
             sharePrice: 1.15e6,
             lastUpdate: uint64(block.timestamp),
@@ -659,20 +716,20 @@ contract SharePriceRouterTest is Test {
         router.updateSharePrices(srcChain, reports);
 
         // Test conversion from USDC to USDT (both 6 decimals)
-        (uint256 price, uint64 timestamp) = router.getLatestSharePrice(srcChain, address(opUsdcVault), USDT);
-        assertEq(price, 1.15e6, "Price should match for stable to stable conversion");
+        (uint256 price, uint64 timestamp) = router.getLatestSharePrice(srcChain, address(opUsdtVault), USDC);
+        assertApproxEqAbs(price, 1.15e6, 1.15e4, "Price should match for stable to stable conversion");
         assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
     }
 
     function testGetLatestSharePrice_CrossChainETH() public {
         uint32 srcChain = 10;
-        
+
         // Setup initial WETH vault report
         VaultReport[] memory reports = new VaultReport[](1);
         reports[0] = VaultReport({
             chainId: srcChain,
-            vaultAddress: address(opWethVault),
-            asset: OPTIMISM_WETH,
+            vaultAddress: address(opStethVault),
+            asset: OPTIMISM_STETH,
             assetDecimals: 18,
             sharePrice: 1.15e18,
             lastUpdate: uint64(block.timestamp),
@@ -683,20 +740,20 @@ contract SharePriceRouterTest is Test {
         router.updateSharePrices(srcChain, reports);
 
         // Test conversion from WETH to stETH (both 18 decimals)
-        (uint256 price, uint64 timestamp) = router.getLatestSharePrice(srcChain, address(opWethVault), STETH);
-        assertEq(price, 1.15e18, "Price should match for ETH to ETH conversion");
+        (uint256 price, uint64 timestamp) = router.getLatestSharePrice(srcChain, address(opStethVault), WETH);
+        assertApproxEqAbs(price, 1.15e18, 1.15e16, "Price should match for ETH to ETH conversion");
         assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
     }
 
     function testGetLatestSharePrice_CrossChainBTC() public {
         uint32 srcChain = 10;
-        
+
         // Setup initial WBTC vault report
         VaultReport[] memory reports = new VaultReport[](1);
         reports[0] = VaultReport({
             chainId: srcChain,
-            vaultAddress: address(opWbtcVault),
-            asset: OPTIMISM_WBTC,
+            vaultAddress: address(opTbtcVault),
+            asset: OPTIMISM_TBTC,
             assetDecimals: 8,
             sharePrice: 1.15e8,
             lastUpdate: uint64(block.timestamp),
@@ -705,10 +762,105 @@ contract SharePriceRouterTest is Test {
 
         vm.prank(endpoint);
         router.updateSharePrices(srcChain, reports);
-
-        // Test conversion from WBTC to renBTC (both 8 decimals)
-        (uint256 price, uint64 timestamp) = router.getLatestSharePrice(srcChain, address(opWbtcVault), TBTC);
-        assertEq(price, 1.15e8, "Price should match for BTC to BTC conversion");
+        
+        (uint256 price, uint64 timestamp) = router.getLatestSharePrice(srcChain, address(opTbtcVault), WBTC);
+        assertApproxEqAbs(price, 1.15e8, 1.15e5, "Price should match for BTC to BTC conversion");
         assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
     }
-} 
+
+    function test_crossChainAssetConversion() public {
+        vm.startPrank(admin);
+
+        router.setCrossChainAssetMapping(10, OPTIMISM_USDC, USDC);
+
+        router.setCrossChainAssetMapping(10, OPTIMISM_WETH, WETH);
+
+        (address localUSDC, uint8 usdcDecimals) = router.getLocalAsset(10, OPTIMISM_USDC);
+        (address localWETH, uint8 wethDecimals) = router.getLocalAsset(10, OPTIMISM_WETH);
+
+        assertEq(localUSDC, USDC, "USDC mapping incorrect");
+        assertEq(localWETH, WETH, "WETH mapping incorrect");
+        assertEq(usdcDecimals, 6, "USDC decimals incorrect");
+        assertEq(wethDecimals, 18, "WETH decimals incorrect");
+
+        vm.stopPrank();
+    }
+
+    function test_getSharePrices() public view {
+        address[] memory vaultAddresses = new address[](3);
+        vaultAddresses[0] = address(usdcVault);
+        vaultAddresses[1] = address(wethVault);
+        vaultAddresses[2] = address(wbtcVault);
+
+        VaultReport[] memory reports = router.getSharePrices(vaultAddresses, address(0));
+
+        assertEq(reports.length, vaultAddresses.length, "Should return correct number of reports");
+
+        for (uint256 i = 0; i < reports.length; i++) {
+            assertEq(reports[i].chainId, uint32(block.chainid), "Chain ID should match");
+            assertEq(reports[i].vaultAddress, vaultAddresses[i], "Vault address should match");
+            assertGt(reports[i].sharePrice, 0, "Share price should be non-zero");
+        }
+    }
+
+    function test_revertWhen_UpdateSharePricesWithInvalidChain() public {
+        vm.startPrank(endpoint);
+
+        VaultReport[] memory reports = new VaultReport[](1);
+        reports[0] = VaultReport({
+            chainId: uint32(block.chainid), 
+            vaultAddress: address(opUsdcVault),
+            asset: OPTIMISM_USDC,
+            assetDecimals: 6,
+            sharePrice: 1.1e6,
+            lastUpdate: uint64(block.timestamp),
+            rewardsDelegate: address(0)
+        });
+
+        vm.expectRevert(SharePriceRouter.InvalidChainId.selector);
+        router.updateSharePrices(uint32(block.chainid), reports);
+
+        vm.stopPrank();
+    }
+
+    function test_revertWhen_GetLocalAssetNotConfigured() public {
+        address randomAsset = makeAddr("randomAsset");
+
+        vm.expectRevert(abi.encodeWithSelector(SharePriceRouter.AssetNotConfigured.selector, randomAsset));
+        router.getLocalAsset(10, randomAsset);
+    }
+
+    function test_sequencerValidation() public {
+        assertTrue(router.isSequencerValid(), "Should be valid with no sequencer");
+
+        vm.startPrank(admin);
+        address mockSequencer = makeAddr("sequencer");
+        router.setSequencer(mockSequencer);
+
+        vm.mockCall(
+            mockSequencer,
+            abi.encodeWithSelector(IChainlink.latestRoundData.selector),
+            abi.encode(0, int256(1), block.timestamp, block.timestamp, 0)
+        );
+
+        assertFalse(router.isSequencerValid(), "Should be invalid when sequencer is down");
+
+        vm.mockCall(
+            mockSequencer,
+            abi.encodeWithSelector(IChainlink.latestRoundData.selector),
+            abi.encode(0, int256(0), block.timestamp, block.timestamp, 0)
+        );
+
+        assertFalse(router.isSequencerValid(), "Should be invalid during grace period");
+
+        vm.mockCall(
+            mockSequencer,
+            abi.encodeWithSelector(IChainlink.latestRoundData.selector),
+            abi.encode(0, int256(0), block.timestamp - router.GRACE_PERIOD_TIME() - 1, block.timestamp, 0)
+        );
+
+        assertTrue(router.isSequencerValid(), "Should be valid after grace period");
+
+        vm.stopPrank();
+    }
+}

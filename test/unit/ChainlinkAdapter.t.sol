@@ -16,21 +16,21 @@ contract ChainlinkAdapterTest is Test {
     address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
     address constant WETH = 0x4200000000000000000000000000000000000006;
     address constant WBTC = 0x0555E30da8f98308EdB960aa94C0Db47230d2B9c;
-    
+
     // Chainlink price feed addresses on BASE (from priceFeedConfig.json)
     address constant ETH_USD_FEED = 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70;
     address constant BTC_USD_FEED = 0xCCADC697c55bbB68dc5bCdf8d3CBe83CdD4E071E;
     address constant SEQUENCER_FEED = 0xBCF85224fc0756B9Fa45aA7892530B47e10b6433;
-    
+
     // Heartbeat values from config
-    uint256 constant ETH_HEARTBEAT = 1200;  // 20 minutes
-    uint256 constant BTC_HEARTBEAT = 1200;  // 20 minutes
-    
+    uint256 constant ETH_HEARTBEAT = 1200; // 20 minutes
+    uint256 constant BTC_HEARTBEAT = 1200; // 20 minutes
+
     // Test contracts
     address public admin;
     ChainlinkAdapter public adapter;
     SharePriceRouter public router;
-    
+
     function setUp() public {
         admin = makeAddr("admin");
         string memory baseRpcUrl = vm.envString("BASE_RPC_URL");
@@ -44,9 +44,9 @@ contract ChainlinkAdapterTest is Test {
 
         // Deploy adapter
         adapter = new ChainlinkAdapter(
-            address(this),  // admin
-            address(router),  // oracle
-            address(router)  // router
+            address(this), // admin
+            address(router), // oracle
+            address(router) // router
         );
 
         // Configure price feeds in router
@@ -61,11 +61,11 @@ contract ChainlinkAdapterTest is Test {
             SEQUENCER_FEED,
             abi.encodeWithSelector(IChainlink.latestRoundData.selector),
             abi.encode(
-                92233720368547777, // roundId
-                int256(0),  // 0 = sequencer is up
-                block.timestamp - 2 hours,  // startedAt (past grace period)
-                block.timestamp,  // updatedAt
-                92233720368547777  // answeredInRound
+                92_233_720_368_547_777, // roundId
+                int256(0), // 0 = sequencer is up
+                block.timestamp - 2 hours, // startedAt (past grace period)
+                block.timestamp, // updatedAt
+                92_233_720_368_547_777 // answeredInRound
             )
         );
 
@@ -74,11 +74,11 @@ contract ChainlinkAdapterTest is Test {
             ETH_USD_FEED,
             abi.encodeWithSelector(IChainlink.latestRoundData.selector),
             abi.encode(
-                92233720368547777, // roundId
-                int256(2000e8),  // 2000 USD
-                block.timestamp,  // startedAt
-                block.timestamp,  // updatedAt
-                92233720368547777  // answeredInRound
+                92_233_720_368_547_777, // roundId
+                int256(2000e8), // 2000 USD
+                block.timestamp, // startedAt
+                block.timestamp, // updatedAt
+                92_233_720_368_547_777 // answeredInRound
             )
         );
 
@@ -87,58 +87,42 @@ contract ChainlinkAdapterTest is Test {
             BTC_USD_FEED,
             abi.encodeWithSelector(IChainlink.latestRoundData.selector),
             abi.encode(
-                92233720368547777, // roundId
-                int256(42000e8),  // 42000 USD
-                block.timestamp,  // startedAt
-                block.timestamp,  // updatedAt
-                92233720368547777  // answeredInRound
+                92_233_720_368_547_777, // roundId
+                int256(42_000e8), // 42000 USD
+                block.timestamp, // startedAt
+                block.timestamp, // updatedAt
+                92_233_720_368_547_777 // answeredInRound
             )
         );
 
         // Mock aggregator functions for both feeds
-        vm.mockCall(
-            ETH_USD_FEED,
-            abi.encodeWithSelector(IChainlink.aggregator.selector),
-            abi.encode(ETH_USD_FEED)
-        );
-        vm.mockCall(
-            BTC_USD_FEED,
-            abi.encodeWithSelector(IChainlink.aggregator.selector),
-            abi.encode(BTC_USD_FEED)
-        );
+        vm.mockCall(ETH_USD_FEED, abi.encodeWithSelector(IChainlink.aggregator.selector), abi.encode(ETH_USD_FEED));
+        vm.mockCall(BTC_USD_FEED, abi.encodeWithSelector(IChainlink.aggregator.selector), abi.encode(BTC_USD_FEED));
 
         // Mock decimals for both feeds
-        vm.mockCall(
-            ETH_USD_FEED,
-            abi.encodeWithSelector(IChainlink.decimals.selector),
-            abi.encode(8)
-        );
-        vm.mockCall(
-            BTC_USD_FEED,
-            abi.encodeWithSelector(IChainlink.decimals.selector),
-            abi.encode(8)
-        );
+        vm.mockCall(ETH_USD_FEED, abi.encodeWithSelector(IChainlink.decimals.selector), abi.encode(8));
+        vm.mockCall(BTC_USD_FEED, abi.encodeWithSelector(IChainlink.decimals.selector), abi.encode(8));
 
         // Mock min/max answers for both feeds
         vm.mockCall(
             ETH_USD_FEED,
             abi.encodeWithSelector(IChainlink.minAnswer.selector),
-            abi.encode(int192(1e8))  // $1
+            abi.encode(int192(1e8)) // $1
         );
         vm.mockCall(
             ETH_USD_FEED,
             abi.encodeWithSelector(IChainlink.maxAnswer.selector),
-            abi.encode(int192(1e12))  // $10000
+            abi.encode(int192(1e12)) // $10000
         );
         vm.mockCall(
             BTC_USD_FEED,
             abi.encodeWithSelector(IChainlink.minAnswer.selector),
-            abi.encode(int192(1e8))  // $1
+            abi.encode(int192(1e8)) // $1
         );
         vm.mockCall(
             BTC_USD_FEED,
             abi.encodeWithSelector(IChainlink.maxAnswer.selector),
-            abi.encode(int192(5e12))  // $50000
+            abi.encode(int192(5e12)) // $50000
         );
 
         // Add assets to adapter
@@ -146,20 +130,20 @@ contract ChainlinkAdapterTest is Test {
             WETH,
             ETH_USD_FEED,
             ETH_HEARTBEAT,
-            true  // USD feed
+            true // USD feed
         );
 
         adapter.addAsset(
             WBTC,
             BTC_USD_FEED,
             BTC_HEARTBEAT,
-            true  // USD feed
+            true // USD feed
         );
     }
 
     function testReturnsCorrectPrice_ETH_USD() public {
         PriceReturnData memory priceData = adapter.getPrice(WETH, true);
-        
+
         assertFalse(priceData.hadError, "Price should not have error");
         assertTrue(priceData.inUSD, "Price should be in USD");
         assertGt(priceData.price, 0, "Price should be greater than 0");
@@ -170,7 +154,7 @@ contract ChainlinkAdapterTest is Test {
 
     function testReturnsCorrectPrice_WBTC_USD() public view {
         PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
-        
+
         assertFalse(priceData.hadError, "Price should not have error");
         assertTrue(priceData.inUSD, "Price should be in USD");
         assertGt(priceData.price, 0, "Price should be greater than 0");
@@ -182,11 +166,11 @@ contract ChainlinkAdapterTest is Test {
             SEQUENCER_FEED,
             abi.encodeWithSelector(IChainlink.latestRoundData.selector),
             abi.encode(
-                92233720368547777, // roundId
-                int256(1),  // 1 = sequencer is down
-                block.timestamp,  // startedAt 
-                block.timestamp,  // updatedAt
-                92233720368547777  // answeredInRound
+                92_233_720_368_547_777, // roundId
+                int256(1), // 1 = sequencer is down
+                block.timestamp, // startedAt
+                block.timestamp, // updatedAt
+                92_233_720_368_547_777 // answeredInRound
             )
         );
 
@@ -200,11 +184,11 @@ contract ChainlinkAdapterTest is Test {
             SEQUENCER_FEED,
             abi.encodeWithSelector(IChainlink.latestRoundData.selector),
             abi.encode(
-                92233720368547777, // roundId
-                int256(0),  // 0 = sequencer is up
-                block.timestamp - 30 minutes,  // startedAt (within grace period)
-                block.timestamp,  // updatedAt
-                92233720368547777  // answeredInRound
+                92_233_720_368_547_777, // roundId
+                int256(0), // 0 = sequencer is up
+                block.timestamp - 30 minutes, // startedAt (within grace period)
+                block.timestamp, // updatedAt
+                92_233_720_368_547_777 // answeredInRound
             )
         );
 
@@ -218,11 +202,11 @@ contract ChainlinkAdapterTest is Test {
             ETH_USD_FEED,
             abi.encodeWithSelector(IChainlink.latestRoundData.selector),
             abi.encode(
-                92233720368547777, // roundId
-                int256(2000e8),  // 2000 USD
-                block.timestamp - 5 hours,  // startedAt
-                block.timestamp - 5 hours,  // updatedAt
-                92233720368547777  // answeredInRound
+                92_233_720_368_547_777, // roundId
+                int256(2000e8), // 2000 USD
+                block.timestamp - 5 hours, // startedAt
+                block.timestamp - 5 hours, // updatedAt
+                92_233_720_368_547_777 // answeredInRound
             )
         );
 
@@ -241,8 +225,8 @@ contract ChainlinkAdapterTest is Test {
         assertEq(priceData.hadError, false, "Price should not have error before removal");
         assertGt(priceData.price, 0, "Price should be greater than 0 before removal");
 
-        // Remove the asset 
-        adapter.removeAsset(WETH); 
+        // Remove the asset
+        adapter.removeAsset(WETH);
 
         // Verify it reverts after removal
         vm.expectRevert(ChainlinkAdapter.ChainlinkAdaptor__AssetNotSupported.selector);
@@ -261,12 +245,7 @@ contract ChainlinkAdapterTest is Test {
 
     function testCanAddSameAsset() public {
         // Should be able to add the same asset again
-        adapter.addAsset(
-            WETH,
-            ETH_USD_FEED,
-            1 hours,
-            true
-        );
+        adapter.addAsset(WETH, ETH_USD_FEED, 1 hours, true);
 
         // Verify it still works
         PriceReturnData memory priceData = adapter.getPrice(WETH, true);
@@ -281,4 +260,4 @@ contract ChainlinkAdapterTest is Test {
         vm.expectRevert(ChainlinkAdapter.ChainlinkAdaptor__AssetNotSupported.selector);
         adapter.removeAsset(address(0));
     }
-} 
+}
