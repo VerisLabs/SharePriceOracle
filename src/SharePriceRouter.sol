@@ -314,7 +314,14 @@ contract SharePriceRouter is OwnableRoles {
     ) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(_chainId, _vaultAddress));
     }
-
+    
+    /**
+     * @notice Gets the latest price for an asset
+     * @param _asset The asset address
+     * @return price The latest price
+     * @return timestamp The timestamp of the price
+     * @return inUSD Whether the price is in USD
+     */
     function getLatestAssetPrice(
         address _asset
     ) external view returns (uint256 price, uint64 timestamp, bool inUSD) {

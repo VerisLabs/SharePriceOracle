@@ -21,6 +21,7 @@ address constant WBTC = 0x0555E30da8f98308EdB960aa94C0Db47230d2B9c;
 address constant USDT = 0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2;
 address constant STETH = 0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452;
 address constant TBTC = 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf;
+address constant DAI = 0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb;
 
 // Chainlink price feed addresses on BASE
 address constant ETH_USD_FEED = 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70;
@@ -29,6 +30,7 @@ address constant USDC_USD_FEED = 0x7e860098F58bBFC8648a4311b374B1D669a2bc6B;
 address constant USDT_USD_FEED = 0xf19d560eB8d2ADf07BD6D13ed03e1D11215721F9;
 address constant STETH_USD_FEED = 0xf586d0728a47229e747d824a939000Cf21dEF5A0;
 address constant TBTC_USD_FEED = 0x6D75BFB5A5885f841b132198C9f0bE8c872057BF;
+address constant DAI_USD_FEED = 0x591e79239a7d679378eC8c847e5038150364C78F;
 
 // Add Optimism asset addresses (mocked for testing)
 address constant OPTIMISM_USDC = 0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85;
@@ -37,6 +39,7 @@ address constant OPTIMISM_WETH = 0x4200000000000000000000000000000000000006;
 address constant OPTIMISM_STETH = 0x1F32b1c2345538c0c6f582fCB022739c4A194Ebb;
 address constant OPTIMISM_WBTC = 0x68f180fcCe6836688e9084f035309E29Bf0A2095;
 address constant OPTIMISM_TBTC = 0x6c84a8f1c29108F47a79964b5Fe888D4f4D0dE40;
+address constant OPTIMISM_DAI = 0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1;
 
 contract SharePriceRouterTest is BaseTest {
     // Test contracts
@@ -50,6 +53,7 @@ contract SharePriceRouterTest is BaseTest {
     MockVault public usdtVault;
     MockVault public stethVault;
     MockVault public TbtcVault;
+    MockVault public daiVault;
 
     // Test vaults for Optimism (mocked)
     MockVault public opUsdcVault;
@@ -58,6 +62,7 @@ contract SharePriceRouterTest is BaseTest {
     MockVault public opStethVault;
     MockVault public opWbtcVault;
     MockVault public opTbtcVault;
+    MockVault public opDaiVault;
 
     // Test accounts
     address public admin;
@@ -97,12 +102,13 @@ contract SharePriceRouterTest is BaseTest {
 
         // Configure price feeds in adapter
         vm.startPrank(oracle);
-        chainlinkAdapter.addAsset(USDC, USDC_USD_FEED, 1200, true); // 20 min heartbeat
-        chainlinkAdapter.addAsset(USDT, USDT_USD_FEED, 1200, true);
+        chainlinkAdapter.addAsset(USDC, USDC_USD_FEED, 86400, true); // 20 min heartbeat
+        chainlinkAdapter.addAsset(USDT, USDT_USD_FEED, 86400, true);
         chainlinkAdapter.addAsset(WETH, ETH_USD_FEED, 1200, true);
         chainlinkAdapter.addAsset(STETH, STETH_USD_FEED, 1200, false); // stETH/ETH feed
         chainlinkAdapter.addAsset(WBTC, BTC_USD_FEED, 1200, true);
         chainlinkAdapter.addAsset(TBTC, TBTC_USD_FEED, 1200, true);
+        chainlinkAdapter.addAsset(DAI, DAI_USD_FEED, 86400, true);
         vm.stopPrank();
 
         // Deploy Base network mock vaults
@@ -111,7 +117,7 @@ contract SharePriceRouterTest is BaseTest {
         wethVault = new MockVault(WETH, 18, 1.1e18); // 1.1 WETH
         stethVault = new MockVault(STETH, 18, 1.2e18); // 1.2 stETH
         wbtcVault = new MockVault(WBTC, 8, 1.1e8); // 1.1 WBTC
-        TbtcVault = new MockVault(TBTC, 8, 1.2e8); // 1.2 renBTC
+        TbtcVault = new MockVault(TBTC, 8, 1.2e8); // 1.2 tBTC
 
         // Deploy Optimism mock vaults (for cross-chain testing)
         opUsdcVault = new MockVault(OPTIMISM_USDC, 6, 1.15e6); // 1.15 USDC
@@ -119,7 +125,8 @@ contract SharePriceRouterTest is BaseTest {
         opWethVault = new MockVault(OPTIMISM_WETH, 18, 1.15e18); // 1.15 WETH
         opStethVault = new MockVault(OPTIMISM_STETH, 18, 1.25e18); // 1.25 stETH
         opWbtcVault = new MockVault(OPTIMISM_WBTC, 8, 1.15e8); // 1.15 WBTC
-        opTbtcVault = new MockVault(OPTIMISM_TBTC, 8, 1.25e8); // 1.25 renBTC
+        opTbtcVault = new MockVault(OPTIMISM_TBTC, 8, 1.25e8); // 1.25 tBTC
+        opDaiVault = new MockVault(OPTIMISM_DAI, 18, 1.35e18); // 1.35 DAI
 
         vm.startPrank(admin);
         // Setup cross-chain asset mappings
@@ -129,6 +136,7 @@ contract SharePriceRouterTest is BaseTest {
         router.setCrossChainAssetMapping(10, OPTIMISM_STETH, STETH);
         router.setCrossChainAssetMapping(10, OPTIMISM_WBTC, WBTC);
         router.setCrossChainAssetMapping(10, OPTIMISM_TBTC, TBTC);
+        router.setCrossChainAssetMapping(10, OPTIMISM_DAI, DAI);
 
         // Configure local assets with chainlink adapter
         router.setLocalAssetConfig(USDC, address(chainlinkAdapter), USDC_USD_FEED, 0, true);
@@ -137,15 +145,17 @@ contract SharePriceRouterTest is BaseTest {
         router.setLocalAssetConfig(STETH, address(chainlinkAdapter), STETH_USD_FEED, 0, false); // stETH/ETH feed
         router.setLocalAssetConfig(WBTC, address(chainlinkAdapter), BTC_USD_FEED, 0, true);
         router.setLocalAssetConfig(TBTC, address(chainlinkAdapter), TBTC_USD_FEED, 0, true);
+        router.setLocalAssetConfig(DAI, address(chainlinkAdapter), DAI_USD_FEED, 0, true);
 
         // Update prices in router
-        address[] memory assets = new address[](6);
+        address[] memory assets = new address[](7);
         assets[0] = USDC;
         assets[1] = USDT;
         assets[2] = WETH;
         assets[3] = STETH;
         assets[4] = WBTC;
         assets[5] = TBTC;
+        assets[6] = DAI;
         router.batchUpdatePrices(assets);
         vm.stopPrank();
     }
@@ -372,6 +382,39 @@ contract SharePriceRouterTest is BaseTest {
         vm.prank(endpoint);
         vm.expectRevert(SharePriceRouter.ZeroAddress.selector);
         router.updateSharePrices(srcChain, reports);
+    }
+
+    // Price Conversion Tests
+    function testGetLatestSharePrice_DAI_TO_USDC_Stables() public {
+        uint32 srcChain = 10;
+        uint256 sharePrice = 1.3e18; // 1.3 DAI
+
+        // Set up cross-chain mapping for USDC
+        vm.prank(admin);
+        router.setCrossChainAssetMapping(srcChain, OPTIMISM_USDC, USDC);
+
+        VaultReport[] memory reports = new VaultReport[](1);
+        reports[0] = VaultReport({
+            chainId: srcChain,
+            vaultAddress: address(opDaiVault),
+            asset: OPTIMISM_DAI,
+            assetDecimals: 18,
+            sharePrice: sharePrice,
+            lastUpdate: uint64(block.timestamp),
+            rewardsDelegate: address(0)
+        });
+
+        vm.prank(endpoint);
+        router.updateSharePrices(srcChain, reports);
+
+        (uint256 usdcPrice,,) = router.getLatestAssetPrice(USDC);
+        (uint256 daiPrice,,) = router.getLatestAssetPrice(DAI);
+        uint256 price_ = (sharePrice * daiPrice / usdcPrice) / 10 ** 12;
+
+        (uint256 price, uint64 timestamp) = router.getLatestSharePrice(srcChain, address(opDaiVault), USDC);
+
+        assertApproxEqAbs(price, price_, 1.3e4, "Price should match for same stable asset");
+        assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
     }
 
     // Price Conversion Tests
