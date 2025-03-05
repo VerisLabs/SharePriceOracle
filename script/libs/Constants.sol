@@ -1,27 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-library AddressBook {
+library Constants {
     // Chain IDs
     uint32 constant BASE = 8453;
     uint32 constant OPTIMISM = 10;
     uint32 constant ARBITRUM = 42161;
     uint32 constant POLYGON = 137;
 
-    // Asset Categories
-    enum AssetCategory {
-        STABLE,
-        ETH_LIKE,
-        BTC_LIKE
-    }
-
     // Asset Configuration
     struct AssetConfig {
         address token;
+        address adapter;
         address priceFeed;
+        uint8 priority;
         uint256 heartbeat;
         bool inUSD;
-        AssetCategory category;
     }
 
     // Chain Configuration
@@ -41,51 +35,57 @@ library AddressBook {
         assets[0] = AssetConfig({
             token: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913, // USDC
             priceFeed: 0x7e860098F58bBFC8648a4311b374B1D669a2bc6B,
+            priority: 0,
             heartbeat: 86400,
             inUSD: true,
-            category: AssetCategory.STABLE
+            adapter: 0xA6779d614d351fC52ae6D8558Ecd651763Af33DE
         });
 
         assets[1] = AssetConfig({
             token: 0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2, // USDT
             priceFeed: 0xf19d560eB8d2ADf07BD6D13ed03e1D11215721F9,
+            priority: 0,
             heartbeat: 86400,
             inUSD: true,
-            category: AssetCategory.STABLE
+            adapter: 0xA6779d614d351fC52ae6D8558Ecd651763Af33DE
         });
 
         // ETH assets
         assets[2] = AssetConfig({
             token: 0x4200000000000000000000000000000000000006, // WETH
             priceFeed: 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70,
+            priority: 0,
             heartbeat: 1200,
             inUSD: true,
-            category: AssetCategory.ETH_LIKE
+            adapter: 0xA6779d614d351fC52ae6D8558Ecd651763Af33DE
         });
 
         assets[3] = AssetConfig({
             token: 0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452, // stETH
             priceFeed: 0xf586d0728a47229e747d824a939000Cf21dEF5A0,
+            priority: 0,
             heartbeat: 86400,
             inUSD: false,
-            category: AssetCategory.ETH_LIKE
+            adapter: 0xA6779d614d351fC52ae6D8558Ecd651763Af33DE
         });
 
         // BTC assets
         assets[4] = AssetConfig({
             token: 0x0555E30da8f98308EdB960aa94C0Db47230d2B9c, // WBTC
             priceFeed: 0xCCADC697c55bbB68dc5bCdf8d3CBe83CdD4E071E,
+            priority: 0,
             heartbeat: 1200,
             inUSD: true,
-            category: AssetCategory.BTC_LIKE
+            adapter: 0xA6779d614d351fC52ae6D8558Ecd651763Af33DE
         });
 
         assets[5] = AssetConfig({
             token: 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf, // tBTC
             priceFeed: 0x6D75BFB5A5885f841b132198C9f0bE8c872057BF,
+            priority: 0,
             heartbeat: 86400,
             inUSD: true,
-            category: AssetCategory.BTC_LIKE
+            adapter: 0xA6779d614d351fC52ae6D8558Ecd651763Af33DE
         });
 
         return assets;
@@ -117,36 +117,33 @@ library AddressBook {
         return assets;
     }
 
-    function getChainConfig(uint32 chainId) internal pure returns (
-        uint32 lzEndpointId,
-        address lzEndpoint,
-        address ethUsdFeed
-    ) {
+    function getChainConfig(
+        uint32 chainId
+    )
+        internal
+        pure
+        returns (uint32 lzEndpointId, address lzEndpoint, address ethUsdFeed)
+    {
         if (chainId == BASE) {
             return (
                 30_184,
                 0x1a44076050125825900e736c501f859c50fE728c,
-                0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70
+                0xfE1587A048b283ecEDe0AF9cbDfd6a0e531B732B
             );
         } else if (chainId == OPTIMISM) {
             return (
                 30_111,
                 0x1a44076050125825900e736c501f859c50fE728c,
-                0x13e3Ee699D1909E989722E753853AE30b17e08c5
+                0x052f1ba9cDC9859Fd19849484b69000E54AabBA6
             );
         } else if (chainId == ARBITRUM) {
             return (
                 30_110,
                 0x1a44076050125825900e736c501f859c50fE728c,
-                0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612
-            );
-        } else if (chainId == POLYGON) {
-            return (
-                30_109,
-                0x1a44076050125825900e736c501f859c50fE728c,
-                0xF9680D99D6C9589e2a93a78A04A279e509205945
+                0xE304C2CD95eADA80C61e9782c3089fCc1576d585
             );
         }
+
         revert("Unsupported chain");
     }
-} 
+}

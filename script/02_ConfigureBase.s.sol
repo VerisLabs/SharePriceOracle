@@ -3,18 +3,18 @@ pragma solidity ^0.8.19;
 
 import { Script } from "forge-std/Script.sol";
 import { console2 } from "forge-std/console2.sol";
-import { AddressBook } from "../src/libs/AddressBook.sol";
+import { Constants } from "../script/libs/Constants.sol";
 import { SharePriceRouter } from "../src/SharePriceRouter.sol";
 import { ChainlinkAdapter } from "../src/adapters/Chainlink.sol";
 import { MaxLzEndpoint } from "../src/MaxLzEndpoint.sol";
 import { stdJson } from "forge-std/StdJson.sol";
 
-contract Configure is Script {
+contract ConfigureBase is Script {
     using stdJson for string;
 
     function run() external {
         // Only run on Base chain
-        require(block.chainid == AddressBook.BASE, "This script is only for Base chain");
+        require(block.chainid == Constants.BASE, "This script is only for Base chain");
 
         // Load configuration
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -33,6 +33,9 @@ contract Configure is Script {
 
         // Configure cross-chain asset mappings
         _configureCrossChainMappings(router);
+        
+        // Configure local asset mappings
+        _configureLocalAssetMappings(router);
 
         // Configure LZ endpoints
         _configureLzEndpoints(maxLzEndpoint);
@@ -41,7 +44,7 @@ contract Configure is Script {
     }
 
     function _configureChainlinkFeeds(ChainlinkAdapter adapter) internal {
-        AddressBook.AssetConfig[] memory baseAssets = AddressBook.getBaseAssets();
+        Constants.AssetConfig[] memory baseAssets = Constants.getBaseAssets();
         
         for (uint256 i = 0; i < baseAssets.length; i++) {
             adapter.addAsset(
@@ -53,21 +56,40 @@ contract Configure is Script {
             console2.log(
                 "Configured price feed for token:",
                 baseAssets[i].token,
-                "category:",
-                uint256(baseAssets[i].category)
+                "inUSD:",
+                baseAssets[i].inUSD
+            );
+        }
+    }
+
+    function _configureLocalAssetMappings(SharePriceRouter router) internal {
+        // Get Base assets for mapping
+        Constants.AssetConfig[] memory baseAssets = Constants.getBaseAssets();
+
+        for (uint256 i = 0; i < baseAssets.length; i++) {
+            router.setLocalAssetConfig(
+                baseAssets[i].token,
+                baseAssets[i].adapter,
+                baseAssets[i].priceFeed,
+                baseAssets[i].priority,
+                baseAssets[i].inUSD
+            );
+            console2.log(
+                "Mapped localAsset asset:",
+                baseAssets[i].token
             );
         }
     }
 
     function _configureCrossChainMappings(SharePriceRouter router) internal {
         // Get Base assets for mapping
-        AddressBook.AssetConfig[] memory baseAssets = AddressBook.getBaseAssets();
+        Constants.AssetConfig[] memory baseAssets = Constants.getBaseAssets();
 
         // Configure Optimism mappings
-        address[] memory optimismAssets = AddressBook.getOptimismAssets();
+        address[] memory optimismAssets = Constants.getOptimismAssets();
         for (uint256 i = 0; i < optimismAssets.length - 1; i++) {
             router.setCrossChainAssetMapping(
-                AddressBook.OPTIMISM,
+                Constants.OPTIMISM,
                 optimismAssets[i],
                 baseAssets[i].token
             );
@@ -81,7 +103,7 @@ contract Configure is Script {
         
         // Manual mapping for Optimism USDCe to Base USDC
         router.setCrossChainAssetMapping(
-            AddressBook.OPTIMISM,
+            Constants.OPTIMISM,
             optimismAssets[6], // USDCe
             baseAssets[0].token // Base USDC
         );
@@ -89,10 +111,10 @@ contract Configure is Script {
         console2.log("to Base USDC:", baseAssets[0].token);
 
         // Configure Arbitrum mappings
-        address[] memory arbitrumAssets = AddressBook.getArbitrumAssets();
+        address[] memory arbitrumAssets = Constants.getArbitrumAssets();
         for (uint256 i = 0; i < arbitrumAssets.length; i++) {
             router.setCrossChainAssetMapping(
-                AddressBook.ARBITRUM,
+                Constants.ARBITRUM,
                 arbitrumAssets[i],
                 baseAssets[i].token
             );
@@ -107,12 +129,8 @@ contract Configure is Script {
 
     function _configureLzEndpoints(MaxLzEndpoint maxLzEndpoint) internal {
         // Get remote chain configs from ChainConfig library
-        (uint32 optimismLzId, address optimismLzEndpoint,) = AddressBook.getChainConfig(AddressBook.OPTIMISM);
-        (uint32 arbitrumLzId, address arbitrumLzEndpoint,) = AddressBook.getChainConfig(AddressBook.ARBITRUM);
-
-        // Read MaxLzEndpoint addresses from deployment files
-        address optimismMaxLz = vm.envAddress("OP_MAX_LZ_ENDPOINT_ADDRESS");
-        address arbitrumMaxLz = vm.envAddress("ARB_MAX_LZ_ENDPOINT_ADDRESS");
+        (uint32 optimismLzId, address optimismLzEndpoint, address optimismMaxLz) = Constants.getChainConfig(Constants.OPTIMISM);
+        (uint32 arbitrumLzId, address arbitrumLzEndpoint, address arbitrumMaxLz) = Constants.getChainConfig(Constants.ARBITRUM);
 
         // Set peers for each chain on Base
         maxLzEndpoint.setPeer(optimismLzId, bytes32(uint256(uint160(optimismMaxLz))));

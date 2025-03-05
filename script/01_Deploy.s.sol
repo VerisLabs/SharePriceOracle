@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import {Script} from "forge-std/Script.sol";
 import {console2} from "forge-std/console2.sol";
-import {AddressBook} from "../src/libs/AddressBook.sol";
+import {Constants} from "../script/libs/Constants.sol";
 import {SharePriceRouter} from "../src/SharePriceRouter.sol";
 import {ChainlinkAdapter} from "../src/adapters/Chainlink.sol";
 import {Api3Adapter} from "../src/adapters/Api3.sol";
@@ -36,7 +36,7 @@ contract Deploy is Script {
         _deployCore();
 
         // Deploy chain-specific contracts
-        if (block.chainid == AddressBook.BASE) {
+        if (block.chainid == Constants.BASE) {
             _deployOnBase();
         } 
 
@@ -104,7 +104,7 @@ contract Deploy is Script {
 
         // Create/Update latest symlink
         string memory latestPath = string.concat("deployments/", chainName, "/latest");
-        vm.removeFile(latestPath); // Remove old symlink if exists
+        //vm.removeFile(latestPath); // Remove old symlink if exists
         vm.createDir(latestPath, true); // Create latest directory
         vm.writeFile(
             string.concat(latestPath, "/addresses.json"),
@@ -126,7 +126,7 @@ contract Deploy is Script {
         json = string.concat(json, '"router":"', address(router).toHexString(), '",');
         json = string.concat(json, '"maxLzEndpoint":"', address(maxLzEndpoint).toHexString(), '"');
         
-        if (block.chainid == AddressBook.BASE) {
+        if (block.chainid == Constants.BASE) {
             json = string.concat(json, ',');
             json = string.concat(json, '"chainlinkAdapter":"', address(chainlinkAdapter).toHexString(), '",');
             json = string.concat(json, '"api3Adapter":"', address(api3Adapter).toHexString(), '"');
@@ -154,10 +154,10 @@ contract Deploy is Script {
     }
 
     function _getChainName() internal view returns (string memory) {
-        if (block.chainid == AddressBook.BASE) return "base";
-        if (block.chainid == AddressBook.OPTIMISM) return "optimism";
-        if (block.chainid == AddressBook.ARBITRUM) return "arbitrum";
-        if (block.chainid == AddressBook.POLYGON) return "polygon";
+        if (block.chainid == Constants.BASE) return "base";
+        if (block.chainid == Constants.OPTIMISM) return "optimism";
+        if (block.chainid == Constants.ARBITRUM) return "arbitrum";
+        if (block.chainid == Constants.POLYGON) return "polygon";
         return "unknown";
     }
 }

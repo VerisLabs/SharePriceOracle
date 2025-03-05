@@ -1,0 +1,9 @@
+{
+    "timestamp": 1741188819,
+    "chainId": 42161,
+    "deployer": "0x429796dac057e7c15724196367007f1e9cff82f9",
+    "contracts": {
+        "router": "0x5edd8bd98d96404a2387c2fd37b48d363df67803",
+        "maxLzEndpoint": "0xe304c2cd95eada80c61e9782c3089fcc1576d585"
+    }
+}
