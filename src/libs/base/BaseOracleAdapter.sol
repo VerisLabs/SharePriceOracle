@@ -27,7 +27,7 @@ abstract contract BaseOracleAdapter is OwnableRoles {
 
     /// @notice Role identifier for Oracle operations
     uint256 public constant ORACLE_ROLE = _ROLE_1;
-    
+
     /// @notice Scaling factor for 18 decimal precision
     uint256 constant WAD = 1e18;
 
@@ -80,10 +80,7 @@ abstract contract BaseOracleAdapter is OwnableRoles {
      * @param inUSD Whether to return the price in USD (true) or ETH (false)
      * @return PriceReturnData Structure containing price, error status, and denomination
      */
-    function getPrice(
-        address asset,
-        bool inUSD
-    ) external view virtual returns (PriceReturnData memory);
+    function getPrice(address asset, bool inUSD) external view virtual returns (PriceReturnData memory);
 
     /**
      * @notice Removes price feed support for an asset

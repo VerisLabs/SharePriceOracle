@@ -45,11 +45,7 @@ contract UniswapV3Adapter is BaseOracleAdapter {
 
     /// EVENTS ///
 
-    event UniswapV3AssetAdded(
-        address asset,
-        AdaptorData assetConfig,
-        bool isUpdate
-    );
+    event UniswapV3AssetAdded(address asset, AdaptorData assetConfig, bool isUpdate);
     event UniswapV3AssetRemoved(address asset);
 
     /// ERRORS ///
@@ -66,7 +62,9 @@ contract UniswapV3Adapter is BaseOracleAdapter {
         address _oracleRouter,
         IStaticOracle oracleAddress_,
         address WETH_
-    ) BaseOracleAdapter(_admin, _oracle, _oracleRouter) {
+    )
+        BaseOracleAdapter(_admin, _oracle, _oracleRouter)
+    {
         uniswapOracleRouter = oracleAddress_;
         WETH = WETH_;
     }
@@ -80,10 +78,7 @@ contract UniswapV3Adapter is BaseOracleAdapter {
     ///              USD or not.
     /// @return pData A structure containing the price, error status,
     ///                         and the quote format of the price.
-    function getPrice(
-        address asset,
-        bool inUSD
-    ) external view override returns (PriceReturnData memory pData) {
+    function getPrice(address asset, bool inUSD) external view override returns (PriceReturnData memory pData) {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
             revert UniswapV3Adaptor__AssetIsNotSupported(asset);
@@ -98,21 +93,12 @@ contract UniswapV3Adapter is BaseOracleAdapter {
         uint256 twapPrice;
 
         // Pull twap price via a staticcall.
-        (bool success, bytes memory returnData) = address(uniswapOracleRouter)
-            .staticcall(
-                abi.encodePacked(
-                    uniswapOracleRouter
-                        .quoteSpecificPoolsWithTimePeriod
-                        .selector,
-                    abi.encode(
-                        10 ** data.baseDecimals,
-                        asset,
-                        data.quoteToken,
-                        pools,
-                        data.secondsAgo
-                    )
-                )
-            );
+        (bool success, bytes memory returnData) = address(uniswapOracleRouter).staticcall(
+            abi.encodePacked(
+                uniswapOracleRouter.quoteSpecificPoolsWithTimePeriod.selector,
+                abi.encode(10 ** data.baseDecimals, asset, data.quoteToken, pools, data.secondsAgo)
+            )
+        );
 
         if (success) {
             // Extract the twap price from returned calldata.
@@ -123,9 +109,7 @@ contract UniswapV3Adapter is BaseOracleAdapter {
             return pData;
         }
 
-        ISharePriceRouter OracleRouter = ISharePriceRouter(
-            ORACLE_ROUTER_ADDRESS
-        );
+        ISharePriceRouter OracleRouter = ISharePriceRouter(ORACLE_ROUTER_ADDRESS);
         pData.inUSD = inUSD;
 
         // We want the asset price in USD which uniswap cant do,
@@ -149,8 +133,7 @@ contract UniswapV3Adapter is BaseOracleAdapter {
 
             // We have a route to USD pricing so we can convert
             // the quote token price to USD and return.
-            uint256 newPrice = (twapPrice * quoteTokenDenominator) /
-                (10 ** data.quoteDecimals);
+            uint256 newPrice = (twapPrice * quoteTokenDenominator) / (10 ** data.quoteDecimals);
 
             // Validate price will not overflow on conversion to uint240.
             if (_checkOracleOverflow(newPrice)) {
@@ -179,8 +162,7 @@ contract UniswapV3Adapter is BaseOracleAdapter {
             }
 
             // Adjust decimals if necessary.
-            uint256 newPrice = (twapPrice * quoteTokenDenominator) /
-                (10 ** data.quoteDecimals);
+            uint256 newPrice = (twapPrice * quoteTokenDenominator) / (10 ** data.quoteDecimals);
 
             // Validate price will not overflow on conversion to uint240.
             if (_checkOracleOverflow(newPrice)) {
@@ -229,7 +211,9 @@ contract UniswapV3Adapter is BaseOracleAdapter {
             data.baseDecimals = ERC20(asset).decimals();
             data.quoteDecimals = ERC20(token0).decimals();
             data.quoteToken = token0;
-        } else revert UniswapV3Adaptor__AssetNotInPool(asset, data.priceSource, token0, token1);
+        } else {
+            revert UniswapV3Adaptor__AssetNotInPool(asset, data.priceSource, token0, token1);
+        }
 
         // Save adaptor data and update mapping that we support `asset` now.
         adaptorData[asset] = data;

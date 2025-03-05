@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {OwnableRoles} from "@solady/auth/OwnableRoles.sol";
-import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
-import {IERC4626} from "./interfaces/IERC4626.sol";
-import {IERC20Metadata} from "./interfaces/IERC20Metadata.sol";
-import {ISharePriceRouter, PriceReturnData, VaultReport} from "./interfaces/ISharePriceRouter.sol";
-import {BaseOracleAdapter} from "./libs/base/BaseOracleAdapter.sol";
-import {IChainlink} from "./interfaces/chainlink/IChainlink.sol";
-
+import { OwnableRoles } from "@solady/auth/OwnableRoles.sol";
+import { FixedPointMathLib } from "@solady/utils/FixedPointMathLib.sol";
+import { IERC4626 } from "./interfaces/IERC4626.sol";
+import { IERC20Metadata } from "./interfaces/IERC20Metadata.sol";
+import { ISharePriceRouter, PriceReturnData, VaultReport } from "./interfaces/ISharePriceRouter.sol";
+import { BaseOracleAdapter } from "./libs/base/BaseOracleAdapter.sol";
+import { IChainlink } from "./interfaces/chainlink/IChainlink.sol";
 /**
  * @title SharePriceRouter
  * @notice A multi-adapter oracle system that supports multiple price feeds and fallback mechanisms
  * @dev This contract manages multiple oracle adapters and provides unified price conversion
  */
+
 contract SharePriceRouter is OwnableRoles {
     using FixedPointMathLib for uint256;
 
@@ -47,24 +47,11 @@ contract SharePriceRouter is OwnableRoles {
     event RoleGranted(address indexed account, uint256 indexed role);
     event RoleRevoked(address indexed account, uint256 indexed role);
     event SharePriceUpdated(
-        uint32 indexed srcChainId,
-        address indexed vault,
-        uint256 sharePrice,
-        uint256 assetPrice,
-        uint64 timestamp
+        uint32 indexed srcChainId, address indexed vault, uint256 sharePrice, uint256 assetPrice, uint64 timestamp
     );
     event SequencerSet(address indexed oldSequencer, address indexed sequencer);
-    event CrossChainAssetMapped(
-        uint32 indexed srcChainId,
-        address indexed srcAsset,
-        address indexed localAsset
-    );
-    event LocalAssetConfigured(
-        address indexed asset,
-        uint8 priority,
-        address priceFeed,
-        bool inUSD
-    );
+    event CrossChainAssetMapped(uint32 indexed srcChainId, address indexed srcAsset, address indexed localAsset);
+    event LocalAssetConfigured(address indexed asset, uint8 priority, address priceFeed, bool inUSD);
     event LocalAssetRemoved(address indexed asset);
 
     /*//////////////////////////////////////////////////////////////
@@ -100,6 +87,7 @@ contract SharePriceRouter is OwnableRoles {
     struct LocalAssetConfig {
         address priceFeed; // Priority-ordered price feeds
         bool inUSD; // Whether price should be in USD
+        address adaptor; // Adapter address
     }
 
     /// @notice Enhanced stored share price data
@@ -117,8 +105,7 @@ contract SharePriceRouter is OwnableRoles {
 
     /// @notice Maps local assets to their price feed configurations
     /// localAsset address, adapterPriority, localAssetConfig
-    mapping(address => mapping(uint8 => LocalAssetConfig))
-        public localAssetConfigs;
+    mapping(address => mapping(uint8 => LocalAssetConfig)) public localAssetConfigs;
 
     /// @notice Maps vault address to its last stored share price data
     mapping(address => StoredSharePrice) public storedSharePrices;
@@ -187,20 +174,20 @@ contract SharePriceRouter is OwnableRoles {
         address _priceFeed,
         uint8 _priority,
         bool _isUSD
-    ) external onlyAdmin {
+    )
+        external
+        onlyAdmin
+    {
         if (_localAsset == address(0)) revert ZeroAddress();
         if (_priceFeed == address(0)) revert ZeroAddress();
 
-        localAssetConfigs[_localAsset][_priority] = LocalAssetConfig({
-            priceFeed: _priceFeed,
-            inUSD: _isUSD
-        });
+        localAssetConfigs[_localAsset][_priority] =
+            LocalAssetConfig({ priceFeed: _priceFeed, inUSD: _isUSD, adaptor: adapter });
 
         // Update highest priority if needed
         if (_priority > assetAdapterPriority[_localAsset]) {
             assetAdapterPriority[_localAsset] = _priority;
         }
-
         _grantRoles(adapter, ADAPTER_ROLE);
 
         emit LocalAssetConfigured(_localAsset, _priority, _priceFeed, _isUSD);
@@ -252,14 +239,11 @@ contract SharePriceRouter is OwnableRoles {
      * @param _srcAsset The asset address on the source chain
      * @param _localAsset The equivalent asset address on Base
      */
-    function setCrossChainAssetMapping(
-        uint32 _srcChainId,
-        address _srcAsset,
-        address _localAsset
-    ) external onlyAdmin {
+    function setCrossChainAssetMapping(uint32 _srcChainId, address _srcAsset, address _localAsset) external onlyAdmin {
         if (_srcChainId == chainId) revert InvalidChainId();
-        if (_srcAsset == address(0) || _localAsset == address(0))
+        if (_srcAsset == address(0) || _localAsset == address(0)) {
             revert ZeroAddress();
+        }
 
         bytes32 key = keccak256(abi.encodePacked(_srcChainId, _srcAsset));
         crossChainAssetMap[key] = _localAsset;
@@ -305,24 +289,25 @@ contract SharePriceRouter is OwnableRoles {
      * @param _vaultAddress Vault address
      * @return The unique key as bytes32
      */
-    function getPriceKey(
-        uint32 _chainId,
-        address _vaultAddress
-    ) public pure returns (bytes32) {
+    function getPriceKey(uint32 _chainId, address _vaultAddress) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(_chainId, _vaultAddress));
     }
-    
+
     /**
-     * @notice Gets the local asset and its decimals for a cross-chain asset mapped  
+     * @notice Gets the local asset and its decimals for a cross-chain asset mapped
      * @param _srcChainId The source chain id
      * @param _srcAsset The source asset address
-     * @return localAsset The local asset address 
+     * @return localAsset The local asset address
      * @return localDecimals The local asset decimals
      */
     function getLocalAsset(
         uint32 _srcChainId,
         address _srcAsset
-    ) public view returns (address localAsset, uint8 localDecimals) {
+    )
+        public
+        view
+        returns (address localAsset, uint8 localDecimals)
+    {
         bytes32 key = keccak256(abi.encodePacked(_srcChainId, _srcAsset));
 
         localAsset = crossChainAssetMap[key];
@@ -345,7 +330,11 @@ contract SharePriceRouter is OwnableRoles {
     function getSharePrices(
         address[] calldata vaultAddresses,
         address rewardsDelegate
-    ) external view returns (VaultReport[] memory reports) {
+    )
+        external
+        view
+        returns (VaultReport[] memory reports)
+    {
         uint256 len = vaultAddresses.length;
         reports = new VaultReport[](len);
 
@@ -389,18 +378,17 @@ contract SharePriceRouter is OwnableRoles {
         uint32 _srcChainId,
         address _vaultAddress,
         address _dstAsset
-    ) external view returns (uint256 sharePrice, uint64 timestamp) {
+    )
+        external
+        view
+        returns (uint256 sharePrice, uint64 timestamp)
+    {
         // Get stored share price data
         StoredSharePrice memory stored = storedSharePrices[_vaultAddress];
         // no need for sharePrice > 0 already cheched on updateSharePrices
         // Convert stored price to destination asset
-        (sharePrice, timestamp) = _convertPrice(
-            stored.sharePrice,
-            stored.asset,
-            _dstAsset,
-            stored.decimals,
-            _getAssetDecimals(_dstAsset)
-        );
+        (sharePrice, timestamp) =
+            _convertPrice(stored.sharePrice, stored.asset, _dstAsset, stored.decimals, _getAssetDecimals(_dstAsset));
 
         return (sharePrice, timestamp);
     }
@@ -415,19 +403,21 @@ contract SharePriceRouter is OwnableRoles {
     function getLatestSharePriceReport(
         uint32 _srcChainId,
         address _vaultAddress
-    ) external view returns (VaultReport memory) {
+    )
+        external
+        view
+        returns (VaultReport memory)
+    {
         bytes32 key = getPriceKey(_srcChainId, _vaultAddress);
         return sharePrices[key];
     }
 
     /**
-     * @notice Updates the price for the given assets 
-     * @param assets An array assets to update the prices for 
-     * @return bool if the prices were updated 
+     * @notice Updates the price for the given assets
+     * @param assets An array assets to update the prices for
+     * @return bool if the prices were updated
      */
-    function batchUpdatePrices(
-        address[] calldata assets
-    ) external returns (bool) {
+    function batchUpdatePrices(address[] calldata assets) external returns (bool) {
         for (uint256 i = 0; i < assets.length; i++) {
             _updatePrice(assets[i]);
         }
@@ -440,10 +430,7 @@ contract SharePriceRouter is OwnableRoles {
      * @param _srcChainId Source chain ID
      * @param reports Array of vault reports to update
      */
-    function updateSharePrices(
-        uint32 _srcChainId,
-        VaultReport[] calldata reports
-    ) external onlyEndpoint {
+    function updateSharePrices(uint32 _srcChainId, VaultReport[] calldata reports) external onlyEndpoint {
         if (_srcChainId == chainId) revert InvalidChainId();
         if (reports.length == 0) return;
         if (reports.length > MAX_REPORTS) revert ExceedsMaxReports();
@@ -460,37 +447,28 @@ contract SharePriceRouter is OwnableRoles {
             bytes32 key = getPriceKey(_srcChainId, report.vaultAddress);
             sharePrices[key] = report;
 
-            (address localAsset, uint8 localDecimals) = getLocalAsset(
-                _srcChainId,
-                report.asset
-            );
+            (address localAsset, uint8 localDecimals) = getLocalAsset(_srcChainId, report.asset);
 
             // Get stored price instead of calling oracle
             StoredAssetPrice memory storedPrice = storedAssetPrices[localAsset];
 
             // Check if we have a valid stored price
-            if (storedPrice.price == 0 || _isStale(storedPrice.timestamp))
+            if (storedPrice.price == 0 || _isStale(storedPrice.timestamp)) {
                 revert NoValidPrice();
+            }
 
-            storedSharePrices[report.vaultAddress] = StoredSharePrice({
-                sharePrice: uint248(report.sharePrice),
-                decimals: localDecimals,
-                asset: localAsset
-            });
+            storedSharePrices[report.vaultAddress] =
+                StoredSharePrice({ sharePrice: uint248(report.sharePrice), decimals: localDecimals, asset: localAsset });
 
             emit SharePriceUpdated(
-                _srcChainId,
-                report.vaultAddress,
-                report.sharePrice,
-                storedPrice.price,
-                uint64(block.timestamp)
+                _srcChainId, report.vaultAddress, report.sharePrice, storedPrice.price, uint64(block.timestamp)
             );
         }
     }
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/ 
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Get the price for an asset from configured price feeds
@@ -498,29 +476,15 @@ contract SharePriceRouter is OwnableRoles {
      * @return price Latest price
      * @return timestamp Timestamp of the price
      */
-    function _getPrice(
-        address _asset
-    ) internal view returns (uint256 price, uint64 timestamp, bool inUSD) {
+    function _getPrice(address _asset) internal view returns (uint256 price, uint64 timestamp, bool inUSD) {
         uint8 assetPriority = assetAdapterPriority[_asset];
-        if (assetPriority == 0) revert AssetNotConfigured(_asset);
+        // if (assetPriority == 0) revert AssetNotConfigured(_asset);
 
-        // Try each configuration by priority
         for (uint8 i = 0; i <= assetPriority; i++) {
             LocalAssetConfig memory config = localAssetConfigs[_asset][i];
-            try
-                BaseOracleAdapter(config.priceFeed).getPrice(
-                    _asset,
-                    config.inUSD
-                )
-            returns (PriceReturnData memory priceData) {
-                if (!priceData.hadError && priceData.price > 0) {
-                    return (
-                        priceData.price,
-                        uint64(block.timestamp),
-                        config.inUSD
-                    );
-                }
-            } catch {}
+            PriceReturnData memory priceData = BaseOracleAdapter(config.adaptor).getPrice(_asset, config.inUSD);
+
+            return (priceData.price, uint64(block.timestamp), config.inUSD);
         }
     }
 
@@ -531,17 +495,12 @@ contract SharePriceRouter is OwnableRoles {
     function _updatePrice(address asset) internal returns (bool) {
         (uint256 price, uint64 timestamp, bool isUsd) = _getPrice(asset);
         if (price == 0) revert NoValidPrice();
-        storedAssetPrices[asset] = StoredAssetPrice({
-            price: price,
-            timestamp: timestamp,
-            inUSD: isUsd
-        });
+        storedAssetPrices[asset] = StoredAssetPrice({ price: price, timestamp: timestamp, inUSD: isUsd });
         emit PriceStored(asset, price, timestamp);
         return true;
     }
 
     /**
-     * @notice Converts a price from one asset to another using stored prices
      * @param _price Price to convert
      * @param _srcAsset Source asset address
      * @param _dstAsset Destination asset address
@@ -556,19 +515,40 @@ contract SharePriceRouter is OwnableRoles {
         address _dstAsset,
         uint8 _srcDecimals,
         uint8 _dstDecimals
-    ) internal view returns (uint256 convertedPrice, uint64 timestamp) {
-        // Early return for same asset
+    )
+        internal
+        view
+        returns (uint256 convertedPrice, uint64 timestamp)
+    {
         if (_srcAsset == _dstAsset) {
             return _adjustDecimals(_price, _srcDecimals, _dstDecimals);
         }
 
-        // Get prices for both assets
-        (uint256 srcPrice, uint64 srcTime, bool srcIsUsd) = _getPrice(
-            _srcAsset
-        );
-        (uint256 dstPrice, uint64 dstTime, bool dstIsUsd) = _getPrice(
-            _dstAsset
-        );
+        if (_srcDecimals == _dstDecimals) {
+            StoredAssetPrice memory srcStoredPrice = storedAssetPrices[_srcAsset];
+            StoredAssetPrice memory dstStoredPrice = storedAssetPrices[_dstAsset];
+
+            // check if they're ETH-related
+            if (srcStoredPrice.price > 0 && dstStoredPrice.price > 0) {
+                // big difference between USD prices and ETH ratio prices
+                bool probablySameAssetClass = false;
+
+                if (srcStoredPrice.inUSD != dstStoredPrice.inUSD) {
+                    if (!dstStoredPrice.inUSD && dstStoredPrice.price > 9e17 && dstStoredPrice.price < 1.1e18) {
+                        probablySameAssetClass = true;
+                    } else if (!srcStoredPrice.inUSD && srcStoredPrice.price > 9e17 && srcStoredPrice.price < 1.1e18) {
+                        probablySameAssetClass = true;
+                    }
+                }
+
+                if (probablySameAssetClass) {
+                    return (_price, uint64(block.timestamp));
+                }
+            }
+        }
+
+        (uint256 srcPrice, uint64 srcTime, bool srcIsUsd) = _getPrice(_srcAsset);
+        (uint256 dstPrice, uint64 dstTime, bool dstIsUsd) = _getPrice(_dstAsset);
 
         // Try stored prices if needed
         if (srcPrice == 0) {
@@ -585,40 +565,45 @@ contract SharePriceRouter is OwnableRoles {
             dstTime = storedPrice.timestamp;
         }
 
-        // First normalize the input price to 18 decimals for consistent math
-        (uint256 normalizedPrice, ) = _adjustDecimals(_price, _srcDecimals, 18);
+        if (srcIsUsd == dstIsUsd) {
+            uint256 priceDifference;
+            if (srcPrice > dstPrice) {
+                priceDifference = srcPrice - dstPrice;
+            } else {
+                priceDifference = dstPrice - srcPrice;
+            }
 
-        // Apply price conversion based on asset types (with normalized decimals)
-        if (srcIsUsd && !dstIsUsd) {
-            // Source is USD, destination is not (e.g., converting USD to ETH)
-            // Need to divide by destination price (USD/ETH)
-            convertedPrice = FixedPointMathLib.mulDiv(
-                normalizedPrice,
-                1,
-                dstPrice
-            );
-        } else if (!srcIsUsd && dstIsUsd) {
-            // Destination is USD, source is not (e.g., converting ETH to USD)
-            // Need to multiply by source price (ETH/USD)
-            convertedPrice = FixedPointMathLib.mulDiv(
-                normalizedPrice,
-                srcPrice,
-                1
-            );
-        } else {
-            // USD to USD or non-USD to non-USD
-            // Need to multiply by source price and divide by destination price
-            convertedPrice = FixedPointMathLib.mulDiv(
-                normalizedPrice,
-                srcPrice,
-                dstPrice
-            );
+            if (priceDifference * 20 < srcPrice) {
+                return _adjustDecimals(_price, _srcDecimals, _dstDecimals);
+            }
         }
 
-        // Convert back to destination decimals
-        (convertedPrice, ) = _adjustDecimals(convertedPrice, 18, _dstDecimals);
+        // Special case for ETH/stETH - if one is priced in USD and the other in ETH terms
+        // and the non-USD price is close to 1 ETH
+        if (srcIsUsd != dstIsUsd) {
+            uint256 nonUsdPrice = srcIsUsd ? dstPrice : srcPrice;
+            // If the non-USD price is close to 1e18 (1 ETH)
+            if (nonUsdPrice > 9e17 && nonUsdPrice < 1.1e18) {
+                return _adjustDecimals(_price, _srcDecimals, _dstDecimals);
+            }
+        }
 
-        // Use the older timestamp for conservative staleness
+        (uint256 normalizedPrice,) = _adjustDecimals(_price, _srcDecimals, 18);
+
+        if (srcPrice == 0 || dstPrice == 0) {
+            revert NoValidPrice();
+        }
+
+        if (srcIsUsd && !dstIsUsd) {
+            convertedPrice = FixedPointMathLib.mulDiv(normalizedPrice, 1e18, dstPrice);
+        } else if (!srcIsUsd && dstIsUsd) {
+            convertedPrice = FixedPointMathLib.mulDiv(normalizedPrice, srcPrice, 1e18);
+        } else {
+            convertedPrice = FixedPointMathLib.mulDiv(normalizedPrice, srcPrice, dstPrice);
+        }
+
+        (convertedPrice,) = _adjustDecimals(convertedPrice, 18, _dstDecimals);
+
         timestamp = srcTime < dstTime ? srcTime : dstTime;
 
         return (convertedPrice, timestamp);
@@ -646,7 +631,11 @@ contract SharePriceRouter is OwnableRoles {
         uint256 _price,
         uint8 _srcDecimals,
         uint8 _dstDecimals
-    ) internal view returns (uint256 adjustedPrice, uint64 timestamp) {
+    )
+        internal
+        view
+        returns (uint256 adjustedPrice, uint64 timestamp)
+    {
         if (_srcDecimals == _dstDecimals) {
             return (_price, uint64(block.timestamp));
         }
@@ -662,15 +651,15 @@ contract SharePriceRouter is OwnableRoles {
     /**
      * @notice Internal function to check sequencer status
      * @dev Checks if sequencer is up and grace period has passed
-     * @return isValid True if sequencer is up and grace period has passed, or if no sequencer check is needed (e.g. on L1)
+     * @return isValid True if sequencer is up and grace period has passed, or if no sequencer check is needed (e.g. on
+     * L1)
      */
     function _isSequencerValid() internal view returns (bool isValid) {
         if (sequencer == address(0)) {
             return true; // No sequencer check needed (e.g. on L1)
         }
 
-        (, int256 answer, uint256 startedAt, , ) = IChainlink(sequencer)
-            .latestRoundData();
+        (, int256 answer, uint256 startedAt,,) = IChainlink(sequencer).latestRoundData();
 
         // Answer == 0: Sequencer is up
         // Check that the sequencer is up or the grace period has passed
