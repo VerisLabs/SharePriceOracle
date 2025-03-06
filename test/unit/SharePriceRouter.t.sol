@@ -4,7 +4,7 @@ pragma solidity ^0.8.17;
 import { Test } from "forge-std/Test.sol";
 import { SharePriceRouter } from "../../src/SharePriceRouter.sol";
 import { IERC20Metadata } from "../../src/interfaces/IERC20Metadata.sol";
-import { VaultReport } from "../../src/interfaces/ISharePriceRouter.sol";
+import { ISharePriceRouter } from "../../src/interfaces/ISharePriceRouter.sol";
 import { MockVault } from "../mocks/MockVault.sol";
 import { MockChainlinkSequencer } from "../mocks/MockChainlinkSequencer.sol";
 import { IChainlink } from "../../src/interfaces/chainlink/IChainlink.sol";
@@ -105,9 +105,9 @@ contract SharePriceRouterTest is BaseTest {
         chainlinkAdapter.addAsset(USDC, USDC_USD_FEED, 86400, true); // 20 min heartbeat
         chainlinkAdapter.addAsset(USDT, USDT_USD_FEED, 86400, true);
         chainlinkAdapter.addAsset(WETH, ETH_USD_FEED, 1200, true);
-        chainlinkAdapter.addAsset(STETH, STETH_USD_FEED, 1200, false); // stETH/ETH feed
+        chainlinkAdapter.addAsset(STETH, STETH_USD_FEED, 86400, false); // stETH/ETH feed
         chainlinkAdapter.addAsset(WBTC, BTC_USD_FEED, 1200, true);
-        chainlinkAdapter.addAsset(TBTC, TBTC_USD_FEED, 1200, true);
+        chainlinkAdapter.addAsset(TBTC, TBTC_USD_FEED, 86400, true);
         chainlinkAdapter.addAsset(DAI, DAI_USD_FEED, 86400, true);
         vm.stopPrank();
 
@@ -156,7 +156,15 @@ contract SharePriceRouterTest is BaseTest {
         assets[4] = WBTC;
         assets[5] = TBTC;
         assets[6] = DAI;
-        router.batchUpdatePrices(assets);
+        bool[] memory inUSD = new bool[](7);
+        inUSD[0] = true;
+        inUSD[1] = true;
+        inUSD[2] = true;
+        inUSD[3] = false;
+        inUSD[4] = true;
+        inUSD[5] = true;
+        inUSD[6] = true;
+        router.batchUpdatePrices(assets, inUSD);
         vm.stopPrank();
     }
 
@@ -293,8 +301,8 @@ contract SharePriceRouterTest is BaseTest {
         address localAsset = WETH;
         uint256 sharePrice = 1e18;
 
-        VaultReport[] memory reports = new VaultReport[](1);
-        reports[0] = VaultReport({
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: vaultAddr,
             asset: asset,
@@ -313,7 +321,7 @@ contract SharePriceRouterTest is BaseTest {
 
         // Verify stored data
         bytes32 key = keccak256(abi.encodePacked(srcChain, vaultAddr));
-        VaultReport memory report = router.getLatestSharePriceReport(srcChain, vaultAddr);
+        ISharePriceRouter.VaultReport memory report = router.getLatestSharePriceReport(srcChain, vaultAddr);
 
         assertEq(report.chainId, srcChain, "Chain ID should match");
         assertEq(report.vaultAddress, vaultAddr, "Vault address should match");
@@ -324,8 +332,8 @@ contract SharePriceRouterTest is BaseTest {
 
     function testRevertUpdateSharePrices_InvalidChainId() public {
         uint32 srcChain = uint32(block.chainid); // Same as current chain
-        VaultReport[] memory reports = new VaultReport[](1);
-        reports[0] = VaultReport({
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: makeAddr("vault"),
             asset: makeAddr("asset"),
@@ -341,7 +349,7 @@ contract SharePriceRouterTest is BaseTest {
     }
 
     function testRevertUpdateSharePrices_TooManyReports() public {
-        VaultReport[] memory reports = new VaultReport[](router.MAX_REPORTS() + 1);
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](router.MAX_REPORTS() + 1);
 
         vm.prank(endpoint);
         vm.expectRevert(SharePriceRouter.ExceedsMaxReports.selector);
@@ -350,8 +358,8 @@ contract SharePriceRouterTest is BaseTest {
 
     function testRevertUpdateSharePrices_ZeroSharePrice() public {
         uint32 srcChain = 10;
-        VaultReport[] memory reports = new VaultReport[](1);
-        reports[0] = VaultReport({
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: makeAddr("vault"),
             asset: makeAddr("asset"),
@@ -368,8 +376,8 @@ contract SharePriceRouterTest is BaseTest {
 
     function testRevertUpdateSharePrices_ZeroAsset() public {
         uint32 srcChain = 10;
-        VaultReport[] memory reports = new VaultReport[](1);
-        reports[0] = VaultReport({
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: makeAddr("vault"),
             asset: address(0), // Zero asset address
@@ -393,8 +401,8 @@ contract SharePriceRouterTest is BaseTest {
         vm.prank(admin);
         router.setCrossChainAssetMapping(srcChain, OPTIMISM_USDC, USDC);
 
-        VaultReport[] memory reports = new VaultReport[](1);
-        reports[0] = VaultReport({
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opDaiVault),
             asset: OPTIMISM_DAI,
@@ -407,8 +415,8 @@ contract SharePriceRouterTest is BaseTest {
         vm.prank(endpoint);
         router.updateSharePrices(srcChain, reports);
 
-        (uint256 usdcPrice,,) = router.getLatestAssetPrice(USDC);
-        (uint256 daiPrice,,) = router.getLatestAssetPrice(DAI);
+        (uint256 usdcPrice,) = router.getLatestAssetPrice(USDC, true);
+        (uint256 daiPrice,) = router.getLatestAssetPrice(DAI, true);
         uint256 price_ = (sharePrice * daiPrice / usdcPrice) / 10 ** 12;
 
         (uint256 price, uint64 timestamp) = router.getLatestSharePrice(srcChain, address(opDaiVault), USDC);
@@ -427,8 +435,8 @@ contract SharePriceRouterTest is BaseTest {
         vm.prank(admin);
         router.setCrossChainAssetMapping(srcChain, OPTIMISM_USDC, USDC);
 
-        VaultReport[] memory reports = new VaultReport[](1);
-        reports[0] = VaultReport({
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: vaultAddr,
             asset: OPTIMISM_USDC,
@@ -456,8 +464,8 @@ contract SharePriceRouterTest is BaseTest {
         vm.prank(admin);
         router.setCrossChainAssetMapping(srcChain, optimismWETH, WETH);
 
-        VaultReport[] memory reports = new VaultReport[](1);
-        reports[0] = VaultReport({
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: vaultAddr,
             asset: optimismWETH,
@@ -485,8 +493,8 @@ contract SharePriceRouterTest is BaseTest {
         vm.prank(admin);
         router.setCrossChainAssetMapping(srcChain, optimismWBTC, WBTC);
 
-        VaultReport[] memory reports = new VaultReport[](1);
-        reports[0] = VaultReport({
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: vaultAddr,
             asset: optimismWBTC,
@@ -513,8 +521,8 @@ contract SharePriceRouterTest is BaseTest {
         vm.prank(admin);
         router.setCrossChainAssetMapping(srcChain, OPTIMISM_USDC, USDC);
 
-        VaultReport[] memory reports = new VaultReport[](1);
-        reports[0] = VaultReport({
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: vaultAddr,
             asset: OPTIMISM_USDC,
@@ -528,8 +536,8 @@ contract SharePriceRouterTest is BaseTest {
         router.updateSharePrices(srcChain, reports);
         
         uint256 normalizedPrice = sharePrice * 10 ** (18 - 6);
-        (uint256 usdcPrice,,) = router.getLatestAssetPrice(USDC);
-        (uint256 wethPrice,,) = router.getLatestAssetPrice(WETH);
+        (uint256 usdcPrice,) = router.getLatestAssetPrice(USDC, true);
+        (uint256 wethPrice,) = router.getLatestAssetPrice(WETH, true);
         uint256 price_ = normalizedPrice * usdcPrice / wethPrice;
 
         // Should fail when trying to convert USDC to WETH
@@ -569,13 +577,16 @@ contract SharePriceRouterTest is BaseTest {
         address[] memory assets = new address[](2);
         assets[0] = USDC;
         assets[1] = WETH;
+        bool[] memory inUSD = new bool[](2);
+        inUSD[0] = true;
+        inUSD[1] = true;
 
         vm.startPrank(admin);
         router.setLocalAssetConfig(USDC, address(chainlinkAdapter), USDC_USD_FEED, 0, true);
         router.setLocalAssetConfig(WETH, address(chainlinkAdapter), ETH_USD_FEED, 0, true);
         vm.stopPrank();
 
-        bool success = router.batchUpdatePrices(assets);
+        bool success = router.batchUpdatePrices(assets, inUSD);
         assertTrue(success, "Batch update should succeed");
 
         // Verify stored prices
@@ -618,10 +629,10 @@ contract SharePriceRouterTest is BaseTest {
         uint32 srcChain = 10; // Optimism
 
         // Create reports for multiple assets
-        VaultReport[] memory reports = new VaultReport[](6);
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](6);
 
         // Stablecoins
-        reports[0] = VaultReport({
+        reports[0] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opUsdcVault),
             asset: OPTIMISM_USDC,
@@ -631,7 +642,7 @@ contract SharePriceRouterTest is BaseTest {
             rewardsDelegate: address(0)
         });
 
-        reports[1] = VaultReport({
+        reports[1] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opUsdtVault),
             asset: OPTIMISM_USDT,
@@ -642,7 +653,7 @@ contract SharePriceRouterTest is BaseTest {
         });
 
         // ETH-like assets
-        reports[2] = VaultReport({
+        reports[2] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opWethVault),
             asset: OPTIMISM_WETH,
@@ -652,7 +663,7 @@ contract SharePriceRouterTest is BaseTest {
             rewardsDelegate: address(0)
         });
 
-        reports[3] = VaultReport({
+        reports[3] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opStethVault),
             asset: OPTIMISM_STETH,
@@ -663,7 +674,7 @@ contract SharePriceRouterTest is BaseTest {
         });
 
         // BTC-like assets
-        reports[4] = VaultReport({
+        reports[4] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opWbtcVault),
             asset: OPTIMISM_WBTC,
@@ -673,7 +684,7 @@ contract SharePriceRouterTest is BaseTest {
             rewardsDelegate: address(0)
         });
 
-        reports[5] = VaultReport({
+        reports[5] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opTbtcVault),
             asset: OPTIMISM_TBTC,
@@ -688,7 +699,7 @@ contract SharePriceRouterTest is BaseTest {
 
         // Verify all reports were stored correctly
         for (uint256 i = 0; i < reports.length; i++) {
-            VaultReport memory report = router.getLatestSharePriceReport(srcChain, reports[i].vaultAddress);
+            ISharePriceRouter.VaultReport memory report = router.getLatestSharePriceReport(srcChain, reports[i].vaultAddress);
             assertEq(report.chainId, srcChain, "Chain ID should match");
             assertEq(report.vaultAddress, reports[i].vaultAddress, "Vault address should match");
             assertEq(report.asset, reports[i].asset, "Asset should match");
@@ -701,8 +712,8 @@ contract SharePriceRouterTest is BaseTest {
         uint32 srcChain = 10;
 
         // Setup initial USDC vault report
-        VaultReport[] memory reports = new VaultReport[](1);
-        reports[0] = VaultReport({
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opUsdtVault),
             asset: OPTIMISM_USDT,
@@ -725,8 +736,8 @@ contract SharePriceRouterTest is BaseTest {
         uint32 srcChain = 10;
 
         // Setup initial WETH vault report
-        VaultReport[] memory reports = new VaultReport[](1);
-        reports[0] = VaultReport({
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opStethVault),
             asset: OPTIMISM_STETH,
@@ -749,8 +760,8 @@ contract SharePriceRouterTest is BaseTest {
         uint32 srcChain = 10;
 
         // Setup initial WBTC vault report
-        VaultReport[] memory reports = new VaultReport[](1);
-        reports[0] = VaultReport({
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opTbtcVault),
             asset: OPTIMISM_TBTC,
@@ -792,7 +803,7 @@ contract SharePriceRouterTest is BaseTest {
         vaultAddresses[1] = address(wethVault);
         vaultAddresses[2] = address(wbtcVault);
 
-        VaultReport[] memory reports = router.getSharePrices(vaultAddresses, address(0));
+        ISharePriceRouter.VaultReport[] memory reports = router.getSharePrices(vaultAddresses, address(0));
 
         assertEq(reports.length, vaultAddresses.length, "Should return correct number of reports");
 
@@ -806,8 +817,8 @@ contract SharePriceRouterTest is BaseTest {
     function test_revertWhen_UpdateSharePricesWithInvalidChain() public {
         vm.startPrank(endpoint);
 
-        VaultReport[] memory reports = new VaultReport[](1);
-        reports[0] = VaultReport({
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
             chainId: uint32(block.chainid), 
             vaultAddress: address(opUsdcVault),
             asset: OPTIMISM_USDC,

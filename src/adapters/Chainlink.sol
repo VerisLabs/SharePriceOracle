@@ -2,7 +2,7 @@
 pragma solidity ^0.8.17;
 
 import { BaseOracleAdapter } from "../libs/base/BaseOracleAdapter.sol";
-import { ISharePriceRouter, PriceReturnData } from "../interfaces/ISharePriceRouter.sol";
+import { ISharePriceRouter } from "../interfaces/ISharePriceRouter.sol";
 import { IChainlink } from "../interfaces/chainlink/IChainlink.sol";
 
 /**
@@ -63,7 +63,6 @@ contract ChainlinkAdapter is BaseOracleAdapter {
     error ChainlinkAdaptor__AssetNotSupported();
     error ChainlinkAdaptor__InvalidHeartbeat();
     error ChainlinkAdaptor__InvalidMinMaxConfig();
-    error ChainlinkAdaptor__InvalidPrice();
     error ChainlinkAdaptor__SequencerDown();
 
     /*//////////////////////////////////////////////////////////////
@@ -86,9 +85,9 @@ contract ChainlinkAdapter is BaseOracleAdapter {
      * @notice Retrieves the price of a specified asset from Chainlink
      * @param asset Address of the asset to price
      * @param inUSD Whether to return the price in USD (true) or ETH (false)
-     * @return PriceReturnData Structure containing price, error status, and denomination
+     * @return ISharePriceRouter.PriceReturnData Structure containing price, error status, and denomination
      */
-    function getPrice(address asset, bool inUSD) external view override returns (PriceReturnData memory) {
+    function getPrice(address asset, bool inUSD) external view override returns (ISharePriceRouter.PriceReturnData memory) {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
             revert ChainlinkAdaptor__AssetNotSupported();
@@ -203,9 +202,9 @@ contract ChainlinkAdapter is BaseOracleAdapter {
     /**
      * @notice Retrieves the price of a specified asset in USD
      * @param asset Address of the asset to price
-     * @return PriceReturnData Structure containing price, error status, and denomination in USD
+     * @return ISharePriceRouter.PriceReturnData Structure containing price, error status, and denomination in USD
      */
-    function _getPriceInUSD(address asset) internal view returns (PriceReturnData memory) {
+    function _getPriceInUSD(address asset) internal view returns (ISharePriceRouter.PriceReturnData memory) {
         if (adaptorDataUSD[asset].isConfigured) {
             return _parseData(adaptorDataUSD[asset], true);
         }
@@ -216,9 +215,9 @@ contract ChainlinkAdapter is BaseOracleAdapter {
     /**
      * @notice Retrieves the price of a specified asset in ETH
      * @param asset Address of the asset to price
-     * @return PriceReturnData Structure containing price, error status, and denomination in ETH
+     * @return ISharePriceRouter.PriceReturnData Structure containing price, error status, and denomination in ETH
      */
-    function _getPriceInETH(address asset) internal view returns (PriceReturnData memory) {
+    function _getPriceInETH(address asset) internal view returns (ISharePriceRouter.PriceReturnData memory) {
         if (adaptorDataNonUSD[asset].isConfigured) {
             return _parseData(adaptorDataNonUSD[asset], false);
         }
@@ -233,7 +232,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
      * @param inUSD Whether price is in USD (true) or ETH (false)
      * @return pData Structure containing normalized price and status
      */
-    function _parseData(AdapterData memory data, bool inUSD) internal view returns (PriceReturnData memory pData) {
+    function _parseData(AdapterData memory data, bool inUSD) internal view returns (ISharePriceRouter.PriceReturnData memory pData) {
         pData.inUSD = inUSD;
         if (!ISharePriceRouter(ORACLE_ROUTER_ADDRESS).isSequencerValid()) {
             revert ChainlinkAdaptor__SequencerDown();
@@ -243,7 +242,8 @@ contract ChainlinkAdapter is BaseOracleAdapter {
 
         // If we got a price of 0 or less, bubble up an error immediately.
         if (price <= 0) {
-            revert ChainlinkAdaptor__InvalidPrice();
+            pData.hadError = true;
+            return pData;
         }
 
         uint256 newPrice = (uint256(price) * WAD) / (10 ** data.decimals);

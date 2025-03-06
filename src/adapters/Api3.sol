@@ -3,7 +3,7 @@ pragma solidity ^0.8.17;
 
 import { BaseOracleAdapter } from "../libs/base/BaseOracleAdapter.sol";
 import { Bytes32Helper } from "../libs/Bytes32Helper.sol";
-import { ISharePriceRouter, PriceReturnData } from "../interfaces/ISharePriceRouter.sol";
+import { ISharePriceRouter } from "../interfaces/ISharePriceRouter.sol";
 import { IProxy } from "../interfaces/api3/IProxy.sol";
 
 contract Api3Adapter is BaseOracleAdapter {
@@ -58,7 +58,6 @@ contract Api3Adapter is BaseOracleAdapter {
     error Api3Adapter__AssetNotSupported();
     error Api3Adapter__InvalidHeartbeat();
     error Api3Adapter__DAPINameError();
-    error Api3Adapter__InvalidPrice();
 
     /// CONSTRUCTOR ///
 
@@ -85,7 +84,7 @@ contract Api3Adapter is BaseOracleAdapter {
      * @return A structure containing the price, error status,
      *         and the quote format of the price.
      */
-    function getPrice(address asset, bool inUSD) external view override returns (PriceReturnData memory) {
+    function getPrice(address asset, bool inUSD) external view override returns (ISharePriceRouter.PriceReturnData memory) {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
             revert Api3Adapter__AssetNotSupported();
@@ -179,7 +178,7 @@ contract Api3Adapter is BaseOracleAdapter {
     /// @param asset The address of the asset for which the price is needed.
     /// @return A structure containing the price, error status,
     ///         and the quote format of the price (USD).
-    function _getPriceInUSD(address asset) internal view returns (PriceReturnData memory) {
+    function _getPriceInUSD(address asset) internal view returns (ISharePriceRouter.PriceReturnData memory) {
         if (adapterDataUSD[asset].isConfigured) {
             return _parseData(adapterDataUSD[asset], true);
         }
@@ -191,7 +190,7 @@ contract Api3Adapter is BaseOracleAdapter {
     /// @param asset The address of the asset for which the price is needed.
     /// @return A structure containing the price, error status,
     ///         and the quote format of the price (ETH).
-    function _getPriceInETH(address asset) internal view returns (PriceReturnData memory) {
+    function _getPriceInETH(address asset) internal view returns (ISharePriceRouter.PriceReturnData memory) {
         if (adapterDataNonUSD[asset].isConfigured) {
             return _parseData(adapterDataNonUSD[asset], false);
         }
@@ -206,11 +205,12 @@ contract Api3Adapter is BaseOracleAdapter {
     /// @param inUSD A boolean to denote if the price is in USD.
     /// @return pData A structure containing the price, error status,
     ///               and the currency of the price.
-    function _parseData(AdapterData memory data, bool inUSD) internal view returns (PriceReturnData memory pData) {
+    function _parseData(AdapterData memory data, bool inUSD) internal view returns (ISharePriceRouter.PriceReturnData memory pData) {
         (int256 price, uint256 updatedAt) = data.proxyFeed.read();
 
         if (price <= 0) {
-            revert Api3Adapter__InvalidPrice();
+            pData.hadError = true;
+            return pData;
         }
 
         uint256 rawPrice = uint256(price);

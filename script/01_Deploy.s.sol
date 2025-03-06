@@ -67,7 +67,7 @@ contract Deploy is Script {
         console2.log("=== Base Chain Specific Deployments ===");
 
         // Deploy adapters
-        chainlinkAdapter = new ChainlinkAdapter(admin, address(router), address(router));
+        chainlinkAdapter = new ChainlinkAdapter(admin, oracleAddress, address(router));
         console2.log("ChainlinkAdapter deployed at:", address(chainlinkAdapter));
 
         api3Adapter = new Api3Adapter(

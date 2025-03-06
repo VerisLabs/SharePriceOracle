@@ -9,7 +9,7 @@ import "../base/BaseTest.t.sol";
 import { USDCE_BASE } from "../utils/AddressBook.sol";
 import { BaseOracleAdapter } from "../../src/libs/base/BaseOracleAdapter.sol";
 import { IChainlink } from "../../src/interfaces/chainlink/IChainlink.sol";
-import { ISharePriceRouter, PriceReturnData } from "../../src/interfaces/ISharePriceRouter.sol";
+import { ISharePriceRouter } from "../../src/interfaces/ISharePriceRouter.sol";
 
 contract ChainlinkAdapterTest is Test {
     // Constants for BASE network
@@ -142,7 +142,7 @@ contract ChainlinkAdapterTest is Test {
     }
 
     function testReturnsCorrectPrice_ETH_USD() public {
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
 
         assertFalse(priceData.hadError, "Price should not have error");
         assertTrue(priceData.inUSD, "Price should be in USD");
@@ -153,7 +153,7 @@ contract ChainlinkAdapterTest is Test {
     }
 
     function testReturnsCorrectPrice_WBTC_USD() public view {
-        PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
+        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
 
         assertFalse(priceData.hadError, "Price should not have error");
         assertTrue(priceData.inUSD, "Price should be in USD");
@@ -210,7 +210,7 @@ contract ChainlinkAdapterTest is Test {
             )
         );
 
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertTrue(priceData.hadError, "Should error on stale price");
     }
 
@@ -221,7 +221,7 @@ contract ChainlinkAdapterTest is Test {
 
     function testRevertAfterAssetRemove() public {
         // First verify we can get a price
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, false, "Price should not have error before removal");
         assertGt(priceData.price, 0, "Price should be greater than 0 before removal");
 
@@ -248,7 +248,7 @@ contract ChainlinkAdapterTest is Test {
         adapter.addAsset(WETH, ETH_USD_FEED, 1 hours, true);
 
         // Verify it still works
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertFalse(priceData.hadError, "Price should not have error");
         assertGt(priceData.price, 0, "Price should be greater than 0");
 

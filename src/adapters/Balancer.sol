@@ -3,7 +3,7 @@ pragma solidity ^0.8.17;
 
 import { BaseOracleAdapter } from "../libs/base/BaseOracleAdapter.sol";
 import { ERC20 } from "@solady/tokens/ERC20.sol";
-import { ISharePriceRouter, PriceReturnData } from "../interfaces/ISharePriceRouter.sol";
+import { ISharePriceRouter } from "../interfaces/ISharePriceRouter.sol";
 import { IBalancerWeightedPool } from "../interfaces/balancer/IBalancerWeightedPool.sol";
 import { IBalancerVault } from "../interfaces/balancer/IBalancerVault.sol";
 
@@ -86,7 +86,7 @@ contract BalancerAdapter is BaseOracleAdapter {
     //////////////////////////////////////////////////////////////*/
 
 
-    function getPrice(address asset, bool inUSD) external view override returns (PriceReturnData memory pData) {
+    function getPrice(address asset, bool inUSD) external view override returns (ISharePriceRouter.PriceReturnData memory pData) {
         // Validate we support pricing this BPT
         if (!isSupportedAsset[asset]) {
             revert BalancerAdapter__AssetNotSupported();
@@ -105,9 +105,9 @@ contract BalancerAdapter is BaseOracleAdapter {
 
         for (uint256 i = 0; i < tokens.length; i++) {
             // Get underlying token price
-            (uint256 tokenPrice, uint256 errorCode) = router.getPrice(tokens[i], inUSD);
+            (uint256 tokenPrice, bool hadError) = router.getPrice(tokens[i], inUSD);
             
-            if (errorCode > 0) {
+            if (hadError) {
                 pData.hadError = true;
                 return pData;
             }

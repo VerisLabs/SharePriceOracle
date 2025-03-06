@@ -6,7 +6,7 @@ import { BalancerAdapter } from "../../src/adapters/Balancer.sol";
 import { SharePriceRouter } from "../../src/SharePriceRouter.sol";
 import { IBalancerWeightedPool } from "../../src/interfaces/balancer/IBalancerWeightedPool.sol";
 import { IBalancerVault } from "../../src/interfaces/balancer/IBalancerVault.sol";
-import { ISharePriceRouter, PriceReturnData } from "../../src/interfaces/ISharePriceRouter.sol";
+import { ISharePriceRouter } from "../../src/interfaces/ISharePriceRouter.sol";
 
 contract BalancerAdapterTest is Test {
     // Constants for BASE network
@@ -56,7 +56,7 @@ contract BalancerAdapterTest is Test {
 
 
     function testReturnsCorrectPrice_WETH_cbETH_BPT() public {
-        PriceReturnData memory priceData = adapter.getPrice(WETH_cbETH_BPT, true);
+        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH_cbETH_BPT, true);
 
         assertFalse(priceData.hadError, "Price should not have error");
         assertTrue(priceData.inUSD, "Price should be in USD");
@@ -94,7 +94,7 @@ contract BalancerAdapterTest is Test {
     }
 
     function testRevertAfterAssetRemove() public {
-        PriceReturnData memory priceData = adapter.getPrice(WETH_cbETH_BPT, true);
+        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH_cbETH_BPT, true);
         assertFalse(priceData.hadError, "Price should not have error before removal");
         assertGt(priceData.price, 0, "Price should be greater than 0 before removal");
 
@@ -127,7 +127,7 @@ contract BalancerAdapterTest is Test {
     function testCanAddSameAsset() public {
         adapter.addAsset(WETH_cbETH_BPT, WETH_cbETH_POOL, 1 hours);
 
-        PriceReturnData memory priceData = adapter.getPrice(WETH_cbETH_BPT, true);
+        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH_cbETH_BPT, true);
         assertFalse(priceData.hadError, "Price should not have error");
         assertGt(priceData.price, 0, "Price should be greater than 0");
 
@@ -140,7 +140,7 @@ contract BalancerAdapterTest is Test {
     }
 
     function testPriceInETH() public {
-        PriceReturnData memory priceData = adapter.getPrice(WETH_cbETH_BPT, false);
+        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH_cbETH_BPT, false);
 
         assertFalse(priceData.hadError, "Price should not have error");
         assertFalse(priceData.inUSD, "Price should be in ETH");

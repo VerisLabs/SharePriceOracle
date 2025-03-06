@@ -3,7 +3,7 @@ pragma solidity ^0.8.17;
 
 import { BaseOracleAdapter } from "../libs/base/BaseOracleAdapter.sol";
 import { ERC20 } from "@solady/tokens/ERC20.sol";
-import { ISharePriceRouter, PriceReturnData } from "../interfaces/ISharePriceRouter.sol";
+import { ISharePriceRouter } from "../interfaces/ISharePriceRouter.sol";
 import { IStaticOracle } from "../interfaces/uniswap/IStaticOracle.sol";
 import { UniswapV3Pool } from "../interfaces/uniswap/UniswapV3Pool.sol";
 
@@ -78,7 +78,7 @@ contract UniswapV3Adapter is BaseOracleAdapter {
     ///              USD or not.
     /// @return pData A structure containing the price, error status,
     ///                         and the quote format of the price.
-    function getPrice(address asset, bool inUSD) external view override returns (PriceReturnData memory pData) {
+    function getPrice(address asset, bool inUSD) external view override returns (ISharePriceRouter.PriceReturnData memory pData) {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
             revert UniswapV3Adaptor__AssetIsNotSupported(asset);
@@ -123,10 +123,10 @@ contract UniswapV3Adapter is BaseOracleAdapter {
                 return pData;
             }
 
-            (uint256 quoteTokenDenominator, uint256 errorCode) = OracleRouter.getPrice(data.quoteToken, true);
+            (uint256 quoteTokenDenominator, bool hadError) = OracleRouter.getPrice(data.quoteToken, true);
 
             // Validate we did not run into any errors pricing the quote asset.
-            if (errorCode > 0) {
+            if (hadError) {
                 pData.hadError = true;
                 return pData;
             }
@@ -153,10 +153,10 @@ contract UniswapV3Adapter is BaseOracleAdapter {
                 return pData;
             }
 
-            (uint256 quoteTokenDenominator, uint256 errorCode) = OracleRouter.getPrice(data.quoteToken, false);
+            (uint256 quoteTokenDenominator, bool hadError) = OracleRouter.getPrice(data.quoteToken, false);
 
             // Validate we did not run into any errors pricing the quote asset.
-            if (errorCode > 0) {
+            if (hadError) {
                 pData.hadError = true;
                 return pData;
             }

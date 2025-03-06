@@ -9,7 +9,7 @@ import {
     MessagingReceipt,
     Origin
 } from "./interfaces/ILayerZeroEndpointV2.sol";
-import { ISharePriceRouter, VaultReport } from "./interfaces/ISharePriceRouter.sol";
+import { ISharePriceRouter } from "./interfaces/ISharePriceRouter.sol";
 import { Ownable } from "@solady/auth/Ownable.sol";
 import { MsgCodec } from "./libs/MsgCodec.sol";
 
@@ -49,7 +49,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
     event SharePricesSent(uint32 indexed dstEid, address[] vaults);
     event SharePricesRequested(uint32 indexed dstEid, address[] vaults);
     event EnforcedOptionsSet(EnforcedOptionParam[] params);
-    event VaultReportsSent(uint32 indexed dstEid, VaultReport[] reports);
+    event VaultReportsSent(uint32 indexed dstEid, ISharePriceRouter.VaultReport[] reports);
     event RoleGranted(address indexed account, uint256 indexed role);
     event RoleRevoked(address indexed account, uint256 indexed role);
     event OracleUpdated(address indexed oldOracle, address indexed newOracle);
@@ -153,7 +153,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
         external
         payable
     {
-        VaultReport[] memory reports = oracle.getSharePrices(vaultAddresses, rewardsDelegate);
+        ISharePriceRouter.VaultReport[] memory reports = oracle.getSharePrices(vaultAddresses, rewardsDelegate);
         bytes memory message = MsgCodec.encodeVaultReports(AB_TYPE, reports, options);
         bytes memory combinedOptions = _getCombinedOptions(dstEid, AB_TYPE, options);
 
@@ -268,7 +268,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
         uint16 msgType = MsgCodec.decodeMsgType(message);
 
         if (msgType == AB_TYPE) {
-            (, VaultReport[] memory reports,,) = MsgCodec.decodeVaultReports(message);
+            (, ISharePriceRouter.VaultReport[] memory reports,,) = MsgCodec.decodeVaultReports(message);
 
             oracle.updateSharePrices(reports[0].chainId, reports);
         } else if (msgType == ABA_TYPE) {
@@ -287,7 +287,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
         (, address[] memory vaultAddresses, address rewardsDelegate, uint256 start, uint256 length) =
             MsgCodec.decodeVaultAddresses(message);
 
-        VaultReport[] memory reports = oracle.getSharePrices(vaultAddresses, rewardsDelegate);
+        ISharePriceRouter.VaultReport[] memory reports = oracle.getSharePrices(vaultAddresses, rewardsDelegate);
 
         bytes memory returnOptions = message[start:start + length];
         bytes memory returnMessage = MsgCodec.encodeVaultReports(AB_TYPE, reports, returnOptions);

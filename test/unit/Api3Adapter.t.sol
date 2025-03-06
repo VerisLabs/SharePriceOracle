@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import { Test } from "forge-std/Test.sol";
 import { Api3Adapter } from "../../src/adapters/Api3.sol";
 import { IProxy } from "../../src/interfaces/api3/IProxy.sol";
-import { ISharePriceRouter, PriceReturnData } from "../../src/interfaces/ISharePriceRouter.sol";
+import { ISharePriceRouter } from "../../src/interfaces/ISharePriceRouter.sol";
 import { SharePriceRouter } from "../../src/SharePriceRouter.sol";
 
 contract Api3AdapterTest is Test {
@@ -78,7 +78,7 @@ contract Api3AdapterTest is Test {
         vm.stopPrank();
 
         // Get price
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
 
         assertFalse(priceData.hadError);
         assertTrue(priceData.inUSD);
@@ -86,7 +86,7 @@ contract Api3AdapterTest is Test {
     }
 
     function testReturnsCorrectPrice_WBTC_USD() public view {
-        PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
+        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
 
         assertEq(priceData.hadError, false, "Price should not have error");
         assertGt(priceData.price, 0, "Price should be greater than 0");
@@ -99,8 +99,8 @@ contract Api3AdapterTest is Test {
             DAPI_PROXY_ETH_USD, abi.encodeWithSelector(IProxy.read.selector), abi.encode(-1, uint32(block.timestamp))
         );
 
-        vm.expectRevert(Api3Adapter.Api3Adapter__InvalidPrice.selector);
-        adapter.getPrice(WETH, true);
+        ISharePriceRouter.PriceReturnData memory data = adapter.getPrice(WETH, true);
+        assertEq(data.hadError, true, "Should error on negative price");
     }
 
     function testPriceError_StaleTimestamp() public {
@@ -111,7 +111,7 @@ contract Api3AdapterTest is Test {
             abi.encode(100, uint32(block.timestamp - 5 hours))
         );
 
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, true, "Should error on stale timestamp");
     }
 
@@ -123,7 +123,7 @@ contract Api3AdapterTest is Test {
             abi.encode(type(int224).max, uint32(block.timestamp))
         );
 
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, true, "Should error on price exceeding max");
     }
 
@@ -134,7 +134,7 @@ contract Api3AdapterTest is Test {
 
     function testRevertAfterAssetRemove() public {
         // Get price before removal to ensure it works
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, false, "Price should not have error before removal");
         assertGt(priceData.price, 0, "Price should be greater than 0 before removal");
 
@@ -167,7 +167,7 @@ contract Api3AdapterTest is Test {
         adapter.addAsset(WETH, "ETH/USD", DAPI_PROXY_ETH_USD, 1 hours, true);
 
         // Verify it still works
-        PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, false, "Price should not have error");
         assertGt(priceData.price, 0, "Price should be greater than 0");
     }
