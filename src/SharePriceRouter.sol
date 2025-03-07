@@ -418,7 +418,7 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
                 _getAssetDecimals(_dstAsset)
             );
         }
-    
+
         // returns the oldest timestamp
         if (stored.timestamp < timestamp) {
             timestamp = stored.timestamp;
@@ -539,11 +539,14 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
         bool _inUSD
     ) internal view returns (uint256 price, uint64 timestamp, bool hadError) {
         uint8 assetPriority = assetAdapterPriority[_asset];
-
         LocalAssetConfig memory config;
         PriceReturnData memory priceData;
+
         for (uint8 i = 0; i <= assetPriority; ++i) {
             config = localAssetConfigs[_asset][i];
+
+            if (config.adaptor == address(0)) continue;
+
             priceData = BaseOracleAdapter(config.adaptor).getPrice(
                 _asset,
                 _inUSD
@@ -554,6 +557,9 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
                 priceData.hadError
             );
         }
+
+        // All adapters returned errors or no valid adapters found
+        return (0, uint64(block.timestamp), true);
     }
 
     /**

@@ -39,7 +39,8 @@ Manages cross-chain communication via LayerZero protocol:
 - Secure message passing between chains
 - Peer verification and validation
 - Fee estimation and payment
-- Request-response pattern support
+- Request-response pattern support (AB and ABA patterns)
+- Message deduplication and enforced options
 
 ### Cross-Chain Flow
 
@@ -65,7 +66,7 @@ Manages cross-chain communication via LayerZero protocol:
 
 - **Role-Based Access Control**:
   - `ADMIN_ROLE`: Configuration and management
-  - `UPDATER_ROLE`: Price update operations
+  - `ADAPTER_ROLE`: Price feed adapter operations
   - `ENDPOINT_ROLE`: LayerZero endpoint operations
 
 - **Price Validation**:
@@ -78,12 +79,13 @@ Manages cross-chain communication via LayerZero protocol:
   - Peer validation for LayerZero endpoints
   - Message deduplication
   - Chain ID verification
+  - Enforced options for cross-chain messages
 
 ## Prerequisites
 
 - [Foundry](https://getfoundry.sh/)
 - Make
-- Solidity ^0.8.17
+- Solidity ^0.8.19
 
 ## Installation
 
@@ -235,14 +237,13 @@ struct VaultReport {
 struct PriceReturnData {
     uint240 price;       // Price normalized to WAD (1e18)
     bool hadError;       // Error flag
-    bool inUSD;          // Price denomination
+    bool inUSD;         // Price denomination
 }
 
-enum AssetCategory {
-    UNKNOWN,
-    BTC_LIKE,  // WBTC, BTCb, TBTC, etc.
-    ETH_LIKE,  // ETH, stETH, rsETH, etc.
-    STABLE     // USDC, USDT, DAI, etc.
+struct LocalAssetConfig {
+    address priceFeed;  // Priority-ordered price feeds
+    bool inUSD;         // Whether price should be in USD
+    address adaptor;    // Adapter address
 }
 ```
 
@@ -251,7 +252,7 @@ enum AssetCategory {
 - Dependence on external oracle quality and uptime
 - LayerZero gas costs for cross-chain operations
 - 24-hour price staleness threshold for all assets
-- Maximum 100 reports per cross-chain message
+- Maximum 10 reports per cross-chain message
 - Price precision limited to uint240 (to fit in storage)
 
 ## License
@@ -276,10 +277,11 @@ BASE_RPC_URL=base_rpc_url
 
 ## Deployment Process
 
-The deployment is split into two main scripts:
+The deployment is split into three main scripts:
 
-1. `Deploy.s.sol`: Deploys the core contracts
-2. `Configure.s.sol`: Configures assets, price feeds, and cross-chain mappings
+1. `01_Deploy.s.sol`: Deploys the core contracts
+2. `02_ConfigureBase.s.sol`: Configures assets and price feeds
+3. `03_ConfigurePeers.s.sol`: Sets up cross-chain peer relationships
 
 ### Step 1: Deploy Core Contracts
 
@@ -296,7 +298,7 @@ The deployment script will automatically detect which chain you're on and deploy
 
 To deploy:
 ```bash
-forge script script/Deploy.s.sol:Deploy --rpc-url $RPC_URL --broadcast --verify
+forge script script/01_Deploy.s.sol:Deploy --rpc-url $RPC_URL --broadcast --verify
 ```
 
 ### Step 2: Configure Protocol (Base Chain Only)
@@ -304,7 +306,7 @@ forge script script/Deploy.s.sol:Deploy --rpc-url $RPC_URL --broadcast --verify
 After deployment, configure the protocol on Base chain:
 
 ```bash
-forge script script/Configure.s.sol:Configure --rpc-url $BASE_RPC_URL --broadcast
+forge script script/02_ConfigureBase.s.sol:Configure --rpc-url $BASE_RPC_URL --broadcast
 ```
 
 This will:
@@ -317,6 +319,14 @@ This will:
    - Optimism (Chain ID: 10)
    - Arbitrum (Chain ID: 42161)
    - Polygon (Chain ID: 137)
+
+### Step 3: Configure Peers
+
+Configure peer relationships between chains:
+
+```bash
+forge script script/03_ConfigurePeers.s.sol:Configure --rpc-url $RPC_URL --broadcast
+```
 
 ## Contract Addresses
 
@@ -336,6 +346,7 @@ forge verify-contract <CONTRACT_ADDRESS> <CONTRACT_NAME> --chain base
 2. Double-check all price feed addresses and configurations
 3. Verify cross-chain asset mappings are correct
 4. Ensure proper roles are assigned to contracts
+5. Validate peer relationships between chains
 
 ## Troubleshooting
 
@@ -345,3 +356,4 @@ If you encounter issues:
 2. Verify you have sufficient ETH for deployment
 3. Check that you're using the correct RPC URL
 4. Confirm contract addresses in configuration match deployed contracts
+5. Verify LayerZero endpoint configurations
