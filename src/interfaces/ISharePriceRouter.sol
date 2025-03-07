@@ -57,6 +57,7 @@ interface ISharePriceRouter {
     struct StoredSharePrice {
         uint248 sharePrice; // Share price in terms of local asset
         uint8 decimals; // Decimals of the local asset
+        uint64 timestamp;
         address asset; // The local asset address (USDC, WETH, WBTC)
     }
 

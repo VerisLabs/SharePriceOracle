@@ -257,7 +257,20 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
      * @return True if the sequencer is valid
      */
     function isSequencerValid() external view returns (bool) {
-        return _isSequencerValid();
+        if (sequencer == address(0)) {
+            return true; // No sequencer check needed (e.g. on L1)
+        }
+
+        (, int256 answer, uint256 startedAt, , ) = IChainlink(sequencer)
+            .latestRoundData();
+
+        // Answer == 0: Sequencer is up
+        // Check that the sequencer is up or the grace period has passed
+        if (answer != 0 || block.timestamp < startedAt + GRACE_PERIOD_TIME) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -270,8 +283,8 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
     function getPriceKey(
         uint32 _chainId,
         address _vaultAddress
-    ) public pure returns (bytes32) {
-        return keccak256(abi.encodePacked(_chainId, _vaultAddress));
+    ) external pure returns (bytes32) {
+        return _getPriceKey(_chainId, _vaultAddress);
     }
 
     /**
@@ -379,6 +392,8 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
         address _vaultAddress,
         address _dstAsset
     ) external view returns (uint256 sharePrice, uint64 timestamp) {
+        StoredSharePrice memory stored = storedSharePrices[_vaultAddress];
+
         if (_srcChainId == chainId) {
             IERC4626 vault = IERC4626(_vaultAddress);
             address asset = vault.asset();
@@ -392,20 +407,22 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
                 assetDecimals,
                 _getAssetDecimals(_dstAsset)
             );
+        } else {
+            // no need for sharePrice > 0 already cheched on updateSharePrices
+            // Convert stored price to destination asset
+            (sharePrice, timestamp) = _convertPrice(
+                stored.sharePrice,
+                stored.asset,
+                _dstAsset,
+                stored.decimals,
+                _getAssetDecimals(_dstAsset)
+            );
         }
-
-        // Get stored share price data
-        StoredSharePrice memory stored = storedSharePrices[_vaultAddress];
-        // no need for sharePrice > 0 already cheched on updateSharePrices
-        // Convert stored price to destination asset
-        (sharePrice, timestamp) = _convertPrice(
-            stored.sharePrice,
-            stored.asset,
-            _dstAsset,
-            stored.decimals,
-            _getAssetDecimals(_dstAsset)
-        );
-
+    
+        // returns the oldest timestamp
+        if (stored.timestamp < timestamp) {
+            timestamp = stored.timestamp;
+        }
         return (sharePrice, timestamp);
     }
 
@@ -420,7 +437,7 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
         uint32 _srcChainId,
         address _vaultAddress
     ) external view returns (VaultReport memory) {
-        bytes32 key = getPriceKey(_srcChainId, _vaultAddress);
+        bytes32 key = _getPriceKey(_srcChainId, _vaultAddress);
         return sharePrices[key];
     }
 
@@ -463,7 +480,7 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
             if (report.asset == address(0)) revert ZeroAddress();
 
             // Store the original report
-            bytes32 key = getPriceKey(_srcChainId, report.vaultAddress);
+            bytes32 key = _getPriceKey(_srcChainId, report.vaultAddress);
             sharePrices[key] = report;
 
             (address localAsset, uint8 localDecimals) = getLocalAsset(
@@ -475,12 +492,17 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
             StoredAssetPrice memory storedPrice = storedAssetPrices[localAsset];
 
             // Check if we have a valid stored price
-            if (storedPrice.price == 0 || _isStale(storedPrice.timestamp)) {
+            if (
+                storedPrice.price == 0 ||
+                block.timestamp - storedPrice.timestamp >
+                PRICE_STALENESS_THRESHOLD
+            ) {
                 revert NoValidPrice();
             }
 
             storedSharePrices[report.vaultAddress] = StoredSharePrice({
                 sharePrice: uint248(report.sharePrice),
+                timestamp: report.lastUpdate,
                 decimals: localDecimals,
                 asset: localAsset
             });
@@ -498,6 +520,13 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
     /*//////////////////////////////////////////////////////////////
                           INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    function _getPriceKey(
+        uint32 _chainId,
+        address vaultAddress
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(_chainId, vaultAddress));
+    }
 
     /**
      * @notice Get the price for an asset from configured price feeds
@@ -604,19 +633,11 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
         if (srcInUSD && !dstInUSD) {
             // Source is USD, destination is not (e.g., converting USD to ETH)
             // Need to divide by destination price (USD/ETH)
-            convertedPrice = FixedPointMathLib.mulDiv(
-                _price,
-                1e18,
-                dstPrice
-            );
+            convertedPrice = FixedPointMathLib.mulDiv(_price, 1e18, dstPrice);
         } else if (!srcInUSD && dstInUSD) {
             // Destination is USD, source is not (e.g., converting ETH to USD)
             // Need to multiply by source price (ETH/USD)
-            convertedPrice = FixedPointMathLib.mulDiv(
-                _price,
-                srcPrice,
-                1e18
-            );
+            convertedPrice = FixedPointMathLib.mulDiv(_price, srcPrice, 1e18);
         } else {
             // USD to USD or non-USD to non-USD
             // Need to multiply by source price and divide by destination price
@@ -669,38 +690,5 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
             adjustedPrice = _price * 10 ** (_dstDecimals - _srcDecimals);
         }
         timestamp = uint64(block.timestamp);
-    }
-
-    /**
-     * @notice Internal function to check sequencer status
-     * @dev Checks if sequencer is up and grace period has passed
-     * @return isValid True if sequencer is up and grace period has passed, or if no sequencer check is needed (e.g. on
-     * L1)
-     */
-    function _isSequencerValid() internal view returns (bool isValid) {
-        if (sequencer == address(0)) {
-            return true; // No sequencer check needed (e.g. on L1)
-        }
-
-        (, int256 answer, uint256 startedAt, , ) = IChainlink(sequencer)
-            .latestRoundData();
-
-        // Answer == 0: Sequencer is up
-        // Check that the sequencer is up or the grace period has passed
-        if (answer != 0 || block.timestamp < startedAt + GRACE_PERIOD_TIME) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * @notice Checks if a timestamp is considered stale
-     * @dev Compares against PRICE_STALENESS_THRESHOLD
-     * @param timestamp The timestamp to check
-     * @return True if the timestamp is stale
-     */
-    function _isStale(uint256 timestamp) internal view returns (bool) {
-        return block.timestamp - timestamp > PRICE_STALENESS_THRESHOLD;
     }
 }
