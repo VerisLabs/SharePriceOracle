@@ -13,8 +13,10 @@ import {ISharePriceRouter} from "./interfaces/ISharePriceRouter.sol";
  * @title SharePriceRouter
  * @notice A multi-adapter oracle system that supports multiple price feeds and fallback mechanisms
  * @dev This contract manages multiple oracle adapters and provides unified price conversion
+ *
+ * @dev Adapted from Curvance MIT Oracle :
+ *      https://github.com/curvance/Curvance-CantinaCompetition/blob/develop/contracts/oracles/
  */
-
 contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
     using FixedPointMathLib for uint256;
 
@@ -246,6 +248,11 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
                           EXTERNAL VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    /**
+     * @notice Checks if an asset is supported by the router
+     * @param asset The asset address
+     * @return True if the asset is supported
+     */
     function isSupportedAsset(address asset) external view returns (bool) {
         LocalAssetConfig memory config = localAssetConfigs[asset][0];
         return config.priceFeed != address(0);
@@ -333,7 +340,7 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
     function getPrice(
         address asset,
         bool inUSD
-    ) public view returns (uint256 price, bool hadError) {
+    ) external view returns (uint256 price, bool hadError) {
         (price, , hadError) = _getPrice(asset, inUSD);
     }
 
@@ -393,7 +400,8 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
         address _dstAsset
     ) external view returns (uint256 sharePrice, uint64 timestamp) {
         StoredSharePrice memory stored = storedSharePrices[_vaultAddress];
-
+        
+        // if it's a same chain vault
         if (_srcChainId == chainId) {
             IERC4626 vault = IERC4626(_vaultAddress);
             address asset = vault.asset();
@@ -408,7 +416,7 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
                 _getAssetDecimals(_dstAsset)
             );
         } else {
-            // no need for sharePrice > 0 already cheched on updateSharePrices
+            // no need for sharePrice > 0 already checked on updateSharePrices
             // Convert stored price to destination asset
             (sharePrice, timestamp) = _convertPrice(
                 stored.sharePrice,
@@ -541,7 +549,10 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
         uint8 assetPriority = assetAdapterPriority[_asset];
         LocalAssetConfig memory config;
         PriceReturnData memory priceData;
-
+        
+        // Loops through the asset adapters to get the price 
+        // from the first adapter that returns a valid price 
+        // or until the assetPriority is reached
         for (uint8 i = 0; i <= assetPriority; ++i) {
             config = localAssetConfigs[_asset][i];
 
@@ -571,7 +582,7 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
             asset,
             inUSD
         );
-
+        
         if (hadError) revert NoValidPrice();
 
         storedAssetPrices[asset] = StoredAssetPrice({
@@ -621,7 +632,7 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
             dstInUSD
         );
 
-        // Try stored prices if needed
+        // when a sharePrice is "updated" we guarantee a price had already been stored
         if (srcHadError) {
             srcPrice = storedAssetPrices[_srcAsset].price;
             srcTime = storedAssetPrices[_srcAsset].timestamp;

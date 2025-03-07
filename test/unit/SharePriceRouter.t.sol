@@ -320,7 +320,6 @@ contract SharePriceRouterTest is BaseTest {
         router.updateSharePrices(srcChain, reports);
 
         // Verify stored data
-        bytes32 key = keccak256(abi.encodePacked(srcChain, vaultAddr));
         ISharePriceRouter.VaultReport memory report = router.getLatestSharePriceReport(srcChain, vaultAddr);
 
         assertEq(report.chainId, srcChain, "Chain ID should match");

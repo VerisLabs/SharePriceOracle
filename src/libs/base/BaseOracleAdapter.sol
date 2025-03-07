@@ -7,8 +7,6 @@ import { OwnableRoles } from "@solady/auth/OwnableRoles.sol";
 /**
  * @title BaseOracleAdapter
  * @notice Base contract for oracle adapters that fetch and normalize asset prices
- * @dev Based on Curvance MIT Oracle:
- *      https://github.com/curvance/Curvance-CantinaCompetition/blob/develop/contracts/oracles/adaptors/BaseOracleAdaptor.sol
  */
 abstract contract BaseOracleAdapter is OwnableRoles {
     /*//////////////////////////////////////////////////////////////
