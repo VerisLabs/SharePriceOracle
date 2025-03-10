@@ -131,13 +131,19 @@ library MsgCodec {
     function decodeVaultReports(bytes calldata encodedMessage)
         public
         pure
-        returns (uint16 msgType, ISharePriceRouter.VaultReport[] memory reports, uint256 extraOptionsStart, uint256 extraOptionsLength)
+        returns (
+            uint16 msgType,
+            ISharePriceRouter.VaultReport[] memory reports,
+            uint256 extraOptionsStart,
+            uint256 extraOptionsLength
+        )
     {
         if (encodedMessage.length < HEADER_SIZE) {
             revert MsgCodec__InvalidMessageLength(encodedMessage.length, HEADER_SIZE);
         }
 
-        (msgType, reports, extraOptionsLength) = abi.decode(encodedMessage, (uint16, ISharePriceRouter.VaultReport[], uint256));
+        (msgType, reports, extraOptionsLength) =
+            abi.decode(encodedMessage, (uint16, ISharePriceRouter.VaultReport[], uint256));
 
         // Cache array length for gas optimization
         uint256 reportsLength = reports.length;

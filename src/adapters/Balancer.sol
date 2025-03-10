@@ -85,8 +85,15 @@ contract BalancerAdapter is BaseOracleAdapter {
                             EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-
-    function getPrice(address asset, bool inUSD) external view override returns (ISharePriceRouter.PriceReturnData memory pData) {
+    function getPrice(
+        address asset,
+        bool inUSD
+    )
+        external
+        view
+        override
+        returns (ISharePriceRouter.PriceReturnData memory pData)
+    {
         // Validate we support pricing this BPT
         if (!isSupportedAsset[asset]) {
             revert BalancerAdapter__AssetNotSupported();
@@ -98,7 +105,7 @@ contract BalancerAdapter is BaseOracleAdapter {
         // Get pool tokens and weights
         (address[] memory tokens,,) = BALANCER_VAULT.getPoolTokens(pool.getPoolId());
         uint256[] memory weights = pool.getNormalizedWeights();
-        
+
         // Calculate geometric mean of underlying token prices
         uint256 geometricMean = WAD;
         ISharePriceRouter router = ISharePriceRouter(ORACLE_ROUTER_ADDRESS);
@@ -106,7 +113,7 @@ contract BalancerAdapter is BaseOracleAdapter {
         for (uint256 i = 0; i < tokens.length; i++) {
             // Get underlying token price
             (uint256 tokenPrice, bool hadError) = router.getPrice(tokens[i], inUSD);
-            
+
             if (hadError) {
                 pData.hadError = true;
                 return pData;
@@ -153,7 +160,7 @@ contract BalancerAdapter is BaseOracleAdapter {
         }
 
         AdapterData storage data = adapterData[bpt];
-        
+
         data.pool = IBalancerWeightedPool(pool);
         data.heartbeat = heartbeat != 0 ? heartbeat : DEFAULT_HEART_BEAT;
         data.isConfigured = true;
@@ -198,4 +205,4 @@ contract BalancerAdapter is BaseOracleAdapter {
             return false;
         }
     }
-} 
+}

@@ -13,14 +13,13 @@ contract ConfigurePeers is Script {
     function run() external {
         // This script is for Optimism, Arbitrum, and Polygon
         require(
-            block.chainid == Constants.OPTIMISM ||
-            block.chainid == Constants.ARBITRUM ||
-            block.chainid == Constants.POLYGON,
+            block.chainid == Constants.OPTIMISM || block.chainid == Constants.ARBITRUM
+                || block.chainid == Constants.POLYGON,
             "This script is only for Optimism, Arbitrum, or Polygon"
         );
 
         (,, address maxLzAddress) = Constants.getChainConfig(uint32(block.chainid));
-        (uint32 baseLzId, , address baseMazLzEndpointAddress) = Constants.getChainConfig(8453);
+        (uint32 baseLzId,, address baseMazLzEndpointAddress) = Constants.getChainConfig(8453);
 
         // Load configuration
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -38,4 +37,4 @@ contract ConfigurePeers is Script {
 
         vm.stopBroadcast();
     }
-} 
+}

@@ -78,7 +78,14 @@ abstract contract BaseOracleAdapter is OwnableRoles {
      * @param inUSD Whether to return the price in USD (true) or ETH (false)
      * @return PriceReturnData Structure containing price, error status, and denomination
      */
-    function getPrice(address asset, bool inUSD) external view virtual returns (ISharePriceRouter.PriceReturnData memory);
+    function getPrice(
+        address asset,
+        bool inUSD
+    )
+        external
+        view
+        virtual
+        returns (ISharePriceRouter.PriceReturnData memory);
 
     /**
      * @notice Removes price feed support for an asset

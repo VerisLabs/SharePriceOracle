@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {MessagingFee} from "./ILayerZeroEndpointV2.sol";
+import { MessagingFee } from "./ILayerZeroEndpointV2.sol";
 
 /**
  * @title ISharePriceRouter
@@ -74,24 +74,11 @@ interface ISharePriceRouter {
     event RoleGranted(address indexed account, uint256 indexed role);
     event RoleRevoked(address indexed account, uint256 indexed role);
     event SharePriceUpdated(
-        uint32 indexed srcChainId,
-        address indexed vault,
-        uint256 sharePrice,
-        uint256 assetPrice,
-        uint64 timestamp
+        uint32 indexed srcChainId, address indexed vault, uint256 sharePrice, uint256 assetPrice, uint64 timestamp
     );
     event SequencerSet(address indexed oldSequencer, address indexed sequencer);
-    event CrossChainAssetMapped(
-        uint32 indexed srcChainId,
-        address indexed srcAsset,
-        address indexed localAsset
-    );
-    event LocalAssetConfigured(
-        address indexed asset,
-        uint8 priority,
-        address priceFeed,
-        bool inUSD
-    );
+    event CrossChainAssetMapped(uint32 indexed srcChainId, address indexed srcAsset, address indexed localAsset);
+    event LocalAssetConfigured(address indexed asset, uint8 priority, address priceFeed, bool inUSD);
     event LocalAssetRemoved(address indexed asset);
 
     /*//////////////////////////////////////////////////////////////
@@ -110,7 +97,8 @@ interface ISharePriceRouter {
         address _priceFeed,
         uint8 _priority,
         bool _isUSD
-    ) external;
+    )
+        external;
 
     /**
      * @notice Grants a role to an account
@@ -134,7 +122,7 @@ interface ISharePriceRouter {
      * @param _sequencer The new sequencer uptime feed address
      */
     function setSequencer(address _sequencer) external;
-    
+
     /**
      * @notice Sets the mapping between a cross-chain asset and its local equivalent
      * @dev Only callable by admin. Maps assets from other chains to their Base equivalents
@@ -142,12 +130,8 @@ interface ISharePriceRouter {
      * @param _srcAsset The asset address on the source chain
      * @param _localAsset The equivalent asset address on Base
      */
-    function setCrossChainAssetMapping(
-        uint32 _srcChainId,
-        address _srcAsset,
-        address _localAsset
-    ) external;
-    
+    function setCrossChainAssetMapping(uint32 _srcChainId, address _srcAsset, address _localAsset) external;
+
     /*//////////////////////////////////////////////////////////////
                         ENDPOINT FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -157,10 +141,7 @@ interface ISharePriceRouter {
      * @param _srcChainId Source chain ID
      * @param reports Array of vault reports to update
      */
-    function updateSharePrices(
-        uint32 _srcChainId,
-        VaultReport[] calldata reports
-    ) external;
+    function updateSharePrices(uint32 _srcChainId, VaultReport[] calldata reports) external;
 
     /*//////////////////////////////////////////////////////////////
                            ADAPTER FUNCTIONS
@@ -168,7 +149,6 @@ interface ISharePriceRouter {
 
     /// @notice Notify router of feed removal
     function notifyFeedRemoval(address asset) external;
-
 
     /*//////////////////////////////////////////////////////////////
                             VIEW FUNCTIONS
@@ -199,22 +179,16 @@ interface ISharePriceRouter {
      * @param _vaultAddress Vault address
      * @return The unique key as bytes32
      */
-    function getPriceKey(
-        uint32 _chainId,
-        address _vaultAddress
-    ) external pure returns (bytes32);
+    function getPriceKey(uint32 _chainId, address _vaultAddress) external pure returns (bytes32);
 
     /**
      * @notice Gets the latest price for an asset
      * @param _asset The asset address
      * @param _inUSD Whether the price should be in USD
      * @return price The latest price
-     * @return hadError Whether the price retrieval had an error 
+     * @return hadError Whether the price retrieval had an error
      */
-    function getLatestAssetPrice(
-        address _asset,
-        bool _inUSD
-    ) external view returns (uint256 price, bool hadError);
+    function getLatestAssetPrice(address _asset, bool _inUSD) external view returns (uint256 price, bool hadError);
 
     /**
      * @notice Gets the local asset and its decimals for a cross-chain asset mapped
@@ -226,13 +200,13 @@ interface ISharePriceRouter {
     function getLocalAsset(
         uint32 _srcChainId,
         address _srcAsset
-    ) external view returns (address localAsset, uint8 localDecimals);
+    )
+        external
+        view
+        returns (address localAsset, uint8 localDecimals);
 
-    function getPrice(
-        address asset,
-        bool inUSD
-    ) external view returns (uint256 price, bool hadError);
-    
+    function getPrice(address asset, bool inUSD) external view returns (uint256 price, bool hadError);
+
     /**
      * @notice Gets share prices for multiple vaults
      * @dev Returns array of vault reports with current prices
@@ -243,7 +217,10 @@ interface ISharePriceRouter {
     function getSharePrices(
         address[] calldata vaultAddresses,
         address rewardsDelegate
-    ) external view returns (VaultReport[] memory reports);
+    )
+        external
+        view
+        returns (VaultReport[] memory reports);
 
     /**
      * @notice Gets the latest share price for a vault
@@ -262,7 +239,10 @@ interface ISharePriceRouter {
         uint32 _srcChainId,
         address _vaultAddress,
         address _dstAsset
-    ) external view returns (uint256 sharePrice, uint64 timestamp);
+    )
+        external
+        view
+        returns (uint256 sharePrice, uint64 timestamp);
 
     /**
      * @notice Get latest share price report for a specific vault
@@ -274,16 +254,15 @@ interface ISharePriceRouter {
     function getLatestSharePriceReport(
         uint32 _srcChainId,
         address _vaultAddress
-    ) external view returns (VaultReport memory);
+    )
+        external
+        view
+        returns (VaultReport memory);
 
     /**
      * @notice Updates the price for the given assets
      * @param assets An array assets to update the prices for
      * @return bool if the prices were updated
      */
-    function batchUpdatePrices(
-        address[] calldata assets,
-        bool[] calldata inUSD
-    ) external returns (bool);
+    function batchUpdatePrices(address[] calldata assets, bool[] calldata inUSD) external returns (bool);
 }
-

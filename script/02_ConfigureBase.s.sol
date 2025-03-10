@@ -21,7 +21,7 @@ contract ConfigureBase is Script {
         address routerAddress = vm.envAddress("ROUTER_ADDRESS");
         address chainlinkAdapterAddress = vm.envAddress("CHAINLINK_ADAPTER_ADDRESS");
         address maxLzEndpointAddress = vm.envAddress("BASE_MAX_LZ_ENDPOINT_ADDRESS");
-        
+
         SharePriceRouter router = SharePriceRouter(routerAddress);
         ChainlinkAdapter chainlinkAdapter = ChainlinkAdapter(chainlinkAdapterAddress);
         MaxLzEndpoint maxLzEndpoint = MaxLzEndpoint(payable(maxLzEndpointAddress));
@@ -33,7 +33,7 @@ contract ConfigureBase is Script {
 
         // Configure cross-chain asset mappings
         _configureCrossChainMappings(router);
-        
+
         // Configure local asset mappings
         _configureLocalAssetMappings(router);
 
@@ -45,20 +45,10 @@ contract ConfigureBase is Script {
 
     function _configureChainlinkFeeds(ChainlinkAdapter adapter) internal {
         Constants.AssetConfig[] memory baseAssets = Constants.getBaseAssets();
-        
+
         for (uint256 i = 0; i < baseAssets.length; i++) {
-            adapter.addAsset(
-                baseAssets[i].token,
-                baseAssets[i].priceFeed,
-                baseAssets[i].heartbeat,
-                baseAssets[i].inUSD
-            );
-            console2.log(
-                "Configured price feed for token:",
-                baseAssets[i].token,
-                "inUSD:",
-                baseAssets[i].inUSD
-            );
+            adapter.addAsset(baseAssets[i].token, baseAssets[i].priceFeed, baseAssets[i].heartbeat, baseAssets[i].inUSD);
+            console2.log("Configured price feed for token:", baseAssets[i].token, "inUSD:", baseAssets[i].inUSD);
         }
     }
 
@@ -74,10 +64,7 @@ contract ConfigureBase is Script {
                 baseAssets[i].priority,
                 baseAssets[i].inUSD
             );
-            console2.log(
-                "Mapped localAsset asset:",
-                baseAssets[i].token
-            );
+            console2.log("Mapped localAsset asset:", baseAssets[i].token);
         }
     }
 
@@ -88,19 +75,10 @@ contract ConfigureBase is Script {
         // Configure Optimism mappings
         address[] memory optimismAssets = Constants.getOptimismAssets();
         for (uint256 i = 0; i < optimismAssets.length - 1; i++) {
-            router.setCrossChainAssetMapping(
-                Constants.OPTIMISM,
-                optimismAssets[i],
-                baseAssets[i].token
-            );
-            console2.log(
-                "Mapped Optimism asset:",
-                optimismAssets[i],
-                "to Base asset:",
-                baseAssets[i].token
-            );
+            router.setCrossChainAssetMapping(Constants.OPTIMISM, optimismAssets[i], baseAssets[i].token);
+            console2.log("Mapped Optimism asset:", optimismAssets[i], "to Base asset:", baseAssets[i].token);
         }
-        
+
         // Manual mapping for Optimism USDCe to Base USDC
         router.setCrossChainAssetMapping(
             Constants.OPTIMISM,
@@ -113,24 +91,17 @@ contract ConfigureBase is Script {
         // Configure Arbitrum mappings
         address[] memory arbitrumAssets = Constants.getArbitrumAssets();
         for (uint256 i = 0; i < arbitrumAssets.length; i++) {
-            router.setCrossChainAssetMapping(
-                Constants.ARBITRUM,
-                arbitrumAssets[i],
-                baseAssets[i].token
-            );
-            console2.log(
-                "Mapped Arbitrum asset:",
-                arbitrumAssets[i],
-                "to Base asset:",
-                baseAssets[i].token
-            );
+            router.setCrossChainAssetMapping(Constants.ARBITRUM, arbitrumAssets[i], baseAssets[i].token);
+            console2.log("Mapped Arbitrum asset:", arbitrumAssets[i], "to Base asset:", baseAssets[i].token);
         }
     }
 
     function _configureLzEndpoints(MaxLzEndpoint maxLzEndpoint) internal {
         // Get remote chain configs from ChainConfig library
-        (uint32 optimismLzId, address optimismLzEndpoint, address optimismMaxLz) = Constants.getChainConfig(Constants.OPTIMISM);
-        (uint32 arbitrumLzId, address arbitrumLzEndpoint, address arbitrumMaxLz) = Constants.getChainConfig(Constants.ARBITRUM);
+        (uint32 optimismLzId, address optimismLzEndpoint, address optimismMaxLz) =
+            Constants.getChainConfig(Constants.OPTIMISM);
+        (uint32 arbitrumLzId, address arbitrumLzEndpoint, address arbitrumMaxLz) =
+            Constants.getChainConfig(Constants.ARBITRUM);
 
         // Set peers for each chain on Base
         maxLzEndpoint.setPeer(optimismLzId, bytes32(uint256(uint160(optimismMaxLz))));
@@ -145,4 +116,4 @@ contract ConfigureBase is Script {
         console2.log("MaxLzEndpoint:", arbitrumMaxLz);
         console2.log("LZ Endpoint:", arbitrumLzEndpoint);
     }
-} 
+}

@@ -11,8 +11,7 @@ import { IChainlink } from "../../src/interfaces/chainlink/IChainlink.sol";
 import { MockChainlinkFeed } from "../mocks/MockChainlinkFeed.sol";
 import { ChainlinkAdapter } from "../../src/adapters/Chainlink.sol";
 import { BaseTest } from "../base/BaseTest.t.sol";
-import {console2} from "forge-std/console2.sol";
-
+import { console2 } from "forge-std/console2.sol";
 
 // Constants for BASE network
 address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
@@ -102,13 +101,13 @@ contract SharePriceRouterTest is BaseTest {
 
         // Configure price feeds in adapter
         vm.startPrank(oracle);
-        chainlinkAdapter.addAsset(USDC, USDC_USD_FEED, 86400, true); // 20 min heartbeat
-        chainlinkAdapter.addAsset(USDT, USDT_USD_FEED, 86400, true);
+        chainlinkAdapter.addAsset(USDC, USDC_USD_FEED, 86_400, true); // 20 min heartbeat
+        chainlinkAdapter.addAsset(USDT, USDT_USD_FEED, 86_400, true);
         chainlinkAdapter.addAsset(WETH, ETH_USD_FEED, 1200, true);
-        chainlinkAdapter.addAsset(STETH, STETH_USD_FEED, 86400, false); // stETH/ETH feed
+        chainlinkAdapter.addAsset(STETH, STETH_USD_FEED, 86_400, false); // stETH/ETH feed
         chainlinkAdapter.addAsset(WBTC, BTC_USD_FEED, 1200, true);
-        chainlinkAdapter.addAsset(TBTC, TBTC_USD_FEED, 86400, true);
-        chainlinkAdapter.addAsset(DAI, DAI_USD_FEED, 86400, true);
+        chainlinkAdapter.addAsset(TBTC, TBTC_USD_FEED, 86_400, true);
+        chainlinkAdapter.addAsset(DAI, DAI_USD_FEED, 86_400, true);
         vm.stopPrank();
 
         // Deploy Base network mock vaults
@@ -533,14 +532,14 @@ contract SharePriceRouterTest is BaseTest {
 
         vm.prank(endpoint);
         router.updateSharePrices(srcChain, reports);
-        
+
         uint256 normalizedPrice = sharePrice * 10 ** (18 - 6);
         (uint256 usdcPrice,) = router.getLatestAssetPrice(USDC, true);
         (uint256 wethPrice,) = router.getLatestAssetPrice(WETH, true);
         uint256 price_ = normalizedPrice * usdcPrice / wethPrice;
 
         // Should fail when trying to convert USDC to WETH
-        (uint256 price, ) = router.getLatestSharePrice(srcChain, vaultAddr, WETH);
+        (uint256 price,) = router.getLatestSharePrice(srcChain, vaultAddr, WETH);
         assertApproxEqAbs(price, price_, 1.1e15, "Price should be 0 for incompatible asset categories");
     }
 
@@ -698,7 +697,8 @@ contract SharePriceRouterTest is BaseTest {
 
         // Verify all reports were stored correctly
         for (uint256 i = 0; i < reports.length; i++) {
-            ISharePriceRouter.VaultReport memory report = router.getLatestSharePriceReport(srcChain, reports[i].vaultAddress);
+            ISharePriceRouter.VaultReport memory report =
+                router.getLatestSharePriceReport(srcChain, reports[i].vaultAddress);
             assertEq(report.chainId, srcChain, "Chain ID should match");
             assertEq(report.vaultAddress, reports[i].vaultAddress, "Vault address should match");
             assertEq(report.asset, reports[i].asset, "Asset should match");
@@ -772,7 +772,7 @@ contract SharePriceRouterTest is BaseTest {
 
         vm.prank(endpoint);
         router.updateSharePrices(srcChain, reports);
-        
+
         (uint256 price, uint64 timestamp) = router.getLatestSharePrice(srcChain, address(opTbtcVault), WBTC);
         assertApproxEqAbs(price, 1.15e8, 1.15e5, "Price should match for BTC to BTC conversion");
         assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
@@ -818,7 +818,7 @@ contract SharePriceRouterTest is BaseTest {
 
         ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
         reports[0] = ISharePriceRouter.VaultReport({
-            chainId: uint32(block.chainid), 
+            chainId: uint32(block.chainid),
             vaultAddress: address(opUsdcVault),
             asset: OPTIMISM_USDC,
             assetDecimals: 6,
@@ -872,5 +872,506 @@ contract SharePriceRouterTest is BaseTest {
         assertTrue(router.isSequencerValid(), "Should be valid after grace period");
 
         vm.stopPrank();
+    }
+
+    function testRevertWhen_InvalidRoleRevocation() public {
+        vm.startPrank(admin);
+        vm.expectRevert();
+        router.revokeRole(user, 0);
+        vm.stopPrank();
+    }
+
+    function testRevertWhen_UpdateSharePricesWithZeroAsset() public {
+        vm.startPrank(endpoint);
+
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
+            chainId: 10,
+            vaultAddress: address(opUsdcVault),
+            asset: address(0),
+            assetDecimals: 6,
+            sharePrice: 1.1e6,
+            lastUpdate: uint64(block.timestamp),
+            rewardsDelegate: address(0)
+        });
+
+        vm.expectRevert(SharePriceRouter.ZeroAddress.selector);
+        router.updateSharePrices(10, reports);
+        vm.stopPrank();
+    }
+
+    function testRevertWhen_UpdateSharePricesWithZeroSharePrice() public {
+        vm.startPrank(endpoint);
+
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
+            chainId: 10,
+            vaultAddress: address(opUsdcVault),
+            asset: OPTIMISM_USDC,
+            assetDecimals: 6,
+            sharePrice: 0,
+            lastUpdate: uint64(block.timestamp),
+            rewardsDelegate: address(0)
+        });
+
+        vm.expectRevert(SharePriceRouter.NoValidPrice.selector);
+        router.updateSharePrices(10, reports);
+        vm.stopPrank();
+    }
+
+    function testRevertWhen_UpdateSharePricesWithMismatchedChainId() public {
+        vm.startPrank(endpoint);
+
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
+            chainId: 5,
+            vaultAddress: address(opUsdcVault),
+            asset: OPTIMISM_USDC,
+            assetDecimals: 6,
+            sharePrice: 1.1e6,
+            lastUpdate: uint64(block.timestamp),
+            rewardsDelegate: address(0)
+        });
+
+        vm.expectRevert(SharePriceRouter.InvalidChainId.selector);
+        router.updateSharePrices(10, reports);
+        vm.stopPrank();
+    }
+
+    function testRevertWhen_BatchUpdatePricesWithMismatchedArrayLengths() public {
+        address[] memory assets = new address[](2);
+        assets[0] = USDC;
+        assets[1] = WETH;
+
+        bool[] memory inUSD = new bool[](1);
+        inUSD[0] = true;
+
+        vm.expectRevert(SharePriceRouter.InvalidLength.selector);
+        router.batchUpdatePrices(assets, inUSD);
+    }
+
+    function testGetSharePricesWithInvalidVault() public {
+        address[] memory vaults = new address[](1);
+        vaults[0] = makeAddr("invalidVault");
+
+        vm.expectRevert();
+        router.getSharePrices(vaults, address(0));
+    }
+
+    function testIsSupportedAsset() public {
+        assertTrue(router.isSupportedAsset(USDC), "USDC should be supported");
+        assertFalse(router.isSupportedAsset(makeAddr("unsupportedAsset")), "Random asset should not be supported");
+    }
+
+    function testRevertWhen_SetLocalAssetConfigWithZeroAdapter() public {
+        vm.startPrank(admin);
+        vm.expectRevert(SharePriceRouter.ZeroAddress.selector);
+        router.setLocalAssetConfig(USDC, address(0), USDC_USD_FEED, 0, true);
+        vm.stopPrank();
+    }
+
+    function testRevertWhen_GrantRoleToZeroAddress() public {
+        vm.startPrank(admin);
+
+        bool success = false;
+        try router.grantRole(address(0), router.ADMIN_ROLE()) {
+            success = true;
+        } catch { }
+
+        assertFalse(success, "Should have reverted when granting role to zero address");
+
+        vm.stopPrank();
+    }
+
+    function testRevertWhen_RevokeRoleFromZeroAddress() public {
+        vm.startPrank(admin);
+        bool success = false;
+
+        try router.revokeRole(address(0), router.ADMIN_ROLE()) {
+            success = true;
+        } catch { }
+        assertFalse(success, "Should have reverted when revoking role from zero address");
+
+        vm.stopPrank();
+    }
+
+    function testGetLatestSharePrice_SameChainVault() public view {
+        (uint256 price, uint64 timestamp) = router.getLatestSharePrice(uint32(block.chainid), address(usdcVault), USDC);
+
+        assertEq(price, 1.1e6, "Share price should match vault's share price");
+        assertEq(timestamp, 0, "Timestamp should be current");
+    }
+
+    function testGetLatestSharePrice_CrossChainConversion() public {
+        uint32 srcChain = 10;
+        uint256 sharePrice = 1.15e6;
+
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
+            chainId: srcChain,
+            vaultAddress: address(opUsdcVault),
+            asset: OPTIMISM_USDC,
+            assetDecimals: 6,
+            sharePrice: sharePrice,
+            lastUpdate: uint64(block.timestamp),
+            rewardsDelegate: address(0)
+        });
+
+        vm.prank(endpoint);
+        router.updateSharePrices(srcChain, reports);
+
+        (uint256 price, uint64 timestamp) = router.getLatestSharePrice(srcChain, address(opUsdcVault), USDT);
+
+        assertApproxEqAbs(price, 1.15e6, 1.15e4, "Price should be converted correctly");
+        assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
+    }
+
+    function testGetLatestSharePrice_DifferentDecimals() public {
+        uint32 srcChain = 10;
+        uint256 sharePrice = 1.15e18;
+
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
+            chainId: srcChain,
+            vaultAddress: address(opWethVault),
+            asset: OPTIMISM_WETH,
+            assetDecimals: 18,
+            sharePrice: sharePrice,
+            lastUpdate: uint64(block.timestamp),
+            rewardsDelegate: address(0)
+        });
+
+        vm.prank(endpoint);
+        router.updateSharePrices(srcChain, reports);
+
+        (uint256 price, uint64 timestamp) = router.getLatestSharePrice(srcChain, address(opWethVault), USDC);
+
+        (uint256 wethPrice,) = router.getLatestAssetPrice(WETH, true);
+        (uint256 usdcPrice,) = router.getLatestAssetPrice(USDC, true);
+
+        uint256 expectedPrice = (sharePrice * wethPrice / usdcPrice) / 10 ** 12;
+
+        assertApproxEqAbs(price, expectedPrice, 1e4, "Price should be converted and scaled correctly");
+        assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
+    }
+
+    function testUpdateSharePrices_MultipleReports() public {
+        uint32 srcChain = 10;
+
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](3);
+
+        reports[0] = ISharePriceRouter.VaultReport({
+            chainId: srcChain,
+            vaultAddress: address(opUsdcVault),
+            asset: OPTIMISM_USDC,
+            assetDecimals: 6,
+            sharePrice: 1.15e6,
+            lastUpdate: uint64(block.timestamp),
+            rewardsDelegate: address(0)
+        });
+
+        reports[1] = ISharePriceRouter.VaultReport({
+            chainId: srcChain,
+            vaultAddress: address(opWethVault),
+            asset: OPTIMISM_WETH,
+            assetDecimals: 18,
+            sharePrice: 1.15e18,
+            lastUpdate: uint64(block.timestamp),
+            rewardsDelegate: address(0)
+        });
+
+        reports[2] = ISharePriceRouter.VaultReport({
+            chainId: srcChain,
+            vaultAddress: address(opWbtcVault),
+            asset: OPTIMISM_WBTC,
+            assetDecimals: 8,
+            sharePrice: 1.15e8,
+            lastUpdate: uint64(block.timestamp),
+            rewardsDelegate: address(0)
+        });
+
+        vm.prank(endpoint);
+        router.updateSharePrices(srcChain, reports);
+
+        for (uint256 i = 0; i < reports.length; i++) {
+            ISharePriceRouter.VaultReport memory storedReport =
+                router.getLatestSharePriceReport(srcChain, reports[i].vaultAddress);
+
+            assertEq(storedReport.chainId, reports[i].chainId, "Chain ID should match");
+            assertEq(storedReport.vaultAddress, reports[i].vaultAddress, "Vault address should match");
+            assertEq(storedReport.asset, reports[i].asset, "Asset should match");
+            assertEq(storedReport.sharePrice, reports[i].sharePrice, "Share price should match");
+            assertEq(storedReport.assetDecimals, reports[i].assetDecimals, "Decimals should match");
+        }
+    }
+
+    function testRevertWhen_UpdateSharePricesWithStalePrice() public {
+        uint32 srcChain = 10;
+
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
+            chainId: srcChain,
+            vaultAddress: address(opUsdcVault),
+            asset: OPTIMISM_USDC,
+            assetDecimals: 6,
+            sharePrice: 1.15e6,
+            lastUpdate: uint64(block.timestamp),
+            rewardsDelegate: address(0)
+        });
+
+        vm.warp(block.timestamp + router.PRICE_STALENESS_THRESHOLD() + 1);
+
+        vm.prank(endpoint);
+        vm.expectRevert(SharePriceRouter.NoValidPrice.selector);
+        router.updateSharePrices(srcChain, reports);
+    }
+
+    function testUpdateSharePricesEmptyArray() public {
+        uint32 srcChain = 10;
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](0);
+
+        vm.prank(endpoint);
+        router.updateSharePrices(srcChain, reports);
+    }
+
+    function testSharePriceStalenessBehavior() public {
+        uint32 srcChain = 10;
+
+        vm.prank(admin);
+        router.setCrossChainAssetMapping(srcChain, OPTIMISM_USDC, USDC);
+
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
+            chainId: srcChain,
+            vaultAddress: address(opUsdcVault),
+            asset: OPTIMISM_USDC,
+            assetDecimals: 6,
+            sharePrice: 1.1e6,
+            lastUpdate: uint64(block.timestamp - 23 hours),
+            rewardsDelegate: address(0)
+        });
+
+        vm.prank(endpoint);
+        router.updateSharePrices(srcChain, reports);
+
+        vm.warp(block.timestamp + 25 hours);
+
+        reports[0].lastUpdate = uint64(block.timestamp);
+
+        vm.prank(endpoint);
+        vm.expectRevert(SharePriceRouter.NoValidPrice.selector);
+        router.updateSharePrices(srcChain, reports);
+    }
+
+    function testGetPriceKeyExternal() public view {
+        uint32 testChainId = 1;
+        address testVault = address(usdcVault);
+
+        bytes32 manualKey = keccak256(abi.encodePacked(testChainId, testVault));
+        bytes32 functionKey = router.getPriceKey(testChainId, testVault);
+
+        assertEq(functionKey, manualKey, "Keys should match");
+    }
+
+    function testCrossChainConversionWithDifferentDecimals() public {
+        vm.startPrank(admin);
+
+        address[] memory assets = new address[](2);
+        assets[0] = USDC;
+        assets[1] = WETH;
+        bool[] memory inUSD = new bool[](2);
+        inUSD[0] = true;
+        inUSD[1] = true;
+        router.batchUpdatePrices(assets, inUSD);
+
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
+            chainId: 10,
+            vaultAddress: address(opWethVault),
+            asset: OPTIMISM_WETH,
+            assetDecimals: 18,
+            sharePrice: 1e18,
+            lastUpdate: uint64(block.timestamp),
+            rewardsDelegate: address(0)
+        });
+
+        vm.stopPrank();
+
+        vm.prank(endpoint);
+        router.updateSharePrices(10, reports);
+
+        (uint256 price, uint64 timestamp) = router.getLatestSharePrice(10, address(opWethVault), USDC);
+
+        assertTrue(price > 0, "Price should be non-zero");
+        assertEq(timestamp, uint64(block.timestamp), "Timestamp should be current");
+    }
+
+    function testSequencerUnavailable() public {
+        MockChainlinkSequencer mockSequencer = new MockChainlinkSequencer();
+        mockSequencer.setDown();
+
+        vm.prank(admin);
+        router.setSequencer(address(mockSequencer));
+
+        assertFalse(router.isSequencerValid(), "Sequencer should be reported as unavailable");
+
+        mockSequencer.setStartedAt(block.timestamp);
+        assertFalse(router.isSequencerValid(), "Should be invalid during grace period");
+
+        vm.warp(block.timestamp + router.GRACE_PERIOD_TIME() + 1);
+        mockSequencer.setStartedAt(block.timestamp - router.GRACE_PERIOD_TIME() - 1);
+        mockSequencer.setUp();
+        assertTrue(router.isSequencerValid(), "Should be valid after grace period");
+    }
+
+    function testInvalidChainIdValidations() public {
+        vm.prank(admin);
+        vm.expectRevert(SharePriceRouter.InvalidChainId.selector);
+        router.setCrossChainAssetMapping(uint32(block.chainid), WETH, USDC);
+
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
+            chainId: uint32(block.chainid),
+            vaultAddress: address(usdcVault),
+            asset: USDC,
+            assetDecimals: 6,
+            sharePrice: 1e6,
+            lastUpdate: uint64(block.timestamp),
+            rewardsDelegate: address(0)
+        });
+
+        vm.prank(endpoint);
+        vm.expectRevert(SharePriceRouter.InvalidChainId.selector);
+        router.updateSharePrices(uint32(block.chainid), reports);
+    }
+
+    function testNotifyFeedRemovalMultiplePriorities() public {
+        vm.startPrank(admin);
+        router.setLocalAssetConfig(USDC, address(chainlinkAdapter), USDC_USD_FEED, 0, true);
+        router.setLocalAssetConfig(USDC, address(chainlinkAdapter), USDC_USD_FEED, 1, true);
+        router.setLocalAssetConfig(USDC, address(chainlinkAdapter), USDC_USD_FEED, 2, true);
+        vm.stopPrank();
+
+        assertEq(router.assetAdapterPriority(USDC), 2, "Highest priority should be 2");
+
+        vm.prank(address(chainlinkAdapter));
+        router.notifyFeedRemoval(USDC);
+
+        for (uint8 i = 0; i <= 2; i++) {
+            (address priceFeed,, address adaptor) = router.localAssetConfigs(USDC, i);
+            assertEq(priceFeed, address(0), "Feed at priority level should be removed");
+            assertEq(adaptor, address(0), "Adapter at priority level should be removed");
+        }
+    }
+
+    function testRevertWhen_SetLocalAssetConfigWithZeroAdapter_Fixed() public {
+        vm.startPrank(admin);
+        vm.expectRevert(SharePriceRouter.ZeroAddress.selector);
+        router.setLocalAssetConfig(USDC, address(0), USDC_USD_FEED, 0, true);
+        vm.stopPrank();
+    }
+
+    function testBatchUpdatePrices_InvalidParameters() public {
+        address[] memory assets = new address[](2);
+        assets[0] = USDC;
+        assets[1] = WETH;
+
+        bool[] memory inUSD = new bool[](1);
+        inUSD[0] = true;
+
+        vm.expectRevert(SharePriceRouter.InvalidLength.selector);
+        router.batchUpdatePrices(assets, inUSD);
+    }
+
+    function testGetLatestSharePrice_DifferentAssets() public view {
+        (uint256 usdcPrice,) = router.getLatestSharePrice(uint32(block.chainid), address(usdcVault), USDC);
+
+        (uint256 wethPrice,) = router.getLatestSharePrice(uint32(block.chainid), address(usdcVault), WETH);
+
+        assertEq(usdcPrice, 1.1e6, "USDC price should be 1.1 USDC");
+
+        assertTrue(wethPrice > 0, "WETH price should be non-zero");
+
+        (uint256 usdcUsdPrice,) = router.getLatestAssetPrice(USDC, true);
+        (uint256 wethUsdPrice,) = router.getLatestAssetPrice(WETH, true);
+
+        uint256 expectedWethPrice = (1.1e6 * usdcUsdPrice * 1e18) / (wethUsdPrice * 1e6);
+
+        assertApproxEqRel(wethPrice, expectedWethPrice, 1e15, "WETH price should be approximately correct");
+    }
+
+    function testGetPrice() public {
+        (uint256 price, bool hadError) = router.getPrice(USDC, true);
+
+        assertTrue(price > 0, "Price should be greater than zero");
+        assertFalse(hadError, "Should not have error for configured asset");
+
+        address randomAsset = makeAddr("randomAsset");
+        (price, hadError) = router.getPrice(randomAsset, true);
+
+        assertTrue(hadError, "Should have error for unconfigured asset");
+    }
+
+    function testGetLatestAssetPrice() public {
+        vm.startPrank(admin);
+        router.setLocalAssetConfig(USDC, address(chainlinkAdapter), USDC_USD_FEED, 0, true);
+
+        address[] memory assets = new address[](1);
+        assets[0] = USDC;
+        bool[] memory inUSD = new bool[](1);
+        inUSD[0] = true;
+        router.batchUpdatePrices(assets, inUSD);
+        vm.stopPrank();
+
+        (uint256 price, bool hadError) = router.getLatestAssetPrice(USDC, true);
+
+        assertTrue(price > 0, "Price should be greater than zero");
+        assertFalse(hadError, "Should not have error for configured asset");
+
+        address randomAsset = makeAddr("randomAsset");
+        (price, hadError) = router.getLatestAssetPrice(randomAsset, true);
+
+        assertTrue(hadError, "Should have error for unconfigured asset");
+    }
+
+    function testGetLocalAsset() public {
+        vm.prank(admin);
+        router.setCrossChainAssetMapping(10, OPTIMISM_USDC, USDC);
+
+        (address localAsset, uint8 localDecimals) = router.getLocalAsset(10, OPTIMISM_USDC);
+
+        assertEq(localAsset, USDC, "Local asset should be USDC");
+        assertEq(localDecimals, 6, "USDC decimals should be 6");
+
+        address randomAsset = makeAddr("randomAsset");
+        vm.expectRevert(abi.encodeWithSelector(SharePriceRouter.AssetNotConfigured.selector, randomAsset));
+        router.getLocalAsset(10, randomAsset);
+    }
+
+    function testGetSharePrices() public {
+        address[] memory vaults = new address[](3);
+        vaults[0] = address(usdcVault);
+        vaults[1] = address(wethVault);
+        vaults[2] = address(wbtcVault);
+
+        address rewardsDelegate = makeAddr("rewardsDelegate");
+
+        ISharePriceRouter.VaultReport[] memory reports = router.getSharePrices(vaults, rewardsDelegate);
+
+        assertEq(reports.length, 3, "Should return 3 reports");
+
+        for (uint256 i = 0; i < reports.length; i++) {
+            assertEq(reports[i].chainId, uint32(block.chainid), "Chain ID should match");
+            assertEq(reports[i].rewardsDelegate, rewardsDelegate, "Rewards delegate should match");
+            assertTrue(reports[i].sharePrice > 0, "Share price should be greater than zero");
+        }
+
+        assertEq(reports[0].vaultAddress, address(usdcVault), "First vault should be USDC vault");
+        assertEq(reports[0].asset, USDC, "First vault asset should be USDC");
+        assertEq(reports[0].assetDecimals, 6, "USDC decimals should be 6");
+
+        assertEq(reports[1].vaultAddress, address(wethVault), "Second vault should be WETH vault");
+        assertEq(reports[1].asset, WETH, "Second vault asset should be WETH");
+        assertEq(reports[1].assetDecimals, 18, "WETH decimals should be 18");
     }
 }

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import {Script} from "forge-std/Script.sol";
-import {console2} from "forge-std/console2.sol";
-import {Constants} from "../script/libs/Constants.sol";
-import {SharePriceRouter} from "../src/SharePriceRouter.sol";
-import {ChainlinkAdapter} from "../src/adapters/Chainlink.sol";
-import {Api3Adapter} from "../src/adapters/Api3.sol";
-import {MaxLzEndpoint} from "../src/MaxLzEndpoint.sol";
-import {LibString} from "@solady/utils/LibString.sol";
+import { Script } from "forge-std/Script.sol";
+import { console2 } from "forge-std/console2.sol";
+import { Constants } from "../script/libs/Constants.sol";
+import { SharePriceRouter } from "../src/SharePriceRouter.sol";
+import { ChainlinkAdapter } from "../src/adapters/Chainlink.sol";
+import { Api3Adapter } from "../src/adapters/Api3.sol";
+import { MaxLzEndpoint } from "../src/MaxLzEndpoint.sol";
+import { LibString } from "@solady/utils/LibString.sol";
 
 contract Deploy is Script {
     using LibString for uint256;
@@ -29,16 +29,16 @@ contract Deploy is Script {
         admin = vm.envAddress("ADMIN_ADDRESS");
         lzEndpointAddress = vm.envAddress("LZ_ENDPOINT_ADDRESS");
         oracleAddress = vm.envAddress("ORACLE_ADDRESS");
-        
+
         vm.startBroadcast(deployerPrivateKey);
-        
+
         // Deploy core contracts
         _deployCore();
 
         // Deploy chain-specific contracts
         if (block.chainid == Constants.BASE) {
             _deployOnBase();
-        } 
+        }
 
         // Save deployment info
         _saveDeployment();
@@ -70,12 +70,8 @@ contract Deploy is Script {
         chainlinkAdapter = new ChainlinkAdapter(admin, oracleAddress, address(router));
         console2.log("ChainlinkAdapter deployed at:", address(chainlinkAdapter));
 
-        api3Adapter = new Api3Adapter(
-            admin, 
-            address(router), 
-            address(router), 
-            0x4200000000000000000000000000000000000006
-        );
+        api3Adapter =
+            new Api3Adapter(admin, address(router), address(router), 0x4200000000000000000000000000000000000006);
         console2.log("Api3Adapter deployed at:", address(api3Adapter));
 
         // Setup adapter permissions
@@ -93,11 +89,11 @@ contract Deploy is Script {
     function _saveDeployment() internal {
         string memory chainName = _getChainName();
         string memory timestamp = block.timestamp.toString();
-        
+
         // Create directory structure
         string memory deploymentDir = string.concat("deployments/", chainName, "/", timestamp);
         vm.createDir(deploymentDir, true);
-        
+
         // Write addresses file
         string memory addressesPath = string.concat(deploymentDir, "/addresses.json");
         vm.writeFile(addressesPath, _generateDeploymentJson());
@@ -106,10 +102,7 @@ contract Deploy is Script {
         string memory latestPath = string.concat("deployments/", chainName, "/latest");
         //vm.removeFile(latestPath); // Remove old symlink if exists
         vm.createDir(latestPath, true); // Create latest directory
-        vm.writeFile(
-            string.concat(latestPath, "/addresses.json"),
-            _generateDeploymentJson()
-        );
+        vm.writeFile(string.concat(latestPath, "/addresses.json"), _generateDeploymentJson());
 
         console2.log("");
         console2.log("Deployment addresses saved to:", addressesPath);
@@ -125,13 +118,13 @@ contract Deploy is Script {
         json = string.concat(json, '"contracts":{');
         json = string.concat(json, '"router":"', address(router).toHexString(), '",');
         json = string.concat(json, '"maxLzEndpoint":"', address(maxLzEndpoint).toHexString(), '"');
-        
+
         if (block.chainid == Constants.BASE) {
-            json = string.concat(json, ',');
+            json = string.concat(json, ",");
             json = string.concat(json, '"chainlinkAdapter":"', address(chainlinkAdapter).toHexString(), '",');
             json = string.concat(json, '"api3Adapter":"', address(api3Adapter).toHexString(), '"');
         }
-        
+
         json = string.concat(json, "}}");
         return json;
     }

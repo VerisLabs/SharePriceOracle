@@ -87,7 +87,15 @@ contract ChainlinkAdapter is BaseOracleAdapter {
      * @param inUSD Whether to return the price in USD (true) or ETH (false)
      * @return ISharePriceRouter.PriceReturnData Structure containing price, error status, and denomination
      */
-    function getPrice(address asset, bool inUSD) external view override returns (ISharePriceRouter.PriceReturnData memory) {
+    function getPrice(
+        address asset,
+        bool inUSD
+    )
+        external
+        view
+        override
+        returns (ISharePriceRouter.PriceReturnData memory)
+    {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
             revert ChainlinkAdaptor__AssetNotSupported();
@@ -98,7 +106,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
         if (inUSD) {
             return _getPriceInUSD(asset);
         }
-        
+
         return _getPriceInETH(asset);
     }
 
@@ -232,7 +240,14 @@ contract ChainlinkAdapter is BaseOracleAdapter {
      * @param inUSD Whether price is in USD (true) or ETH (false)
      * @return pData Structure containing normalized price and status
      */
-    function _parseData(AdapterData memory data, bool inUSD) internal view returns (ISharePriceRouter.PriceReturnData memory pData) {
+    function _parseData(
+        AdapterData memory data,
+        bool inUSD
+    )
+        internal
+        view
+        returns (ISharePriceRouter.PriceReturnData memory pData)
+    {
         pData.inUSD = inUSD;
         if (!ISharePriceRouter(ORACLE_ROUTER_ADDRESS).isSequencerValid()) {
             revert ChainlinkAdaptor__SequencerDown();

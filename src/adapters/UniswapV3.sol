@@ -78,7 +78,15 @@ contract UniswapV3Adapter is BaseOracleAdapter {
     ///              USD or not.
     /// @return pData A structure containing the price, error status,
     ///                         and the quote format of the price.
-    function getPrice(address asset, bool inUSD) external view override returns (ISharePriceRouter.PriceReturnData memory pData) {
+    function getPrice(
+        address asset,
+        bool inUSD
+    )
+        external
+        view
+        override
+        returns (ISharePriceRouter.PriceReturnData memory pData)
+    {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
             revert UniswapV3Adaptor__AssetIsNotSupported(asset);

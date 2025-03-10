@@ -469,11 +469,7 @@ contract MaxLzEndpointTest is BaseTest {
         vm.startPrank(admin);
 
         MaxLzEndpoint.EnforcedOptionParam[] memory params = new MaxLzEndpoint.EnforcedOptionParam[](1);
-        params[0] = MaxLzEndpoint.EnforcedOptionParam({
-            eid: 30_109,
-            msgType: 1,
-            options: hex"0001" 
-         });
+        params[0] = MaxLzEndpoint.EnforcedOptionParam({ eid: 30_109, msgType: 1, options: hex"0001" });
 
         vm.expectRevert();
         endpoint.setEnforcedOptions(params);
@@ -521,5 +517,138 @@ contract MaxLzEndpointTest is BaseTest {
 
         assertEq(user.balance, initialBalance + refundAmount, "ETH should be refunded");
         assertEq(address(endpoint).balance, 1 ether, "Contract balance should be reduced");
+    }
+
+    function test_assertOptionsType3() public {
+        switchTo("BASE");
+        vm.startPrank(admin);
+
+        bytes memory validOptions = endpoint.addExecutorLzReceiveOption(endpoint.newOptions(), 200_000, 0);
+        MaxLzEndpoint.EnforcedOptionParam[] memory params = new MaxLzEndpoint.EnforcedOptionParam[](1);
+        params[0] = MaxLzEndpoint.EnforcedOptionParam({ eid: 30_109, msgType: 1, options: validOptions });
+
+        endpoint.setEnforcedOptions(params);
+
+        bytes memory invalidOptions = hex"0002";
+        params[0].options = invalidOptions;
+
+        vm.expectRevert();
+        endpoint.setEnforcedOptions(params);
+
+        bytes memory tooShortOptions = hex"00";
+        params[0].options = tooShortOptions;
+
+        vm.expectRevert();
+        endpoint.setEnforcedOptions(params);
+
+        vm.stopPrank();
+    }
+
+    function test_revertWhen_InvalidOptionsLength() public {
+        switchTo("BASE");
+        vm.startPrank(admin);
+
+        address[] memory vaults = new address[](1);
+        vaults[0] = address(vault);
+
+        bytes memory invalidOptions = hex"00";
+
+        uint256 mockFee = 15_780_837_555_745;
+        vm.mockCall(
+            base_LZ_end,
+            abi.encodeWithSelector(ILayerZeroEndpointV2.quote.selector),
+            abi.encode(MessagingFee(mockFee, 0))
+        );
+
+        vm.deal(admin, mockFee);
+
+        vm.expectRevert();
+        endpoint.sendSharePrices{ value: mockFee }(30_109, vaults, invalidOptions, user);
+
+        vm.stopPrank();
+    }
+
+    function test_allowInitializePath() public {
+        switchTo("BASE");
+
+        Origin memory validOrigin = Origin(30_109, bytes32(uint256(uint160(address(endpoint_pol)))), 0);
+        bool allowed = endpoint.allowInitializePath(validOrigin);
+        assertTrue(allowed, "Should allow initialization from valid peer");
+
+        Origin memory invalidOrigin = Origin(30_109, bytes32(uint256(uint160(makeAddr("not-a-peer")))), 0);
+        allowed = endpoint.allowInitializePath(invalidOrigin);
+        assertFalse(allowed, "Should not allow initialization from invalid peer");
+    }
+
+    function test_nextNonce() public {
+        switchTo("BASE");
+
+        uint64 nonce = endpoint.nextNonce(0, bytes32(0));
+        assertEq(nonce, 0, "Next nonce should always be 0");
+    }
+
+    function test_newOptions_and_addExecutorLzReceiveOption() public {
+        switchTo("BASE");
+
+        bytes memory options = endpoint.newOptions();
+        assertEq(options.length, 2, "New options should have length 2");
+        assertEq(options[0], 0x00, "First byte of new options should be 0x00");
+
+        bytes memory optionsWithExecutor = endpoint.addExecutorLzReceiveOption(options, 200_000, 0);
+        assertGt(optionsWithExecutor.length, options.length, "Options with executor should be longer");
+
+        bytes memory optionsWithValue = endpoint.addExecutorLzReceiveOption(options, 200_000, 100);
+        assertGt(optionsWithValue.length, optionsWithExecutor.length, "Options with value should be longer");
+    }
+
+    function test_receive_function() public {
+        switchTo("BASE");
+
+        uint256 initialBalance = address(endpoint).balance;
+
+        (bool success,) = address(endpoint).call{ value: 1 ether }("");
+        assertTrue(success, "Receive function should accept ETH");
+
+        assertEq(address(endpoint).balance, initialBalance + 1 ether, "Contract balance should increase");
+    }
+
+    function test_revertWhen_ABAResponseWithInsufficientFunds() public {
+        switchTo("BASE");
+        vm.startPrank(base_LZ_end);
+
+        address[] memory vaults = new address[](1);
+        vaults[0] = address(vault);
+
+        bytes memory returnOptions = endpoint.addExecutorLzReceiveOption(endpoint.newOptions(), 200_000, 0);
+        bytes memory message = MsgCodec.encodeVaultAddresses(2, vaults, user, returnOptions);
+
+        Origin memory origin = Origin(30_109, bytes32(uint256(uint160(address(endpoint_pol)))), 0);
+        bytes32 guid = keccak256(abi.encodePacked(block.timestamp, msg.sender));
+
+        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
+        reports[0] = ISharePriceRouter.VaultReport({
+            chainId: 8453,
+            vaultAddress: address(vault),
+            sharePrice: 1e18,
+            rewardsDelegate: user,
+            lastUpdate: uint64(block.timestamp),
+            asset: WETH,
+            assetDecimals: 18
+        });
+
+        vm.mockCall(
+            address(oracle), abi.encodeWithSelector(ISharePriceRouter.getSharePrices.selector), abi.encode(reports)
+        );
+
+        vm.mockCall(
+            base_LZ_end,
+            abi.encodeWithSelector(ILayerZeroEndpointV2.quote.selector),
+            abi.encode(MessagingFee(1 ether, 0))
+        );
+
+        vm.expectRevert();
+        endpoint.lzReceive(origin, guid, message, address(0), "");
+
+        vm.stopPrank();
     }
 }

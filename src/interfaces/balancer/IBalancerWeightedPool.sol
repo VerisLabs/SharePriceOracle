@@ -6,4 +6,4 @@ interface IBalancerWeightedPool {
     function getNormalizedWeights() external view returns (uint256[] memory);
     function getLastInvariant() external view returns (uint256);
     function getLastInvariantCalculationTimestamp() external view returns (uint256);
-} 
+}

@@ -84,7 +84,15 @@ contract Api3Adapter is BaseOracleAdapter {
      * @return A structure containing the price, error status,
      *         and the quote format of the price.
      */
-    function getPrice(address asset, bool inUSD) external view override returns (ISharePriceRouter.PriceReturnData memory) {
+    function getPrice(
+        address asset,
+        bool inUSD
+    )
+        external
+        view
+        override
+        returns (ISharePriceRouter.PriceReturnData memory)
+    {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
             revert Api3Adapter__AssetNotSupported();
@@ -205,7 +213,14 @@ contract Api3Adapter is BaseOracleAdapter {
     /// @param inUSD A boolean to denote if the price is in USD.
     /// @return pData A structure containing the price, error status,
     ///               and the currency of the price.
-    function _parseData(AdapterData memory data, bool inUSD) internal view returns (ISharePriceRouter.PriceReturnData memory pData) {
+    function _parseData(
+        AdapterData memory data,
+        bool inUSD
+    )
+        internal
+        view
+        returns (ISharePriceRouter.PriceReturnData memory pData)
+    {
         (int256 price, uint256 updatedAt) = data.proxyFeed.read();
 
         if (price <= 0) {
