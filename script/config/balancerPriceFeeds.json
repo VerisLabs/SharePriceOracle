@@ -72,44 +72,79 @@
         "vault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
         "pools": {
           "WETH": {
-            "USD": {
-              "poolId": "0x64541216bafffeec8ea535bb71fbc927831d0595000100000000000000000002",
-              "quoteToken": "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
+            "ARBI": {
+              "poolId": "0xa83b8d30f61d7554ad425d8067d8ba6eaeb6b042000200000000000000000525",
+              "quoteToken": "0x912ce59144191c1204e64559fe8253a0e49e6548",
               "heartbeat": 14400
             }
           },
-          "USDC": {
-            "ETH": {
-              "poolId": "0x64541216bafffeec8ea535bb71fbc927831d0595000100000000000000000002",
-              "quoteToken": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+          "tBTC": {
+            "WETH": {
+              "poolId": "0xc9f52540976385a84bf416903e1ca3983c539e34000200000000000000000434",
+              "quoteToken": "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
+              "heartbeat": 14400
+            }
+          },
+          "ARBI": {
+            "USDCe": {
+              "poolId": "0x0052688295413b32626d226a205b95cdb337de860002000000000000000003d1",
+              "quoteToken": "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8",
+              "heartbeat": 14400
+            }
+          },
+          "ARB": {
+            "WETH": {
+              "poolId": "0x2d42910d826e5500579d121596e98a6eb33c0a1b0002000000000000000003d9",
+              "quoteToken": "0x912ce59144191c1204e64559fe8253a0e49e6548",
               "heartbeat": 14400
             }
           },
           "WBTC": {
-            "USD": {
-              "poolId": "0xa7eb7e5000a87a2ffa354bfe6481a938c2eb7936000100000000000000000021",
-              "quoteToken": "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
+            "WETH": {
+              "poolId": "0x5582b457bebc3cd3f88035f7f54b65fec27b3f4400020000000000000000023a",
+              "quoteToken": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
               "heartbeat": 14400
             }
           },
-          "wstETH": {
-            "ETH": {
-              "poolId": "0xdac42eeb17758daa38caf9a3540c808247527ae3000200000000000000000098",
-              "quoteToken": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
-              "heartbeat": 14400
-            }
-          },
-          "rETH": {
-            "ETH": {
-              "poolId": "0xade4a71bb62bec25154cfc7e6ff49a513b491e81000000000000000000000253",
-              "quoteToken": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+          "LINK": {
+            "WETH": {
+              "poolId": "0x651e00ffd5ecfa7f3d4f33d62ede0a97cf62ede2000200000000000000000006",
+              "quoteToken": "0xf97f4df75117a78c1a5a0dbb814af92458539fb4",
               "heartbeat": 14400
             }
           },
           "DAI": {
-            "USD": {
-              "poolId": "0x0510ccf9eb3ab03c1508d3b9769e8ee2cfd6fdcf00000000000000000000005d",
-              "quoteToken": "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
+            "WETH": {
+              "poolId": "0x7436422be6a633f804f70a0fd2c92876fef837350002000000000000000001e6",
+              "quoteToken": "0xda10009cbd5d07dd0cecc66161fc93d7c9000da1",
+              "heartbeat": 14400
+            }
+          },
+          "USDT": {
+            "USDC": {
+              "poolId": "0xed8c41c832c47552d521511760f872ed7c2dde17000200000000000000000073",
+              "quoteToken": "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+              "heartbeat": 14400
+            }
+          },
+          "wstETH": {
+            "WBTC": {
+              "poolId": "0xb5bd58c733948e3d65d86ba9604e06e5da276fd10002000000000000000003e6",
+              "quoteToken": "0x5979d7b546e38e414f7e9822514be443a4800529",
+              "heartbeat": 14400
+            }
+          },
+          "rETH": {
+            "USDC": {
+              "poolId": "0x45eb4a0ab39d504943fbd2e04e266f9a5f328fd800020000000000000000055d",
+              "quoteToken": "0xec70dcb4a1efa46b8f2d97c310c9c4790ba5ffa8",
+              "heartbeat": 14400
+            }
+          },
+          "WBTCwETHuSDCe": {
+            "USDC": {
+              "poolId": "0x64541216bafffeec8ea535bb71fbc927831d0595000100000000000000000002",
+              "quoteToken": "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8",
               "heartbeat": 14400
             }
           }
