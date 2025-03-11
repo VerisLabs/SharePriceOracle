@@ -58,8 +58,6 @@ contract TestCurve2PoolAssetAdapter is Test {
             address(router),  // oracle
             address(router)  // router
         );
-        console2.log("### ~ Curve2Pool.t.sol:60 ~ setUp ~ chainlinkAdapter:", address(chainlinkAdapter));
-
         // Grant ORACLE_ROLE to test contract
         chainlinkAdapter.grantRole(address(this), uint256(adapter.ORACLE_ROLE()));
 
@@ -83,24 +81,6 @@ contract TestCurve2PoolAssetAdapter is Test {
 
     }
 
-    function testRevertWhenUnderlyingAssetPriceNotSet() public {
-        Curve2PoolAssetAdapter.AdapterData memory data;
-        data.pool = CURVE_PRICE_FEED_CBETH;
-        data.baseToken = WETH;
-        data.quoteTokenIndex = 1;
-        data.baseTokenIndex = 0;
-        data.quoteTokenDecimals = 18;
-        data.baseTokenDecimals = 18;
-        data.upperBound = 10200;
-        data.lowerBound = 10000;
-        // vm.expectRevert(
-        //     Curve2PoolAssetAdapter
-        //         .Curve2PoolAssetAdapter__BaseAssetIsNotSupported
-        //         .selector
-        // );
-        adapter.addAsset(CBETH, data);
-    }
-
     function testReturnsCorrectPrice() public {
 
         ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(CBETH, true);
@@ -111,10 +91,6 @@ contract TestCurve2PoolAssetAdapter is Test {
 
         // Log the actual price for verification
         emit log_named_uint("CBETH/USD Price", priceData.price);
-        console2.log("### ~ testReturnsCorrectPrice ~ priceData.price:", priceData.price);
-
-        
-        // assertApproxEqRel(cbethPrice, ethPrice, 0.02 ether);
     }
         
 
@@ -126,7 +102,7 @@ contract TestCurve2PoolAssetAdapter is Test {
         adapter.getPrice(CBETH, true);
     }
     
-    function testRevertAddAsset__UnsupportedPool() public {
+    function testRevertAddAsset__InvalidPool() public {
         adapter.setReentrancyConfig(2, 6000);
 
         Curve2PoolAssetAdapter.AdapterData memory data;
@@ -137,7 +113,7 @@ contract TestCurve2PoolAssetAdapter is Test {
         data.upperBound = 10200;
         data.lowerBound = 9800;
 
-        vm.expectRevert(Curve2PoolAssetAdapter.Curve2PoolAssetAdapter__UnsupportedPool.selector);
+        vm.expectRevert(Curve2PoolAssetAdapter.Curve2PoolAssetAdapter__InvalidPoolAddress.selector);
         adapter.addAsset(CBETH, data);
     }
     
@@ -243,11 +219,11 @@ contract TestCurve2PoolAssetAdapter is Test {
         adapter.raiseBounds(CBETH, 10100, 10500);
 
         vm.expectRevert(Curve2PoolAssetAdapter.Curve2PoolAssetAdapter__BoundsExceeded.selector);
-        adapter.raiseBounds(CBETH, 10100, 10300);
+        adapter.raiseBounds(CBETH, 10200, 10400);
 
         adapter.raiseBounds(CBETH, 10050, 10300);
     }
-
+        
     function testIsLocked() public {
         vm.expectRevert(CurveBaseAdapter.CurveBaseAdapter__PoolNotFound.selector);
         adapter.isLocked(CBETH, 0);

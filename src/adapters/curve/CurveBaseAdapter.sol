@@ -4,6 +4,7 @@ pragma solidity ^0.8.17;
 import { BaseOracleAdapter } from "../../libs/base/BaseOracleAdapter.sol";
 
 import { ICurveRemoveLiquidity } from "src/interfaces/curve/ICurveRemoveLiquidity.sol";
+import { ICurvePool } from "src/interfaces/curve/ICurvePool.sol";
 
 /// @dev Kudos to Curve Finance/Silo Finance/Chain Security for researching
 ///      specific gas limit values for Pool Reentrancy.
@@ -120,4 +121,13 @@ abstract contract CurveBaseAdapter is BaseOracleAdapter {
         reentrancyConfig[coinsLength] = gasLimit;
         emit UpdatedReentrancyConfiguration(coinsLength, gasLimit);
     }
+
+    function isCurvePool(address pool) public view returns (bool) {
+        try ICurvePool(pool).get_virtual_price() returns (uint256) {
+            return true; // It's a Curve pool
+        } catch {
+            return false; // Not a Curve pool
+        }
+    }
+
 }

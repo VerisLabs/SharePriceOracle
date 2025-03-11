@@ -32,8 +32,8 @@ interface ICurvePool {
     function stored_rates() external view returns (uint256[2] memory);
 
     function get_dy(
-        int128 from,
-        int128 to,
+        uint256 from,
+        uint256 to,
         uint256 _from_amount
     ) external view returns (uint256);
 }

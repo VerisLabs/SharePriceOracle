@@ -8,9 +8,6 @@ import { ISharePriceRouter } from "../../interfaces/ISharePriceRouter.sol";
 import { ICurvePool } from "../../interfaces/curve/ICurvePool.sol";
 import { ERC20 } from "@solady/tokens/ERC20.sol";
 
-import {console2} from "forge-std/console2.sol";
-
-
 /// @notice NOTE: BE CAREFUL USING THIS FEED, ALTHOUGH IT HAS MANY PROTECTIVE
 ///               LAYERS ITS STILL INTENDED TO BE COMBINED WITH OTHER ORACLE
 ///               SOLUTIONS. DO NOT USE THIS ORACLE BY ITSELF.
@@ -79,6 +76,7 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
     error Curve2PoolAssetAdapter__InvalidBounds();
     error Curve2PoolAssetAdapter__InvalidAsset();
     error Curve2PoolAssetAdapter__InvalidAssetIndex();
+    error Curve2PoolAssetAdapter__InvalidPoolAddress();
 
     /// CONSTRUCTOR ///
 
@@ -127,21 +125,16 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
         
         // Validate we support this pool and that this is not
         // a reeentrant call.
-        // if (isLocked(data.pool, 2)) {
-        //     revert Curve2PoolAssetAdapter__Reentrant();
-        // }
+        if (isLocked(data.pool, 2)) {
+            revert Curve2PoolAssetAdapter__Reentrant();
+        }
 
         // Cache the curve pool.
         ICurvePool pool = ICurvePool(data.pool);
-        console2.log("### ~ )externalviewoverridereturns ~ pool:", data.pool);
-
         // Make sure virtualPrice is reasonable.
         uint256 virtualPrice = pool.get_virtual_price();
-        console2.log("### ~ Curve2Pool.sol:135 ~ )externalviewoverridereturns ~ virtualPrice:", virtualPrice);
+        
         _enforceBounds(virtualPrice, data.lowerBound, data.upperBound);
-
-
-        console2.log("### ~ )externalviewoverridereturns ~ data.baseToken:", data.baseToken);
 
         // Get underlying token prices.
         
@@ -157,14 +150,12 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
         uint256 sample = pool.balances(
             uint256(uint128(data.quoteTokenIndex))
         ) / 100;
-        console2.log("### ~ Curve2Pool.sol:155 ~ )externalviewoverridereturns ~ sample:", sample);
 
         uint256 out = pool.get_dy(
-            data.quoteTokenIndex,
-            data.baseTokenIndex,
+            uint256(int256(data.quoteTokenIndex)),
+            uint256(int256(data.baseTokenIndex)),
             sample
         );
-        console2.log("### ~ Curve2Pool.sol:162 ~ )externalviewoverridereturns ~ out:", out);
 
         uint256 price = (out * WAD * (10 ** data.quoteTokenDecimals)) /
             sample /
@@ -191,11 +182,16 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
     function addAsset(address asset, AdapterData memory data) external {
         _checkOraclePermissions();
 
+        if (!isCurvePool(data.pool)) {
+            revert Curve2PoolAssetAdapter__InvalidPoolAddress();
+        }
+
         // Make sure that the asset being added has the proper input
         // via this sanity check.
         if (isLocked(data.pool, 2)) {
-            revert Curve2PoolAssetAdapter__UnsupportedPool();
+            revert Curve2PoolAssetAdapter__Reentrant();
         }
+
 
         // Make sure `asset` is not trying to price denominated in itself.
         if (asset == data.baseToken) {
