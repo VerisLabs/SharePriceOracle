@@ -9,11 +9,11 @@ import { IBalancerV2WeightedPool } from "../interfaces/balancer/IBalancerV2Weigh
 import { FixedPointMathLib } from "@solady/utils/FixedPointMathLib.sol";
 
 /**
- * @title BalancerPriceAdapter
+ * @title BalancerAdapter
  * @notice Extracts asset prices from Balancer V2 weighted pools
  * @dev Provides price data from Balancer pools to the SharePriceRouter
  */
-contract BalancerPriceAdapter is BaseOracleAdapter {
+contract BalancerAdapter is BaseOracleAdapter {
     /*//////////////////////////////////////////////////////////////
                                 TYPES
     //////////////////////////////////////////////////////////////*/

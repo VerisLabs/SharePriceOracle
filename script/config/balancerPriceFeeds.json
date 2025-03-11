@@ -150,48 +150,41 @@
           }
         }
       },
-      "optimism": {
+      "polygon": {
         "vault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
         "pools": {
-          "WETH": {
-            "USD": {
-              "poolId": "0x39965c9dab5448482cf7e002f583c812ceb53046000100000000000000000003",
-              "quoteToken": "0x7F5c764cBc14f9669B88837ca1490cCa17c31607",
+          "USDCwBTC": {
+            "WETH": {
+              "poolId": "0x03cd191f589d12b0582a99808cf19851e468e6b500010000000000000000000a",
+              "quoteTokenbtc": "0x1bfd67037b42cf73acf2047067bd4f2c47d9bfd6",
               "heartbeat": 14400
             }
           },
           "USDC": {
-            "ETH": {
-              "poolId": "0x39965c9dab5448482cf7e002f583c812ceb53046000100000000000000000003",
-              "quoteToken": "0x4200000000000000000000000000000000000006",
+            "WETH": {
+              "poolId": "0x10f21c9bd8128a29aa785ab2de0d044dcdd79436000200000000000000000059",
+              "quoteToken": "0x7ceb23fd6bc0add59e62ac25578270cff1b9f619",
               "heartbeat": 14400
             }
           },
-          "WBTC": {
-            "USD": {
-              "poolId": "0xde45f101250f2ca1c0f8adfc172576d10c12072d00000000000000000000003f",
-              "quoteToken": "0x7F5c764cBc14f9669B88837ca1490cCa17c31607",
+          "WBTCwETH": {
+            "USDC": {
+              "poolId": "0x702605f43471183158938c1a3e5f5a359d7b31ba00010000000000000000004a",
+              "quoteToken": "0x1bfd67037b42cf73acf2047067bd4f2c47d9bfd6",
               "heartbeat": 14400
             }
           },
-          "wstETH": {
-            "ETH": {
-              "poolId": "0xc899d66a4a481e143e690b2d689d7cbcfbe898dd0002000000000000000002ea",
-              "quoteToken": "0x4200000000000000000000000000000000000006",
+          "wETH": {
+            "wPOL": {
+              "poolId": "0x61d5dc44849c9c87b0856a2a311536205c96c7fd000200000000000000000000",
+              "quoteToken": "0x7ceb23fd6bc0add59e62ac25578270cff1b9f619",
               "heartbeat": 14400
             }
           },
-          "rETH": {
-            "ETH": {
-              "poolId": "0xbf1430d9ec673886c3dbb699442ed2df2a49c502000200000000000000000312",
-              "quoteToken": "0x4200000000000000000000000000000000000006",
-              "heartbeat": 14400
-            }
-          },
-          "DAI": {
-            "USD": {
-              "poolId": "0x450f3f0c32e542dd7a0eef7ee3a6f4dc3a00e5ba00000000000000000000051d", 
-              "quoteToken": "0x7F5c764cBc14f9669B88837ca1490cCa17c31607",
+          "wPOL": {
+            "wETH": {
+              "poolId": "0x67ec8a73348a8c463b9fd5827f4815a96312d260000200000000000000000a4b",
+              "quoteToken": "0x7ceb23fd6bc0add59e62ac25578270cff1b9f619",
               "heartbeat": 14400
             }
           }

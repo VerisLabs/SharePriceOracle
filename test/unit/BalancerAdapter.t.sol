@@ -2,14 +2,14 @@
 pragma solidity ^0.8.19;
 
 import { Test } from "forge-std/Test.sol";
-import { BalancerPriceAdapter } from "../../src/adapters/BalancerPriceAdapter.sol";
+import { BalancerAdapter } from "../../src/adapters/Balancer.sol";
 import { SharePriceRouter } from "../../src/SharePriceRouter.sol";
 import { IBalancerV2Vault } from "../../src/interfaces/balancer/IBalancerV2Vault.sol";
 import { IBalancerV2WeightedPool } from "../../src/interfaces/balancer/IBalancerV2WeightedPool.sol";
 import { ISharePriceRouter } from "../../src/interfaces/ISharePriceRouter.sol";
 import { IERC20Metadata } from "../../src/interfaces/IERC20Metadata.sol";
 
-contract BalancerPriceAdapterTest is Test {
+contract BalancerAdapterTest is Test {
     // Constants for BASE network
     address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
     address constant WETH = 0x4200000000000000000000000000000000000006;
@@ -22,7 +22,7 @@ contract BalancerPriceAdapterTest is Test {
     
     uint256 constant HEARTBEAT = 4 hours;
 
-    BalancerPriceAdapter public adapter;
+    BalancerAdapter public adapter;
     SharePriceRouter public router;
 
     function setUp() public {
@@ -33,7 +33,7 @@ contract BalancerPriceAdapterTest is Test {
             address(this) 
         );
 
-        adapter = new BalancerPriceAdapter(
+        adapter = new BalancerAdapter(
             address(this),
             address(router),
             address(router),
@@ -187,7 +187,7 @@ contract BalancerPriceAdapterTest is Test {
     }
 
     function testRevertGetPrice_AssetNotSupported() public {
-        vm.expectRevert(BalancerPriceAdapter.BalancerAdapter__AssetNotSupported.selector);
+        vm.expectRevert(BalancerAdapter.BalancerAdapter__AssetNotSupported.selector);
         adapter.getPrice(address(0xdead), true);
     }
 
@@ -198,12 +198,12 @@ contract BalancerPriceAdapterTest is Test {
 
         adapter.removeAsset(WETH);
 
-        vm.expectRevert(BalancerPriceAdapter.BalancerAdapter__AssetNotSupported.selector);
+        vm.expectRevert(BalancerAdapter.BalancerAdapter__AssetNotSupported.selector);
         adapter.getPrice(WETH, true);
     }
 
     function testRevertAddAsset_InvalidHeartbeat() public {
-        vm.expectRevert(BalancerPriceAdapter.BalancerAdapter__InvalidHeartbeat.selector);
+        vm.expectRevert(BalancerAdapter.BalancerAdapter__InvalidHeartbeat.selector);
         adapter.addAsset(
             WETH,
             WETH_USDC_POOL_ID,
@@ -228,7 +228,7 @@ contract BalancerPriceAdapterTest is Test {
             abi.encode(WETH_USDC_POOL, uint8(1))
         );
 
-        vm.expectRevert(BalancerPriceAdapter.BalancerAdapter__TokensNotInPool.selector);
+        vm.expectRevert(BalancerAdapter.BalancerAdapter__TokensNotInPool.selector);
         adapter.addAsset(
             WETH,
             fakePoolId,
@@ -273,7 +273,7 @@ contract BalancerPriceAdapterTest is Test {
     }
 
     function testRevertRemoveAsset_AssetNotSupported() public {
-        vm.expectRevert(BalancerPriceAdapter.BalancerAdapter__AssetNotSupported.selector);
+        vm.expectRevert(BalancerAdapter.BalancerAdapter__AssetNotSupported.selector);
         adapter.removeAsset(address(0));
     }
 }
