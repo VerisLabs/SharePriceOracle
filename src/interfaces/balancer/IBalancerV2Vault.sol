@@ -18,7 +18,7 @@ interface IBalancerV2Vault {
         external
         view
         returns (address[] memory tokens, uint256[] memory balances, uint256 lastChangeBlock);
-    
+
     /**
      * @notice Returns the Pool information associated with a Pool ID
      * @param poolId The ID of the Pool
@@ -37,7 +37,7 @@ interface IBalancerV2WeightedPool {
      * @return The normalization weight of each token in the pool
      */
     function getNormalizedWeights() external view returns (uint256[] memory);
-    
+
     /**
      * @notice Returns the time of the last swap in the pool
      * @return The timestamp of the last swap

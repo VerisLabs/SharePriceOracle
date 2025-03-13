@@ -19,10 +19,19 @@ library Bytes32Helper {
         if (bytesData.length == 0) {
             revert Bytes32Helper__ZeroLengthString();
         }
-
         /// @solidity memory-safe-assembly
         assembly {
             result := mload(add(stringData, 32))
+        }
+
+        // For strings shorter than 32 bytes, clear the unused bits
+        // This ensures proper right-padding with zeros
+        if (bytesData.length < 32) {
+            // Create a mask for the bits we want to keep
+            // Keep the first (bytesData.length * 8) bits, zero out the rest
+            uint256 mask = type(uint256).max << (8 * (32 - bytesData.length));
+            // Apply the mask
+            result = bytes32(uint256(result) & mask);
         }
     }
 

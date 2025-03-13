@@ -231,7 +231,7 @@ contract Api3Adapter is BaseOracleAdapter {
         uint256 rawPrice = uint256(price);
 
         if (rawPrice > type(uint240).max) {
-            rawPrice = rawPrice / 1e9;
+            rawPrice = type(uint240).max;
         }
 
         pData.price = uint240(rawPrice);

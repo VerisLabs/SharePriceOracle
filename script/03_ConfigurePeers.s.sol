@@ -12,11 +12,7 @@ contract ConfigurePeers is Script {
 
     function run() external {
         // This script is for Optimism, Arbitrum, and Polygon
-        require(
-            block.chainid == Constants.OPTIMISM || block.chainid == Constants.ARBITRUM
-                || block.chainid == Constants.POLYGON,
-            "This script is only for Optimism, Arbitrum, or Polygon"
-        );
+        require(block.chainid != Constants.BASE, "This script is not for Base chain");
 
         (,, address maxLzAddress) = Constants.getChainConfig(uint32(block.chainid));
         (uint32 baseLzId,, address baseMazLzEndpointAddress) = Constants.getChainConfig(8453);

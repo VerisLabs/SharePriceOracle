@@ -11,7 +11,7 @@ interface IBalancerV2WeightedPool {
      * @return The normalization weight of each token in the pool
      */
     function getNormalizedWeights() external view returns (uint256[] memory);
-    
+
     /**
      * @notice Returns the pool's last change block
      * @return The block number of the last change to the pool

@@ -263,6 +263,10 @@ contract ChainlinkAdapter is BaseOracleAdapter {
 
         uint256 newPrice = (uint256(price) * WAD) / (10 ** data.decimals);
 
+        if (newPrice > type(uint240).max) {
+            newPrice = type(uint240).max;
+        }
+
         pData.price = uint240(newPrice);
         pData.hadError = _verifyData(uint256(price), updatedAt, data.max, data.min, data.heartbeat);
     }

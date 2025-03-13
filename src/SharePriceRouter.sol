@@ -250,8 +250,13 @@ contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
      * @return True if the asset is supported
      */
     function isSupportedAsset(address asset) external view returns (bool) {
-        LocalAssetConfig memory config = localAssetConfigs[asset][0];
-        return config.priceFeed != address(0);
+        uint8 highestPriority = assetAdapterPriority[asset];
+        for (uint8 i = 0; i <= highestPriority; i++) {
+            if (localAssetConfigs[asset][i].priceFeed != address(0)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
