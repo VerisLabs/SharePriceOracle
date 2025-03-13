@@ -57,17 +57,20 @@ contract AerodromeV2Adapter is AerodromeBaseAdapter {
         console2.log("### ~ AerodromeV2.sol:51 ~ )externalviewvirtualoverridereturns ~ sqrtPriceX96:", sqrtPriceX96);
 
         //  Convert sqrtPriceX96 to sqrtPrice
-        uint256 sqrtPrice = FixedPointMathLib.fullMulDiv(sqrtPriceX96, 1e18, 2**96);
+        uint256 sqrtPrice = sqrtPriceX96.fullMulDiv(1e18, 2**96);
         console2.log("### ~ AerodromeV2.sol:61 ~ )externalviewvirtualoverridereturns ~ sqrtPrice:", sqrtPrice);
 
         // Compute USDC per cbBTC (price ratio)
         uint256 priceUSDCPerCbBTC = sqrtPrice.fullMulDiv(sqrtPrice, 1e18);
+        console2.log("### ~ AerodromeV2.sol:65 ~ )externalviewvirtualoverridereturns ~ priceUSDCPerCbBTC:", priceUSDCPerCbBTC);
 
         // Compute cbBTC per USDC
         uint256 priceCbBTCPerUSDC = uint256(1e18).fullMulDiv(1e18, priceUSDCPerCbBTC);
-
         console2.log("### ~ AerodromeV2.sol:66 ~ )externalviewvirtualoverridereturns ~ priceCbBTCPerUSDC:", priceCbBTCPerUSDC);
 
+        console2.log("### ~ AerodromeV2.sol:72 ~ )externalviewvirtualoverridereturns ~ data.baseTokenDecimals:", data.baseTokenDecimals);
+        console2.log("### ~ AerodromeV2.sol:72 ~ )externalviewvirtualoverridereturns ~ data.quoteTokenDecimals:", data.quoteTokenDecimals);
+            
         uint256 scaleFactor = data.quoteTokenDecimals > data.baseTokenDecimals 
             ? 10 ** (data.quoteTokenDecimals - data.baseTokenDecimals) 
             : 1e18 / (10 ** (data.baseTokenDecimals - data.quoteTokenDecimals));

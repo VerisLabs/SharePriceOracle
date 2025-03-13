@@ -63,7 +63,7 @@ contract TestAerodromeV2Adapter is Test {
         AerodromeV2Adapter.AdapterData memory data;
         data.pool = AERO_POOL_cbBTC_USDC;
         data.baseToken = USDC;
-        data.quoteTokenDecimals = 18;
+        data.quoteTokenDecimals = 8;
         data.baseTokenDecimals = 6;
        
         adapter.addAsset(cbBTC, data);
@@ -96,7 +96,7 @@ contract TestAerodromeV2Adapter is Test {
         AerodromeV2Adapter.AdapterData memory data;
         data.pool = cbBTC;
         data.baseToken = USDC;
-        data.quoteTokenDecimals = 18;
+        data.quoteTokenDecimals = 8;
         data.baseTokenDecimals = 6;
 
         vm.expectRevert(AerodromeBaseAdapter.AerodromeAdapter__InvalidPoolAddress.selector);
@@ -107,7 +107,7 @@ contract TestAerodromeV2Adapter is Test {
         AerodromeV2Adapter.AdapterData memory data;
         data.pool = AERO_POOL_cbBTC_USDC;
         data.baseToken = USDC;
-        data.quoteTokenDecimals = 18;
+        data.quoteTokenDecimals = 8;
         data.baseTokenDecimals = 6;
 
         vm.expectRevert(AerodromeBaseAdapter.AerodromeAdapter__InvalidAsset.selector);
@@ -120,7 +120,7 @@ contract TestAerodromeV2Adapter is Test {
         AerodromeV2Adapter.AdapterData memory data;
         data.pool = AERO_POOL_cbBTC_USDC;
         data.baseToken = USDC;
-        data.quoteTokenDecimals = 18;
+        data.quoteTokenDecimals = 8;
         data.baseTokenDecimals = 6;
 
         adapter.addAsset(cbBTC, data);
