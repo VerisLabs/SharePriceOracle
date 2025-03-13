@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {AerodromeBaseAdapter} from "./AerodromeBaseAdapter.sol";
+import { AerodromeBaseAdapter } from "./AerodromeBaseAdapter.sol";
 import { ISharePriceRouter } from "../../interfaces/ISharePriceRouter.sol";
 import { IAerodromeV2Pool } from "../../interfaces/aerodrome/IAerodromeV2Pool.sol";
-
-import {console2} from "forge-std/console2.sol";
-
 import { FixedPointMathLib } from "@solady/utils/FixedPointMathLib.sol";
 
 contract AerodromeV2Adapter is AerodromeBaseAdapter {
@@ -20,7 +17,8 @@ contract AerodromeV2Adapter is AerodromeBaseAdapter {
         address _oracle,
         address _oracleRouter
     )
-    AerodromeBaseAdapter(_admin, _oracle, _oracleRouter) {}
+        AerodromeBaseAdapter(_admin, _oracle, _oracleRouter)
+    { }
 
     /// EXTERNAL FUNCTIONS ///
 
@@ -34,7 +32,13 @@ contract AerodromeV2Adapter is AerodromeBaseAdapter {
     function getPrice(
         address asset,
         bool inUSD
-    ) external view virtual override returns (ISharePriceRouter.PriceReturnData memory pData) {
+    )
+        external
+        view
+        virtual
+        override
+        returns (ISharePriceRouter.PriceReturnData memory pData)
+    {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
             revert AerodromeAdapter__AssetIsNotSupported();
@@ -43,49 +47,30 @@ contract AerodromeV2Adapter is AerodromeBaseAdapter {
         AdapterData memory data = adapterData[asset];
 
         // Get underlying token prices.
-        
-        (uint256 basePrice, bool errorCode) = oracleRouter.getPrice(
-            data.baseToken, inUSD
-        );
-        console2.log("### ~ AerodromeV2.sol:50 ~ )externalviewvirtualoverridereturns ~ basePrice:", basePrice);
+
+        (uint256 basePrice, bool errorCode) = oracleRouter.getPrice(data.baseToken, inUSD);
         if (errorCode) {
             pData.hadError = true;
             return pData;
         }
 
         (uint160 sqrtPriceX96,,,,,) = IAerodromeV2Pool(data.pool).slot0();
-        console2.log("### ~ AerodromeV2.sol:51 ~ )externalviewvirtualoverridereturns ~ sqrtPriceX96:", sqrtPriceX96);
 
         //  Convert sqrtPriceX96 to sqrtPrice
-        uint256 sqrtPrice = sqrtPriceX96.fullMulDiv(1e18, 2**96);
-        console2.log("### ~ AerodromeV2.sol:61 ~ )externalviewvirtualoverridereturns ~ sqrtPrice:", sqrtPrice);
+        uint256 sqrtPrice = sqrtPriceX96.fullMulDiv(1e18, 2 ** 96);
+        // Compute token0 per token1 (price ratio)
+        uint256 price_token0_per_token1 = sqrtPrice.fullMulDiv(sqrtPrice, 1e18);
 
-        // Compute USDC per cbBTC (price ratio)
-        uint256 priceUSDCPerCbBTC = sqrtPrice.fullMulDiv(sqrtPrice, 1e18);
-        console2.log("### ~ AerodromeV2.sol:65 ~ )externalviewvirtualoverridereturns ~ priceUSDCPerCbBTC:", priceUSDCPerCbBTC);
+        // Compute token1 per token0
+        uint256 price_token1_per_token0 = uint256(1e18).fullMulDiv(1e18, price_token0_per_token1);
 
-        // Compute cbBTC per USDC
-        uint256 priceCbBTCPerUSDC = uint256(1e18).fullMulDiv(1e18, priceUSDCPerCbBTC);
-        console2.log("### ~ AerodromeV2.sol:66 ~ )externalviewvirtualoverridereturns ~ priceCbBTCPerUSDC:", priceCbBTCPerUSDC);
-
-        console2.log("### ~ AerodromeV2.sol:72 ~ )externalviewvirtualoverridereturns ~ data.baseTokenDecimals:", data.baseTokenDecimals);
-        console2.log("### ~ AerodromeV2.sol:72 ~ )externalviewvirtualoverridereturns ~ data.quoteTokenDecimals:", data.quoteTokenDecimals);
-            
-        uint256 scaleFactor = data.quoteTokenDecimals > data.baseTokenDecimals 
-            ? 10 ** (data.quoteTokenDecimals - data.baseTokenDecimals) 
+        uint256 scaleFactor = data.quoteTokenDecimals > data.baseTokenDecimals
+            ? 10 ** (data.quoteTokenDecimals - data.baseTokenDecimals)
             : 1e18 / (10 ** (data.baseTokenDecimals - data.quoteTokenDecimals));
 
-        uint256 price = priceCbBTCPerUSDC * scaleFactor;
-        console2.log("### ~ AerodromeV2.sol:70 ~ )externalviewvirtualoverridereturns ~ price:", price);
+        uint256 price = price_token1_per_token0 * scaleFactor;
+        price = (price * basePrice) / WAD;
 
-        // uint price = ( 10 ** (data.baseTokenDecimals - data.quoteTokenDecimals)) / sqrtPriceX96;
-        // console2.log("### ~ AerodromeV2.sol:56 ~ )externalviewvirtualoverridereturns ~ price:", price);
-
-
-        // uint256 price = IAerodromeV1Pool(data.pool).getAmountOut(uint256(1 * (10** data.quoteTokenDecimals)), asset);
-
-        price = (price * basePrice) / WAD;        
-        console2.log("### ~ AerodromeV2.sol:62 ~ )externalviewvirtualoverridereturns ~ price:", price);
         if (_checkOracleOverflow(price)) {
             pData.hadError = true;
             return pData;
@@ -100,11 +85,7 @@ contract AerodromeV2Adapter is AerodromeBaseAdapter {
     /// @dev Should be called before `OracleRouter:addAssetPriceFeed`
     ///      is called.
     /// @param asset The address of the lp token to add pricing support for.
-    function addAsset(
-        address asset,
-        AdapterData memory data
-    ) public override {
-
+    function addAsset(address asset, AdapterData memory data) public override {
         _checkOraclePermissions();
 
         if (!isAeroPool(data.pool)) {
