@@ -139,7 +139,7 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
         // Get underlying token prices.
         
         (uint256 basePrice, bool errorCode) = oracleRouter.getPrice(
-            data.baseToken, true
+            data.baseToken, inUSD
         );
         if (errorCode) {
             pData.hadError = true;
