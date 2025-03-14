@@ -25,8 +25,8 @@ contract RedstoneAdapterTest is Test {
     address constant BSDETH_ETH_FEED = 0xC49F0Dd98F38C525A7ce15E73E60675456F3a161;
 
     // Heartbeat values from config
-    uint256 constant BSDETH_HEARTBEAT = 86400; // 1 day
-    uint256 constant BTC_HEARTBEAT = 86400; // 1 day
+    uint256 constant BSDETH_HEARTBEAT = 86_400; // 1 day
+    uint256 constant BTC_HEARTBEAT = 86_400; // 1 day
 
     address public admin;
     RedStoneAdapter public adapter;
@@ -40,11 +40,7 @@ contract RedstoneAdapterTest is Test {
         router = new SharePriceRouter(address(this));
         router.setSequencer(SEQUENCER_FEED);
 
-        adapter = new RedStoneAdapter(
-            address(this), 
-            address(router), 
-            address(router) 
-        );
+        adapter = new RedStoneAdapter(address(this), address(router), address(router));
 
         router.setLocalAssetConfig(BSDETH, address(adapter), BSDETH_ETH_FEED, 0, true);
         router.setLocalAssetConfig(WETH, address(adapter), ETH_USD_FEED, 0, true);
@@ -56,48 +52,28 @@ contract RedstoneAdapterTest is Test {
             SEQUENCER_FEED,
             abi.encodeWithSelector(IRedstone.latestRoundData.selector),
             abi.encode(
-                92_233_720_368_547_777, 
-                int256(0), 
-                block.timestamp - 2 hours, 
-                block.timestamp, 
-                92_233_720_368_547_777 
+                92_233_720_368_547_777, int256(0), block.timestamp - 2 hours, block.timestamp, 92_233_720_368_547_777
             )
         );
 
         vm.mockCall(
             ETH_USD_FEED,
             abi.encodeWithSelector(IRedstone.latestRoundData.selector),
-            abi.encode(
-                92_233_720_368_547_777, 
-                int256(2000e8), 
-                block.timestamp, 
-                block.timestamp, 
-                92_233_720_368_547_777 
-            )
+            abi.encode(92_233_720_368_547_777, int256(2000e8), block.timestamp, block.timestamp, 92_233_720_368_547_777)
         );
 
         vm.mockCall(
             BTC_USD_FEED,
             abi.encodeWithSelector(IRedstone.latestRoundData.selector),
             abi.encode(
-                92_233_720_368_547_777, 
-                int256(42_000e8), 
-                block.timestamp, 
-                block.timestamp, 
-                92_233_720_368_547_777 
+                92_233_720_368_547_777, int256(42_000e8), block.timestamp, block.timestamp, 92_233_720_368_547_777
             )
         );
 
         vm.mockCall(
             BSDETH_ETH_FEED,
             abi.encodeWithSelector(IRedstone.latestRoundData.selector),
-            abi.encode(
-                92_233_720_368_547_777, 
-                int256(1e18), 
-                block.timestamp, 
-                block.timestamp, 
-                92_233_720_368_547_777 
-            )
+            abi.encode(92_233_720_368_547_777, int256(1e18), block.timestamp, block.timestamp, 92_233_720_368_547_777)
         );
 
         vm.mockCall(ETH_USD_FEED, abi.encodeWithSelector(IRedstone.aggregator.selector), abi.encode(ETH_USD_FEED));
@@ -108,57 +84,18 @@ contract RedstoneAdapterTest is Test {
         vm.mockCall(BTC_USD_FEED, abi.encodeWithSelector(IRedstone.decimals.selector), abi.encode(8));
         vm.mockCall(BSDETH_ETH_FEED, abi.encodeWithSelector(IRedstone.decimals.selector), abi.encode(18));
 
-        vm.mockCall(
-            ETH_USD_FEED,
-            abi.encodeWithSelector(IRedstone.minAnswer.selector),
-            abi.encode(int192(1e8)) 
-        );
-        vm.mockCall(
-            ETH_USD_FEED,
-            abi.encodeWithSelector(IRedstone.maxAnswer.selector),
-            abi.encode(int192(1e12))
-        );
-        vm.mockCall(
-            BTC_USD_FEED,
-            abi.encodeWithSelector(IRedstone.minAnswer.selector),
-            abi.encode(int192(1e8))
-        );
-        vm.mockCall(
-            BTC_USD_FEED,
-            abi.encodeWithSelector(IRedstone.maxAnswer.selector),
-            abi.encode(int192(5e12))
-        );
-        vm.mockCall(
-            BSDETH_ETH_FEED,
-            abi.encodeWithSelector(IRedstone.minAnswer.selector),
-            abi.encode(int192(1e16)) 
-        );
-        vm.mockCall(
-            BSDETH_ETH_FEED,
-            abi.encodeWithSelector(IRedstone.maxAnswer.selector),
-            abi.encode(int192(5e18)) 
-        );
+        vm.mockCall(ETH_USD_FEED, abi.encodeWithSelector(IRedstone.minAnswer.selector), abi.encode(int192(1e8)));
+        vm.mockCall(ETH_USD_FEED, abi.encodeWithSelector(IRedstone.maxAnswer.selector), abi.encode(int192(1e12)));
+        vm.mockCall(BTC_USD_FEED, abi.encodeWithSelector(IRedstone.minAnswer.selector), abi.encode(int192(1e8)));
+        vm.mockCall(BTC_USD_FEED, abi.encodeWithSelector(IRedstone.maxAnswer.selector), abi.encode(int192(5e12)));
+        vm.mockCall(BSDETH_ETH_FEED, abi.encodeWithSelector(IRedstone.minAnswer.selector), abi.encode(int192(1e16)));
+        vm.mockCall(BSDETH_ETH_FEED, abi.encodeWithSelector(IRedstone.maxAnswer.selector), abi.encode(int192(5e18)));
 
-        adapter.addAsset(
-            BSDETH,
-            BSDETH_ETH_FEED,
-            BSDETH_HEARTBEAT,
-            false 
-        );
+        adapter.addAsset(BSDETH, BSDETH_ETH_FEED, BSDETH_HEARTBEAT, false);
 
-        adapter.addAsset(
-            WETH,
-            ETH_USD_FEED,
-            BSDETH_HEARTBEAT,
-            true 
-        );
+        adapter.addAsset(WETH, ETH_USD_FEED, BSDETH_HEARTBEAT, true);
 
-        adapter.addAsset(
-            WBTC,
-            BTC_USD_FEED,
-            BTC_HEARTBEAT,
-            true 
-        );
+        adapter.addAsset(WBTC, BTC_USD_FEED, BTC_HEARTBEAT, true);
     }
 
     function testReturnsCorrectPrice_BSDETH_ETH() public {
@@ -186,8 +123,8 @@ contract RedstoneAdapterTest is Test {
 
         assertFalse(priceData.hadError, "Price should not have error");
         assertTrue(priceData.inUSD, "Price should be in USD");
-        assertEq(priceData.price, 42000e18, "Price should match mocked value");
-        
+        assertEq(priceData.price, 42_000e18, "Price should match mocked value");
+
         emit log_named_uint("BTC/USD Price", priceData.price);
     }
 
@@ -195,13 +132,7 @@ contract RedstoneAdapterTest is Test {
         vm.mockCall(
             SEQUENCER_FEED,
             abi.encodeWithSelector(IRedstone.latestRoundData.selector),
-            abi.encode(
-                92_233_720_368_547_777, 
-                int256(1), 
-                block.timestamp, 
-                block.timestamp, 
-                92_233_720_368_547_777 
-            )
+            abi.encode(92_233_720_368_547_777, int256(1), block.timestamp, block.timestamp, 92_233_720_368_547_777)
         );
 
         vm.expectRevert(RedStoneAdapter.RedStoneAdaptor__SequencerDown.selector);
@@ -229,13 +160,7 @@ contract RedstoneAdapterTest is Test {
         vm.mockCall(
             ETH_USD_FEED,
             abi.encodeWithSelector(IRedstone.latestRoundData.selector),
-            abi.encode(
-                92_233_720_368_547_777, 
-                int256(0.5e8), 
-                block.timestamp, 
-                block.timestamp, 
-                92_233_720_368_547_777 
-            )
+            abi.encode(92_233_720_368_547_777, int256(0.5e8), block.timestamp, block.timestamp, 92_233_720_368_547_777)
         );
 
         ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
@@ -247,11 +172,7 @@ contract RedstoneAdapterTest is Test {
             ETH_USD_FEED,
             abi.encodeWithSelector(IRedstone.latestRoundData.selector),
             abi.encode(
-                92_233_720_368_547_777, 
-                int256(12000e8), 
-                block.timestamp, 
-                block.timestamp, 
-                92_233_720_368_547_777 
+                92_233_720_368_547_777, int256(12_000e8), block.timestamp, block.timestamp, 92_233_720_368_547_777
             )
         );
 
@@ -277,38 +198,20 @@ contract RedstoneAdapterTest is Test {
 
     function testRevertAddAsset_InvalidHeartbeat() public {
         vm.expectRevert(RedStoneAdapter.RedStoneAdaptor__InvalidHeartbeat.selector);
-        adapter.addAsset(
-            makeAddr("newToken"),
-            ETH_USD_FEED,
-            25 hours, 
-            true
-        );
+        adapter.addAsset(makeAddr("newToken"), ETH_USD_FEED, 25 hours, true);
     }
 
     function testRevertAddAsset_InvalidMinMaxConfig() public {
         address testToken = makeAddr("testToken");
         address mockFeed = makeAddr("mockFeed");
-        
+
         vm.mockCall(mockFeed, abi.encodeWithSelector(IRedstone.aggregator.selector), abi.encode(mockFeed));
         vm.mockCall(mockFeed, abi.encodeWithSelector(IRedstone.decimals.selector), abi.encode(8));
-        vm.mockCall(
-            mockFeed,
-            abi.encodeWithSelector(IRedstone.minAnswer.selector),
-            abi.encode(int192(100e8)) 
-        );
-        vm.mockCall(
-            mockFeed,
-            abi.encodeWithSelector(IRedstone.maxAnswer.selector),
-            abi.encode(int192(90e8)) 
-        );
+        vm.mockCall(mockFeed, abi.encodeWithSelector(IRedstone.minAnswer.selector), abi.encode(int192(100e8)));
+        vm.mockCall(mockFeed, abi.encodeWithSelector(IRedstone.maxAnswer.selector), abi.encode(int192(90e8)));
 
         vm.expectRevert(RedStoneAdapter.RedStoneAdaptor__InvalidMinMaxConfig.selector);
-        adapter.addAsset(
-            testToken,
-            mockFeed,
-            1 hours,
-            true
-        );
+        adapter.addAsset(testToken, mockFeed, 1 hours, true);
     }
 
     function testCanAddSameAsset() public {

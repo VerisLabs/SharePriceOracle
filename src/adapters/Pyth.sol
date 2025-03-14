@@ -34,7 +34,7 @@ contract PythAdapter is BaseOracleAdapter {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Default heartbeat duration if none specified (1 day)
-    uint32 public constant DEFAULT_HEARTBEAT = 86400;
+    uint32 public constant DEFAULT_HEARTBEAT = 86_400;
 
     /// @notice Default maximum age for prices (60 seconds)
     uint32 public constant DEFAULT_MAX_AGE = 60;
@@ -165,15 +165,7 @@ contract PythAdapter is BaseOracleAdapter {
      * @param maxAge Maximum age of prices to consider valid (0 = DEFAULT_MAX_AGE)
      * @param inUSD Whether feed provides USD prices (true) or ETH prices (false)
      */
-    function addAsset(
-        address asset,
-        bytes32 priceId,
-        uint32 heartbeat,
-        uint32 maxAge,
-        bool inUSD
-    )
-        external
-    {
+    function addAsset(address asset, bytes32 priceId, uint32 heartbeat, uint32 maxAge, bool inUSD) external {
         _checkOraclePermissions();
 
         // Validate inputs
@@ -224,7 +216,7 @@ contract PythAdapter is BaseOracleAdapter {
 
         // Notify the Oracle Router that we are going to stop supporting the asset
         ISharePriceRouter(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
-        
+
         emit PythAssetRemoved(asset);
     }
 
@@ -247,44 +239,44 @@ contract PythAdapter is BaseOracleAdapter {
         returns (ISharePriceRouter.PriceReturnData memory pData)
     {
         pData.inUSD = inUSD;
-        
+
         // Get the appropriate adapter data
         AdapterData memory data = inUSD ? adapterDataUSD[asset] : adapterDataETH[asset];
-        
+
         // If not configured for this price type, try the other one
         if (!data.isConfigured) {
             data = inUSD ? adapterDataETH[asset] : adapterDataUSD[asset];
             pData.inUSD = !inUSD;
-            
+
             // If neither is configured, return an error
             if (!data.isConfigured) {
                 pData.hadError = true;
                 return pData;
             }
         }
-        
+
         try pyth.getPriceNoOlderThan(data.priceId, data.maxAge) returns (PythStructs.Price memory price) {
             // Validate price
             if (price.price <= 0) {
                 pData.hadError = true;
                 return pData;
             }
-            
+
             // Check staleness
             if (block.timestamp - price.publishTime > data.heartbeat) {
                 pData.hadError = true;
                 return pData;
             }
-            
+
             // Convert price to WAD (18 decimals)
             uint256 normalizedPrice = PythUtils.convertToUint(price.price, price.expo, 18);
-            
+
             // Check for overflow before casting to uint240
             if (_checkOracleOverflow(normalizedPrice)) {
                 pData.hadError = true;
                 return pData;
             }
-            
+
             pData.price = uint240(normalizedPrice);
             return pData;
         } catch {
@@ -302,15 +294,13 @@ contract PythAdapter is BaseOracleAdapter {
         if (updateData.length == 0) {
             return;
         }
-        
-        uint256 updateFee = pyth.getUpdateFee(updateData);
-        pyth.updatePriceFeeds{value: updateFee}(updateData);
 
-        
+        uint256 updateFee = pyth.getUpdateFee(updateData);
+        pyth.updatePriceFeeds{ value: updateFee }(updateData);
     }
 
     /**
      * @notice Receive function to accept ETH for price feed updates
      */
-    receive() external payable {}
+    receive() external payable { }
 }

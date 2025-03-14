@@ -10,11 +10,7 @@ library PythUtils {
     /// @dev Function will lose precision if targetDecimals is less than the Pyth price decimals.
     /// This method will truncate any digits that cannot be represented by the targetDecimals.
     /// e.g. If the price is 0.000123 and the targetDecimals is 2, the result will be 0
-    function convertToUint(
-        int64 price,
-        int32 expo,
-        uint8 targetDecimals
-    ) public pure returns (uint256) {
+    function convertToUint(int64 price, int32 expo, uint8 targetDecimals) public pure returns (uint256) {
         if (price < 0 || expo > 0 || expo < -255) {
             revert();
         }
@@ -22,13 +18,9 @@ library PythUtils {
         uint8 priceDecimals = uint8(uint32(-1 * expo));
 
         if (targetDecimals >= priceDecimals) {
-            return
-                uint(uint64(price)) *
-                10 ** uint32(targetDecimals - priceDecimals);
+            return uint256(uint64(price)) * 10 ** uint32(targetDecimals - priceDecimals);
         } else {
-            return
-                uint(uint64(price)) /
-                10 ** uint32(priceDecimals - targetDecimals);
+            return uint256(uint64(price)) / 10 ** uint32(priceDecimals - targetDecimals);
         }
     }
 }
