@@ -1,0 +1,38 @@
+{
+    "curve_price_feeds" : {
+        "CBETH" : {
+            "feed" : "0x11C1fBd4b3De66bC0565779b35171a6CF3E71f59",
+            "denomination": "ETH"
+        }
+    },
+    "chain_tokens": {
+        "optimism": {
+            "chainId": 10,
+            "tokens": {
+                "WETH": "0x4200000000000000000000000000000000000006",
+                "cbETH": "0xadDb6A0412DE1BA0F936DCaeb8Aaa24578dcF3B2"
+            }
+        },
+        "polygon": {
+            "chainId": 137,
+            "tokens": {
+                "WETH": "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619",
+                "fxcbETH" : "0x4b4327dB1600B8B1440163F667e199CEf35385f5"
+            }
+        },
+        "base": {
+            "chainId": 8453,
+            "tokens": {
+                "WETH": "0x4200000000000000000000000000000000000006",
+                "cbETH": "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22"
+            }
+        },
+        "arbitrum": {
+            "chainId": 42161,
+            "tokens": {
+                "WETH": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+                "cbETH": "0x1DEBd73E752bEaF79865Fd6446b0c970EaE7732f"
+            }
+        }
+    }
+}
