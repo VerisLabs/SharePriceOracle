@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
-import "../../src/adapters/RedStone.sol";
+import "../../src/adapters/Redstone.sol";
 import "../../src/SharePriceRouter.sol";
 import "../helpers/Tokens.sol";
 import "../base/BaseTest.t.sol";
