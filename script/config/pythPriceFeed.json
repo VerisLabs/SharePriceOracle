@@ -1,0 +1,238 @@
+{
+    "pyth_price_feeds": {
+        "WETH": {
+            "priceId": "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
+            "denomination": "USD",
+            "heartbeat": 1200,
+            "maxAge": 60
+        },
+        "ETH": {
+            "priceId": "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
+            "denomination": "USD",
+            "heartbeat": 1200,
+            "maxAge": 60
+        },
+        "USDC": {
+            "priceId": "0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
+            "denomination": "USD",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "USDCe": {
+            "priceId": "0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
+            "denomination": "USD",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "USDT": {
+            "priceId": "0x2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b",
+            "denomination": "USD",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "USDe": {
+            "priceId": "0x59dcecd2e1c4cb77f9ee574cc9bbff92a9a9bb969abb7f04a0335483692483c0",
+            "denomination": "USD",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "WBTC": {
+            "priceId": "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
+            "denomination": "USD",
+            "heartbeat": 1200,
+            "maxAge": 60
+        },
+        "USDz": {
+            "priceId": "0xc1e41b5d1f67815af65c40759df394d6d26a63874b77274346888dcb4306b2c3",
+            "denomination": "USD",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "DAI": {
+            "priceId": "0xb0948a5e5313200c632b51bb5ca32f6de0d36e9950a942d19751e833f70dabfd",
+            "denomination": "USD",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "stETH": {
+            "priceId": "0x846fd507af3ce956d3c1e10ca6bf897c5b7ee8e20bc40861a0c2fe9838e72be0",
+            "denomination": "ETH",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "wstETH": {
+            "priceId": "0xf8b1b2481e6469fd5476bc943e4e1d4ea99d8eb5b69885d68bc82a4e1197387f",
+            "denomination": "ETH",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "rETH": {
+            "priceId": "0xab7e49b24f0ff50ecb27dff88e95a4613c4bd280138258ed42c0b4d61ddf710d",
+            "denomination": "ETH",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "rsETH": {
+            "priceId": "0x5a92aff542c9140e5ef774604275630001fcc3a1c9d2c3fa9aedb3775fc748e0",
+            "denomination": "ETH",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "weETH": {
+            "priceId": "0x856aad1f80be63c5b3962464a4ba0b33b0a502a66a0bda38483f46edb87a0c0c",
+            "denomination": "ETH",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "rswETH": {
+            "priceId": "0x9b43818e25e9d82a28ce42f5d6d2aea834a571f0a3863f9a4237d206748e5bdb",
+            "denomination": "ETH",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "cbETH": {
+            "priceId": "0x5a8135d0c044b532375027dcdafcfd5a81f4fb41e67152a9c5651cd6ce9854f6",
+            "denomination": "ETH",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "cbBTC": {
+            "priceId": "0xa43d2be9ca4182e69764f6778c4d54d495941ed7d2821c14f9c3e6162aee0c5e",
+            "denomination": "USD",
+            "heartbeat": 1200,
+            "maxAge": 60
+        },
+        "frxETH": {
+            "priceId": "0x29bc6bc11c026e5b4654a0d5fd9b4f5b1e9b29398a0eefb64aee9d9d86a334aa",
+            "denomination": "ETH",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "OETH": {
+            "priceId": "0xd6eae6ad9f0db53c35c7e9485c7505ae780d21eb6db67fa458d3e3cdb4747e49",
+            "denomination": "ETH",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "ezETH": {
+            "priceId": "0x1f75b3f3b9cdfcbcf04f14fcba88ba8a93b9869aa31025c807a18c34da58e056",
+            "denomination": "ETH",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "tBTC": {
+            "priceId": "0x87f3a2a7d1637e8257cf87db3d970d8bb8e6420cc460f7214b1a35942454b877",
+            "denomination": "USD",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "sUSDe": {
+            "priceId": "0x48d3d0def14291479ca578c4f5ca2ce9de522728a20920f0f379a93a889647de",
+            "denomination": "USD",
+            "heartbeat": 86400,
+            "maxAge": 60
+        },
+        "BITCOIN": {
+            "priceId": "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
+            "denomination": "USD",
+            "heartbeat": 1200,
+            "maxAge": 60
+        },
+        "BSDETH": {
+            "priceId": "0xd6d5339eb9350f554ee97b39bd7452b27e9cbcdafa57ccb1b5c8db26e4675d4f",
+            "denomination": "ETH",
+            "heartbeat": 86400,
+            "maxAge": 60
+        }
+    },
+    "pyth_contracts": {
+        "optimism": "0xff1a0f4744e8582DF1aE09D5611b887B6a12925C",
+        "polygon": "0x2880aB155794e7179c9eE2e38200202908C17B43",
+        "base": "0x8250f4aF4B972684F7b336503E2D6dFeDeB1487a",
+        "arbitrum": "0xff1a0f4744e8582DF1aE09D5611b887B6a12925C"
+    },
+    "chain_tokens": {
+        "optimism": {
+            "chainId": 10,
+            "tokens": {
+                "WETH": "0x4200000000000000000000000000000000000006",
+                "USDC": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+                "USDT": "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58",
+                "USDe": "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34",
+                "WBTC": "0x68f180fcCe6836688e9084f035309E29Bf0A2095",
+                "DAI": "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
+                "wstETH": "0x1F32b1c2345538c0c6f582fCB022739c4A194Ebb",
+                "rETH": "0x9Bcef72be871e61ED4fBbc7630889beE758eb81D",
+                "rsETH": "0x4186BFC76E2E237523CBC30FD220FE055156b41F",
+                "cbETH": "0xadDb6A0412DE1BA0F936DCaeb8Aaa24578dcF3B2",
+                "frxETH": "0x6806411765Af15Bddd26f8f544A34cC40cb9838B",
+                "BTCb": "0x2297aEbD383787A160DD0d9F71508148769342E3",
+                "ezETH": "0x2416092f143378750bb29b79eD961ab195CcEea5",
+                "tBTC": "0x6c84a8f1c29108F47a79964b5Fe888D4f4D0dE40",
+                "USDCe": "0x7F5c764cBc14f9669B88837ca1490cCa17c31607"
+            }
+        },
+        "polygon": {
+            "chainId": 137,
+            "tokens": {
+                "WETH": "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619",
+                "USDC": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+                "USDT": "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+                "WBTC": "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6",
+                "DAI": "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063",
+                "wstETH": "0x03b54A6e9a984069379fae1a4fC4dBAE93B3bCCD",
+                "rETH": "0x0266F4F08D82372CF0FcbCCc0Ff74309089c74d1",
+                "frxETH": "0xEe327F889d5947c1dc1934Bb208a1E792F953E96",
+                "BTCb": "0x2297aEbD383787A160DD0d9F71508148769342E3",
+                "tBTC": "0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b",
+                "USDCe": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+            }
+        },
+        "base": {
+            "chainId": 8453,
+            "tokens": {
+                "WETH": "0x4200000000000000000000000000000000000006",
+                "USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                "USDT": "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2",
+                "USDe": "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34",
+                "WBTC": "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c",
+                "USDz": "0x04D5ddf5f3a8939889F11E97f8c4BB48317F1938",
+                "DAI": "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb",
+                "wstETH": "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452",
+                "rETH": "0xB6fe221Fe9EeF5aBa221c348bA20A1Bf5e73624c",
+                "rsETH": "0x1Bc71130A0e39942a7658878169764Bbd8A45993",
+                "weETH": "0x04C0599Ae5A44757c0af6F9eC3b93da8976c150A",
+                "cbETH": "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22",
+                "cbBTC": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+                "frxETH": "0xEcc68d0451E20292406967Fe7C04280E5238Ac7D",
+                "BTCB": "0x0c41F1FC9022FEB69aF6dc666aBfE73C9FFDA7ce",
+                "ezETH": "0x2416092f143378750bb29b79eD961ab195CcEea5",
+                "tBTC": "0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b",
+                "BSDETH": "0xCb327b99fF831bF8223cCEd12B1338FF3aA322Ff"
+            }
+        },
+        "arbitrum": {
+            "chainId": 42161,
+            "tokens": {
+                "WETH": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+                "USDC": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+                "USDT": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+                "USDe": "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34",
+                "WBTC": "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f",
+                "DAI": "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
+                "wstETH": "0x5979D7b546E38E414F7E9822514be443A4800529",
+                "rETH": "0xEC70Dcb4A1EFa46b8F2D97C310C9c4790ba5ffA8",
+                "rsETH": "0x4186BFC76E2E237523CBC30FD220FE055156b41F",
+                "weETH": "0x35751007a407ca6FEFfE80b3cB397736D2cf4dbe",
+                "cbETH": "0x1DEBd73E752bEaF79865Fd6446b0c970EaE7732f",
+                "cbBTC": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+                "frxETH": "0x178412e79c25968a32e89b11f63B33F733770c2A",
+                "BTCb": "0x2297aEbD383787A160DD0d9F71508148769342E3",
+                "ezETH": "0x2416092f143378750bb29b79eD961ab195CcEea5",
+                "tBTC": "0x7E2a1eDeE171C5B19E6c54D73752396C0A572594",
+                "sUSDe": "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2",
+                "USDCe": "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"
+            }
+        }
+    }
+}
