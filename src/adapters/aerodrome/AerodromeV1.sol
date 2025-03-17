@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {AerodromeBaseAdapter} from "./AerodromeBaseAdapter.sol";
+import { AerodromeBaseAdapter } from "./AerodromeBaseAdapter.sol";
 import { ISharePriceRouter } from "../../interfaces/ISharePriceRouter.sol";
 import { IAerodromeV1Pool } from "../../interfaces/aerodrome/IAerodromeV1Pool.sol";
 
-
 contract AerodromeV1Adapter is AerodromeBaseAdapter {
-
     /// CONSTRUCTOR ///
 
     constructor(
@@ -15,7 +13,8 @@ contract AerodromeV1Adapter is AerodromeBaseAdapter {
         address _oracle,
         address _oracleRouter
     )
-    AerodromeBaseAdapter(_admin, _oracle, _oracleRouter) {}
+        AerodromeBaseAdapter(_admin, _oracle, _oracleRouter)
+    { }
 
     /// EXTERNAL FUNCTIONS ///
 
@@ -29,7 +28,13 @@ contract AerodromeV1Adapter is AerodromeBaseAdapter {
     function getPrice(
         address asset,
         bool inUSD
-    ) external view virtual override returns (ISharePriceRouter.PriceReturnData memory pData) {
+    )
+        external
+        view
+        virtual
+        override
+        returns (ISharePriceRouter.PriceReturnData memory pData)
+    {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
             revert AerodromeAdapter__AssetIsNotSupported();
@@ -38,17 +43,15 @@ contract AerodromeV1Adapter is AerodromeBaseAdapter {
         AdapterData memory data = adapterData[asset];
 
         // Get underlying token prices.
-        
-        (uint256 basePrice, bool errorCode) = oracleRouter.getPrice(
-            data.baseToken, inUSD
-        );
+
+        (uint256 basePrice, bool errorCode) = oracleRouter.getPrice(data.baseToken, inUSD);
         if (errorCode) {
             pData.hadError = true;
             return pData;
         }
-        uint256 price = IAerodromeV1Pool(data.pool).getAmountOut(uint256(1 * (10** data.quoteTokenDecimals)), asset);
+        uint256 price = IAerodromeV1Pool(data.pool).getAmountOut(uint256(1 * (10 ** data.quoteTokenDecimals)), asset);
 
-        price = (price * basePrice) / WAD;        
+        price = (price * basePrice) / WAD;
         if (_checkOracleOverflow(price)) {
             pData.hadError = true;
             return pData;
@@ -63,11 +66,7 @@ contract AerodromeV1Adapter is AerodromeBaseAdapter {
     /// @dev Should be called before `OracleRouter:addAssetPriceFeed`
     ///      is called.
     /// @param asset The address of the lp token to add pricing support for.
-    function addAsset(
-        address asset,
-        AdapterData memory data
-    ) public override {
-
+    function addAsset(address asset, AdapterData memory data) public override {
         _checkOraclePermissions();
 
         if (!isAeroPool(data.pool)) {

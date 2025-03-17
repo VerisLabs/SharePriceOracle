@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-
 import { ISharePriceRouter } from "../../interfaces/ISharePriceRouter.sol";
 import { BaseOracleAdapter } from "../../libs/base/BaseOracleAdapter.sol";
 
-contract AerodromeBaseAdapter is BaseOracleAdapter{
+contract AerodromeBaseAdapter is BaseOracleAdapter {
     /// TYPES ///
 
     /// @notice Stores configuration data for Uniswap V2 stable style
@@ -31,11 +30,7 @@ contract AerodromeBaseAdapter is BaseOracleAdapter{
 
     /// EVENTS ///
 
-    event AerodromePoolAssetAdded(
-        address asset, 
-        AdapterData assetConfig, 
-        bool isUpdate
-    );
+    event AerodromePoolAssetAdded(address asset, AdapterData assetConfig, bool isUpdate);
     event AerodromePoolAssetRemoved(address asset);
 
     /// ERRORS ///
@@ -51,12 +46,10 @@ contract AerodromeBaseAdapter is BaseOracleAdapter{
         address _oracle,
         address _oracleRouter
     )
-    BaseOracleAdapter(_admin, _oracle, _oracleRouter) {
-        oracleRouter = ISharePriceRouter(
-            _oracleRouter
-        );
+        BaseOracleAdapter(_admin, _oracle, _oracleRouter)
+    {
+        oracleRouter = ISharePriceRouter(_oracleRouter);
     }
-
 
     /// EXTERNAL FUNCTIONS ///
 
@@ -70,19 +63,20 @@ contract AerodromeBaseAdapter is BaseOracleAdapter{
     function getPrice(
         address asset,
         bool inUSD
-    ) external view virtual override returns (ISharePriceRouter.PriceReturnData memory pData) {}
-
+    )
+        external
+        view
+        virtual
+        override
+        returns (ISharePriceRouter.PriceReturnData memory pData)
+    { }
 
     /// @notice Helper function for pricing support for `asset`,
     ///         an lp token for a Univ2 style stable liquidity pool.
     /// @dev Should be called before `OracleRouter:addAssetPriceFeed`
     ///      is called.
     /// @param asset The address of the lp token to add pricing support for.
-    function addAsset(
-        address asset,
-        AdapterData memory data
-    ) public virtual {
-
+    function addAsset(address asset, AdapterData memory data) public virtual {
         // Make sure `asset` is not trying to price denominated in itself.
         if (asset == data.baseToken) {
             revert AerodromeAdapter__InvalidAsset();
@@ -90,7 +84,7 @@ contract AerodromeBaseAdapter is BaseOracleAdapter{
 
         // Save adapter data and update mapping that we support `asset` now.
         adapterData[asset] = data;
-        
+
         // Check whether this is new or updated support for `asset`.
         bool isUpdate;
         if (isSupportedAsset[asset]) {
@@ -121,6 +115,4 @@ contract AerodromeBaseAdapter is BaseOracleAdapter{
         // the asset.
         ISharePriceRouter(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
     }
-
-    
 }

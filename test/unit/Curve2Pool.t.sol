@@ -24,7 +24,7 @@ contract TestCurve2PoolAssetAdapter is Test {
     address constant CBETH = 0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22;
 
     // Heartbeat values from config
-    uint256 constant ETH_HEARTBEAT = 1200;  // 20 minutes
+    uint256 constant ETH_HEARTBEAT = 1200; // 20 minutes
 
     // Test contracts
     address public admin;
@@ -40,23 +40,22 @@ contract TestCurve2PoolAssetAdapter is Test {
         // Deploy router with admin
         router = new SharePriceRouter(address(this));
 
-
         adapter = new Curve2PoolAssetAdapter(
-            address(this),  // admin
-            address(router),  // oracle
-            address(router)  // router
+            address(this), // admin
+            address(router), // oracle
+            address(router) // router
         );
 
         // Grant ORACLE_ROLE to test contract
         adapter.grantRole(address(this), uint256(adapter.ORACLE_ROLE()));
 
-        adapter.setReentrancyConfig(2, 10000);    
+        adapter.setReentrancyConfig(2, 10_000);
 
         // Deploy adapter
         chainlinkAdapter = new ChainlinkAdapter(
-            address(this),  // admin
-            address(router),  // oracle
-            address(router)  // router
+            address(this), // admin
+            address(router), // oracle
+            address(router) // router
         );
         // Grant ORACLE_ROLE to test contract
         chainlinkAdapter.grantRole(address(this), uint256(adapter.ORACLE_ROLE()));
@@ -74,15 +73,13 @@ contract TestCurve2PoolAssetAdapter is Test {
         data.baseTokenIndex = 0;
         data.quoteTokenDecimals = 18;
         data.baseTokenDecimals = 18;
-        data.upperBound = 10200;
-        data.lowerBound = 10000;
+        data.upperBound = 10_200;
+        data.lowerBound = 10_000;
 
         adapter.addAsset(CBETH, data);
-
     }
 
     function testReturnsCorrectPrice() public {
-
         ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(CBETH, true);
 
         assertFalse(priceData.hadError, "Price should not have error");
@@ -92,7 +89,6 @@ contract TestCurve2PoolAssetAdapter is Test {
         // Log the actual price for verification
         emit log_named_uint("CBETH/USD Price", priceData.price);
     }
-        
 
     function testRevertAfterAssetRemove() public {
         testReturnsCorrectPrice();
@@ -101,7 +97,7 @@ contract TestCurve2PoolAssetAdapter is Test {
         vm.expectRevert(Curve2PoolAssetAdapter.Curve2PoolAssetAdapter__AssetIsNotSupported.selector);
         adapter.getPrice(CBETH, true);
     }
-    
+
     function testRevertAddAsset__InvalidPool() public {
         adapter.setReentrancyConfig(2, 6000);
 
@@ -110,54 +106,52 @@ contract TestCurve2PoolAssetAdapter is Test {
         data.baseToken = WETH;
         data.quoteTokenIndex = 1;
         data.baseTokenIndex = 0;
-        data.upperBound = 10200;
+        data.upperBound = 10_200;
         data.lowerBound = 9800;
 
         vm.expectRevert(Curve2PoolAssetAdapter.Curve2PoolAssetAdapter__InvalidPoolAddress.selector);
         adapter.addAsset(CBETH, data);
     }
-    
+
     function testRevertAddAsset__InvalidAsset() public {
         Curve2PoolAssetAdapter.AdapterData memory data;
         data.pool = CURVE_PRICE_FEED_CBETH;
         data.baseToken = WETH;
         data.quoteTokenIndex = 1;
         data.baseTokenIndex = 0;
-        data.upperBound = 10200;
+        data.upperBound = 10_200;
         data.lowerBound = 9800;
 
         vm.expectRevert(Curve2PoolAssetAdapter.Curve2PoolAssetAdapter__InvalidAsset.selector);
         adapter.addAsset(WETH, data);
     }
-    
-    function testRevertAddAsset__InvalidBounds() public {
 
+    function testRevertAddAsset__InvalidBounds() public {
         Curve2PoolAssetAdapter.AdapterData memory data;
         data.pool = CURVE_PRICE_FEED_CBETH;
         data.baseToken = WETH;
         data.quoteTokenIndex = 1;
         data.baseTokenIndex = 0;
-        data.upperBound = 10200;
-        data.lowerBound = 10201;
+        data.upperBound = 10_200;
+        data.lowerBound = 10_201;
 
         vm.expectRevert(Curve2PoolAssetAdapter.Curve2PoolAssetAdapter__InvalidBounds.selector);
         adapter.addAsset(CBETH, data);
 
-        data.upperBound = 10400;
+        data.upperBound = 10_400;
         data.lowerBound = 9800;
 
         vm.expectRevert(Curve2PoolAssetAdapter.Curve2PoolAssetAdapter__InvalidBounds.selector);
         adapter.addAsset(CBETH, data);
     }
-    
-    function testRevertAddAsset__InvalidAssetIndex() public {
 
+    function testRevertAddAsset__InvalidAssetIndex() public {
         Curve2PoolAssetAdapter.AdapterData memory data;
         data.pool = CURVE_PRICE_FEED_CBETH;
         data.baseToken = WETH;
         data.quoteTokenIndex = 0;
         data.baseTokenIndex = 0;
-        data.upperBound = 10200;
+        data.upperBound = 10_200;
         data.lowerBound = 9800;
 
         vm.expectRevert(Curve2PoolAssetAdapter.Curve2PoolAssetAdapter__InvalidAssetIndex.selector);
@@ -168,15 +162,14 @@ contract TestCurve2PoolAssetAdapter is Test {
         vm.expectRevert(Curve2PoolAssetAdapter.Curve2PoolAssetAdapter__InvalidAssetIndex.selector);
         adapter.addAsset(CBETH, data);
     }
-    
-    function testUpdateAsset() public {
 
+    function testUpdateAsset() public {
         Curve2PoolAssetAdapter.AdapterData memory data;
         data.pool = CURVE_PRICE_FEED_CBETH;
         data.baseToken = WETH;
         data.quoteTokenIndex = 1;
         data.baseTokenIndex = 0;
-        data.upperBound = 10200;
+        data.upperBound = 10_200;
         data.lowerBound = 9800;
 
         adapter.addAsset(CBETH, data);
@@ -188,50 +181,48 @@ contract TestCurve2PoolAssetAdapter is Test {
         adapter.removeAsset(WETH);
     }
 
-
     function testRaiseBounds() public {
-
         Curve2PoolAssetAdapter.AdapterData memory data;
         data.pool = CURVE_PRICE_FEED_CBETH;
         data.baseToken = WETH;
         data.quoteTokenIndex = 1;
         data.baseTokenIndex = 0;
-        data.upperBound = 10200;
-        data.lowerBound = 10000;
+        data.upperBound = 10_200;
+        data.lowerBound = 10_000;
         adapter.addAsset(CBETH, data);
 
         vm.expectRevert(Curve2PoolAssetAdapter.Curve2PoolAssetAdapter__InvalidBounds.selector);
-        adapter.raiseBounds(CBETH, 10000, 10000);
+        adapter.raiseBounds(CBETH, 10_000, 10_000);
 
         vm.expectRevert(Curve2PoolAssetAdapter.Curve2PoolAssetAdapter__InvalidBounds.selector);
-        adapter.raiseBounds(CBETH, 10000, 10600);
+        adapter.raiseBounds(CBETH, 10_000, 10_600);
 
         vm.expectRevert(Curve2PoolAssetAdapter.Curve2PoolAssetAdapter__InvalidBounds.selector);
-        adapter.raiseBounds(CBETH, 10000, 10100);
+        adapter.raiseBounds(CBETH, 10_000, 10_100);
 
         vm.expectRevert(Curve2PoolAssetAdapter.Curve2PoolAssetAdapter__InvalidBounds.selector);
-        adapter.raiseBounds(CBETH, 10100, 10200);
+        adapter.raiseBounds(CBETH, 10_100, 10_200);
 
         vm.expectRevert(Curve2PoolAssetAdapter.Curve2PoolAssetAdapter__InvalidBounds.selector);
-        adapter.raiseBounds(CBETH, 10300, 10400);
+        adapter.raiseBounds(CBETH, 10_300, 10_400);
 
         vm.expectRevert(Curve2PoolAssetAdapter.Curve2PoolAssetAdapter__InvalidBounds.selector);
-        adapter.raiseBounds(CBETH, 10100, 10500);
+        adapter.raiseBounds(CBETH, 10_100, 10_500);
 
         vm.expectRevert(Curve2PoolAssetAdapter.Curve2PoolAssetAdapter__BoundsExceeded.selector);
-        adapter.raiseBounds(CBETH, 10200, 10400);
+        adapter.raiseBounds(CBETH, 10_200, 10_400);
 
-        adapter.raiseBounds(CBETH, 10050, 10300);
+        adapter.raiseBounds(CBETH, 10_050, 10_300);
     }
-        
+
     function testIsLocked() public {
         vm.expectRevert(CurveBaseAdapter.CurveBaseAdapter__PoolNotFound.selector);
         adapter.isLocked(CBETH, 0);
 
-        adapter.setReentrancyConfig(3, 10000);
+        adapter.setReentrancyConfig(3, 10_000);
         assertEq(adapter.isLocked(CBETH, 3), true);
 
-        adapter.setReentrancyConfig(4, 10000);
+        adapter.setReentrancyConfig(4, 10_000);
         assertEq(adapter.isLocked(CBETH, 4), true);
     }
 
@@ -240,9 +231,9 @@ contract TestCurve2PoolAssetAdapter is Test {
         adapter.setReentrancyConfig(4, 100);
 
         vm.expectRevert(CurveBaseAdapter.CurveBaseAdapter__InvalidConfiguration.selector);
-        adapter.setReentrancyConfig(5, 10000);
+        adapter.setReentrancyConfig(5, 10_000);
 
         vm.expectRevert(CurveBaseAdapter.CurveBaseAdapter__InvalidConfiguration.selector);
-        adapter.setReentrancyConfig(1, 10000);
+        adapter.setReentrancyConfig(1, 10_000);
     }
 }

@@ -35,11 +35,10 @@ contract TestAerodromeV1Adapter is Test {
         // Deploy router with admin
         router = new SharePriceRouter(address(this));
 
-
         adapter = new AerodromeV1Adapter(
-            address(this),  // admin
-            address(router),  // oracle
-            address(router)  // router
+            address(this), // admin
+            address(router), // oracle
+            address(router) // router
         );
 
         // Grant ORACLE_ROLE to test contract
@@ -47,9 +46,9 @@ contract TestAerodromeV1Adapter is Test {
 
         // Deploy adapter
         chainlinkAdapter = new ChainlinkAdapter(
-            address(this),  // admin
-            address(router),  // oracle
-            address(router)  // router
+            address(this), // admin
+            address(router), // oracle
+            address(router) // router
         );
         // Grant ORACLE_ROLE to test contract
         chainlinkAdapter.grantRole(address(this), uint256(adapter.ORACLE_ROLE()));
@@ -65,13 +64,11 @@ contract TestAerodromeV1Adapter is Test {
         data.baseToken = USDC;
         data.quoteTokenDecimals = 18;
         data.baseTokenDecimals = 6;
-       
-        adapter.addAsset(DAI, data);
 
+        adapter.addAsset(DAI, data);
     }
 
     function testReturnsCorrectPrice() public {
-
         ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(DAI, true);
 
         assertFalse(priceData.hadError, "Price should not have error");
@@ -81,7 +78,6 @@ contract TestAerodromeV1Adapter is Test {
         // Log the actual price for verification
         emit log_named_uint("DAI/USD Price", priceData.price);
     }
-        
 
     function testRevertAfterAssetRemove() public {
         testReturnsCorrectPrice();
@@ -90,9 +86,8 @@ contract TestAerodromeV1Adapter is Test {
         vm.expectRevert(AerodromeBaseAdapter.AerodromeAdapter__AssetIsNotSupported.selector);
         adapter.getPrice(DAI, true);
     }
-    
-    function testRevertAddAsset__InvalidPool() public {
 
+    function testRevertAddAsset__InvalidPool() public {
         AerodromeV1Adapter.AdapterData memory data;
         data.pool = DAI;
         data.baseToken = USDC;
@@ -102,7 +97,7 @@ contract TestAerodromeV1Adapter is Test {
         vm.expectRevert(AerodromeBaseAdapter.AerodromeAdapter__InvalidPoolAddress.selector);
         adapter.addAsset(DAI, data);
     }
-    
+
     function testRevertAddAsset__InvalidAsset() public {
         AerodromeV1Adapter.AdapterData memory data;
         data.pool = AERO_POOL_DAI_USDC;
@@ -113,10 +108,8 @@ contract TestAerodromeV1Adapter is Test {
         vm.expectRevert(AerodromeBaseAdapter.AerodromeAdapter__InvalidAsset.selector);
         adapter.addAsset(USDC, data);
     }
-    
-    
-    function testUpdateAsset() public {
 
+    function testUpdateAsset() public {
         AerodromeV1Adapter.AdapterData memory data;
         data.pool = AERO_POOL_DAI_USDC;
         data.baseToken = USDC;
@@ -131,5 +124,4 @@ contract TestAerodromeV1Adapter is Test {
         vm.expectRevert(AerodromeBaseAdapter.AerodromeAdapter__AssetIsNotSupported.selector);
         adapter.removeAsset(USDC);
     }
-
 }

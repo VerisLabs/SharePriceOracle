@@ -2,10 +2,9 @@
 pragma solidity ^0.8.17;
 
 interface IAerodromeV1Pool {
-
     /// @notice Returns [token0, token1]
     function tokens() external view returns (address, address);
-    
+
     /// @notice Address of token in the pool with the lower address value
     function token0() external view returns (address);
 
@@ -39,9 +38,11 @@ interface IAerodromeV1Pool {
         uint256 amountIn,
         uint256 points,
         uint256 window
-    ) external view returns (uint256[] memory);
+    )
+        external
+        view
+        returns (uint256[] memory);
 
-    
     /// @notice Get the amount of tokenOut given the amount of tokenIn
     /// @param amountIn Amount of token in
     /// @param tokenIn  Address of token

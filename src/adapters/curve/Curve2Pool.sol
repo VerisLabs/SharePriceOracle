@@ -43,11 +43,11 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
     ///         this is not meant to be anti tamperproof but,
     ///         more-so mitigate any human error.
     ///         .02e18 = 2%.
-    uint256 internal constant _MAX_BOUND_INCREASE = .02e18;
+    uint256 internal constant _MAX_BOUND_INCREASE = 0.02e18;
     /// @notice Maximum difference between lower bound and upper bound,
     ///         checked on configuration.
     ///         .05e18 = 5%.
-    uint256 internal constant _MAX_BOUND_RANGE = .05e18;
+    uint256 internal constant _MAX_BOUND_RANGE = 0.05e18;
 
     /// STORAGE ///
 
@@ -59,11 +59,7 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
 
     /// EVENTS ///
 
-    event CurvePoolAssetAdded(
-        address asset, 
-        AdapterData assetConfig, 
-        bool isUpdate
-    );
+    event CurvePoolAssetAdded(address asset, AdapterData assetConfig, bool isUpdate);
     event CurvePoolAssetRemoved(address asset);
 
     /// ERRORS ///
@@ -84,10 +80,10 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
         address _admin,
         address _oracle,
         address _oracleRouter
-    ) CurveBaseAdapter (_admin, _oracle, _oracleRouter) {
-        oracleRouter = ISharePriceRouter(
-            _oracleRouter
-        );
+    )
+        CurveBaseAdapter(_admin, _oracle, _oracleRouter)
+    {
+        oracleRouter = ISharePriceRouter(_oracleRouter);
     }
 
     /// EXTERNAL FUNCTIONS ///
@@ -97,10 +93,7 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
     /// @param coinsLength The number of coins (from .coinsLength) on the
     ///                    Curve pool.
     /// @param gasLimit The gas limit to be set on the check.
-    function setReentrancyConfig(
-        uint256 coinsLength,
-        uint256 gasLimit
-    ) external {
+    function setReentrancyConfig(uint256 coinsLength, uint256 gasLimit) external {
         _checkOraclePermissions();
         _setReentrancyConfig(coinsLength, gasLimit);
     }
@@ -115,14 +108,19 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
     function getPrice(
         address asset,
         bool inUSD
-    ) external view override returns (ISharePriceRouter.PriceReturnData memory pData) {
+    )
+        external
+        view
+        override
+        returns (ISharePriceRouter.PriceReturnData memory pData)
+    {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
             revert Curve2PoolAssetAdapter__AssetIsNotSupported();
         }
 
         AdapterData memory data = adapterData[asset];
-        
+
         // Validate we support this pool and that this is not
         // a reeentrant call.
         if (isLocked(data.pool, 2)) {
@@ -133,33 +131,24 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
         ICurvePool pool = ICurvePool(data.pool);
         // Make sure virtualPrice is reasonable.
         uint256 virtualPrice = pool.get_virtual_price();
-        
+
         _enforceBounds(virtualPrice, data.lowerBound, data.upperBound);
 
         // Get underlying token prices.
-        
-        (uint256 basePrice, bool errorCode) = oracleRouter.getPrice(
-            data.baseToken, inUSD
-        );
+
+        (uint256 basePrice, bool errorCode) = oracleRouter.getPrice(data.baseToken, inUSD);
         if (errorCode) {
             pData.hadError = true;
             return pData;
         }
 
         // take 1% of liquidity as sample
-        uint256 sample = pool.balances(
-            uint256(uint128(data.quoteTokenIndex))
-        ) / 100;
+        uint256 sample = pool.balances(uint256(uint128(data.quoteTokenIndex))) / 100;
 
-        uint256 out = pool.get_dy(
-            uint256(int256(data.quoteTokenIndex)),
-            uint256(int256(data.baseTokenIndex)),
-            sample
-        );
+        uint256 out = pool.get_dy(uint256(int256(data.quoteTokenIndex)), uint256(int256(data.baseTokenIndex)), sample);
 
-        uint256 price = (out * WAD * (10 ** data.quoteTokenDecimals)) /
-            sample /
-            (10 ** data.baseTokenDecimals); // in base token decimals
+        uint256 price = (out * WAD * (10 ** data.quoteTokenDecimals)) / sample / (10 ** data.baseTokenDecimals); // in
+            // base token decimals
 
         price = (price * basePrice) / WAD;
 
@@ -171,7 +160,6 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
         pData.inUSD = inUSD;
         pData.price = uint240(price);
     }
-        
 
     /// @notice Adds pricing support for `asset`, an asset inside
     ///         a Curve V2 pool.
@@ -192,7 +180,6 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
             revert Curve2PoolAssetAdapter__Reentrant();
         }
 
-
         // Make sure `asset` is not trying to price denominated in itself.
         if (asset == data.baseToken) {
             revert Curve2PoolAssetAdapter__InvalidAsset();
@@ -208,9 +195,7 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
         if (pool.coins(uint256(uint128(data.quoteTokenIndex))) != asset) {
             revert Curve2PoolAssetAdapter__InvalidAssetIndex();
         }
-        if (
-            pool.coins(uint256(uint128(data.baseTokenIndex))) != data.baseToken
-        ) {
+        if (pool.coins(uint256(uint128(data.baseTokenIndex))) != data.baseToken) {
             revert Curve2PoolAssetAdapter__InvalidAssetIndex();
         }
 
@@ -288,11 +273,7 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
     ///                      is greater than.
     /// @param newUpperBound The new upper bound to make sure `price`
     ///                      is less than.
-    function raiseBounds(
-        address asset,
-        uint256 newLowerBound,
-        uint256 newUpperBound
-    ) external {
+    function raiseBounds(address asset, uint256 newLowerBound, uint256 newUpperBound) external {
         _checkOraclePermissions();
 
         // Convert the parameters from `basis points` to `WAD` form,
@@ -341,17 +322,13 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
     }
 
     /// @notice Helper function to check if `price` is within a reasonable
-    ///         bound. 
+    ///         bound.
     /// @dev Reverts if bounds are breached.
     /// @param virtualPrice The virtual price to check against `lowerBound`
     ///                     and `upperBound`.
     /// @param lowerBound The lower bound to make sure `price` is greater than.
     /// @param upperBound The upper bound to make sure `price` is less than.
-    function _enforceBounds(
-        uint256 virtualPrice,
-        uint256 lowerBound,
-        uint256 upperBound
-    ) internal pure {
+    function _enforceBounds(uint256 virtualPrice, uint256 lowerBound, uint256 upperBound) internal pure {
         if (virtualPrice < lowerBound || virtualPrice > upperBound) {
             revert Curve2PoolAssetAdapter__BoundsExceeded();
         }

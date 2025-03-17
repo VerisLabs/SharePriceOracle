@@ -22,18 +22,9 @@ interface ICurvePool {
 
     function price_oracle(uint256 i) external view returns (uint256);
 
-    function exchange(
-        int128 i,
-        int128 j,
-        uint256 dx,
-        uint256 min_dy
-    ) external payable returns (uint256);
+    function exchange(int128 i, int128 j, uint256 dx, uint256 min_dy) external payable returns (uint256);
 
     function stored_rates() external view returns (uint256[2] memory);
 
-    function get_dy(
-        uint256 from,
-        uint256 to,
-        uint256 _from_amount
-    ) external view returns (uint256);
+    function get_dy(uint256 from, uint256 to, uint256 _from_amount) external view returns (uint256);
 }

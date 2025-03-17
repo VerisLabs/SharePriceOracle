@@ -24,10 +24,7 @@ abstract contract CurveBaseAdapter is BaseOracleAdapter {
 
     /// EVENTS ///
 
-    event UpdatedReentrancyConfiguration(
-        uint256 coinsLength,
-        uint256 gasLimit
-    );
+    event UpdatedReentrancyConfiguration(uint256 coinsLength, uint256 gasLimit);
 
     /// ERRORS ///
 
@@ -42,8 +39,9 @@ abstract contract CurveBaseAdapter is BaseOracleAdapter {
         address _admin,
         address _oracle,
         address _oracleRouter
-    ) BaseOracleAdapter (_admin, _oracle, _oracleRouter) {}
-
+    )
+        BaseOracleAdapter(_admin, _oracle, _oracleRouter)
+    { }
 
     /// PUBLIC FUNCTIONS ///
 
@@ -53,11 +51,8 @@ abstract contract CurveBaseAdapter is BaseOracleAdapter {
     ///         means they currently are in the remove liquidity context and
     ///         are manipulating the virtual price.
     /// @param curvePool The address of the Curve pool to check for Reentry.
-    /// @param coinsLength The number of underlying tokens inside `pool`. 
-    function isLocked(
-        address curvePool,
-        uint256 coinsLength
-    ) public view returns (bool) {
+    /// @param coinsLength The number of underlying tokens inside `pool`.
+    function isLocked(address curvePool, uint256 coinsLength) public view returns (bool) {
         uint256 gasLimit = reentrancyConfig[coinsLength];
 
         if (gasLimit == 0) {
@@ -70,20 +65,14 @@ abstract contract CurveBaseAdapter is BaseOracleAdapter {
 
         if (coinsLength == 2) {
             uint256[2] memory amounts;
-            try pool.remove_liquidity{ gas: gasLimit }(0, amounts) {} catch (
-                bytes memory
-            ) {}
+            try pool.remove_liquidity{ gas: gasLimit }(0, amounts) { } catch (bytes memory) { }
         } else if (coinsLength == 3) {
             uint256[3] memory amounts;
-            try pool.remove_liquidity{ gas: gasLimit }(0, amounts) {} catch (
-                bytes memory
-            ) {}
+            try pool.remove_liquidity{ gas: gasLimit }(0, amounts) { } catch (bytes memory) { }
         }
         if (coinsLength == 4) {
             uint256[4] memory amounts;
-            try pool.remove_liquidity{ gas: gasLimit }(0, amounts) {} catch (
-                bytes memory
-            ) {}
+            try pool.remove_liquidity{ gas: gasLimit }(0, amounts) { } catch (bytes memory) { }
         }
 
         uint256 gasSpent;
@@ -92,10 +81,7 @@ abstract contract CurveBaseAdapter is BaseOracleAdapter {
             gasSpent = gasStart - gasleft();
         }
 
-        return
-            gasSpent > gasLimit
-                ? false /* is not locked */
-                : true /* locked */;
+        return gasSpent > gasLimit ? false /* is not locked */ : true; /* locked */
     }
 
     /// INTERNAL FUNCTIONS ///
@@ -103,10 +89,7 @@ abstract contract CurveBaseAdapter is BaseOracleAdapter {
     /// @notice Sets or updates a Curve pool configuration for the reentrancy check.
     /// @param coinsLength The number of coins (from .coinsLength) on the Curve pool.
     /// @param gasLimit The gas limit to be set on the check.
-    function _setReentrancyConfig(
-        uint256 coinsLength,
-        uint256 gasLimit
-    ) internal {
+    function _setReentrancyConfig(uint256 coinsLength, uint256 gasLimit) internal {
         // Make sure the gas limit assigned is above the minimum for the pool
         if (gasLimit < MIN_GAS_LIMIT) {
             revert CurveBaseAdapter__InvalidConfiguration();
@@ -129,5 +112,4 @@ abstract contract CurveBaseAdapter is BaseOracleAdapter {
             return false; // Not a Curve pool
         }
     }
-
 }

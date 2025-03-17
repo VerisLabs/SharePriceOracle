@@ -2,7 +2,6 @@
 pragma solidity ^0.8.17;
 
 interface IAerodromeV2Pool {
-    
     /// @notice The first of the two tokens of the pool, sorted by address
     /// @return The token contract address
     function token0() external view returns (address);
