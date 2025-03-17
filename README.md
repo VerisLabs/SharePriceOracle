@@ -1,344 +1,118 @@
 # SharePriceOracle
 
-A multi-adapter oracle system for cross-chain ERC4626 vault share prices with robust fallback mechanisms.
+A cross-chain oracle system for ERC4626 vault share prices, enabling secure and efficient price data transmission across different blockchain networks using LayerZero protocol.
 
 ## Overview
 
-SharePriceOracle is a decentralized oracle system that enables accessing and sharing ERC4626 vault share prices across different blockchain networks. It provides a resilient architecture with multiple price feed adapters and cross-chain communication capabilities via LayerZero.
+SharePriceOracle is a multi-adapter oracle system that supports multiple price feeds and fallback mechanisms for cross-chain ERC4626 vault share price routing. It combines functionality of price oracle adapters and router capabilities to provide unified price conversion across chains.
 
-### Key Features
+## Key Features
 
-- **Multi-Adapter Architecture**: Supports multiple oracle providers (Chainlink, API3) with fallback mechanisms
-- **Cross-Chain Communication**: Secure vault share price updates between different blockchain networks
-- **Asset Category Optimization**: Special handling for different asset types (BTC-like, ETH-like, stablecoins)
-- **Fallback Mechanism**: Graceful degradation when primary price sources are unavailable
-- **Price Conversion**: Convert prices between different assets and denominations (USD, ETH)
-- **Role-Based Access Control**: Granular security permissions
+- Multi-chain support (Base, Optimism, Arbitrum)
+- Multiple oracle adapter integration (Chainlink, API3, Pyth, Redstone)
+- Fallback price feed mechanisms
+- Cross-chain asset mapping
+- Configurable price update heartbeats
+- Sequencer uptime validation for L2 chains
 
-## System Architecture
+## Architecture
 
 ### Core Components
 
-#### SharePriceRouter
-The main contract that orchestrates the oracle adapters and provides unified price conversion:
-- Manages multiple oracle adapters with priority-based failover
-- Handles price conversion between different assets
-- Stores historical price data
-- Cross-chain share price mapping and updates
-- Asset categorization for optimized conversion
+1. **SharePriceOracle**: Main contract handling price routing and conversions
+2. **MaxLzEndpoint**: LayerZero endpoint integration for cross-chain communication
+3. **Oracle Adapters**: 
+   - Chainlink
+   - API3
+   - Pyth
+   - Redstone
+   - Balancer
+   - Curve
 
-#### Oracle Adapters
-Modular price feed providers that fetch and normalize price data:
+### Key Contracts
 
-- **BaseOracleAdapter**: Abstract base contract for all adapters
-- **ChainlinkAdapter**: Integration with Chainlink price feeds
-- **Api3Adapter**: Integration with API3 price feeds
-
-#### MaxLzEndpoint
-Manages cross-chain communication via LayerZero protocol:
-- Secure message passing between chains
-- Peer verification and validation
-- Fee estimation and payment
-- Request-response pattern support (AB and ABA patterns)
-- Message deduplication and enforced options
-
-### Cross-Chain Flow
-
-1. **Source Chain**:
-   - Share prices are collected from local vaults via `getSharePrices`
-   - Encoded as `VaultReport` structures
-   - Sent via LayerZero to destination chain
-
-2. **Destination Chain**:
-   - Message is received and verified by `MaxLzEndpoint`
-   - Share prices are extracted and passed to `SharePriceRouter`
-   - Prices are stored with chain ID mapping for later use
-
-3. **Price Access**:
-   - Applications can query share prices via `getLatestSharePrice`
-   - The system attempts multiple fallback strategies:
-     1. Direct price calculation through oracles
-     2. Cross-chain price data
-     3. Stored price data
-     4. Destination vault's own share price as final fallback
-
-### Security Model
-
-- **Role-Based Access Control**:
-  - `ADMIN_ROLE`: Configuration and management
-  - `ADAPTER_ROLE`: Price feed adapter operations
-  - `ENDPOINT_ROLE`: LayerZero endpoint operations
-
-- **Price Validation**:
-  - Staleness checks (24-hour threshold)
-  - Min/Max bounds for prices
-  - Decimal overflow protection
-  - Sequencer health validation for L2 chains
-
-- **Cross-Chain Security**:
-  - Peer validation for LayerZero endpoints
-  - Message deduplication
-  - Chain ID verification
-  - Enforced options for cross-chain messages
-
-## Prerequisites
-
-- [Foundry](https://getfoundry.sh/)
-- Make
-- Solidity ^0.8.19
-
-## Installation
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd SharePriceOracle
+```solidity
+SharePriceOracle.sol      // Main router contract
+MaxLzEndpoint.sol         // LayerZero endpoint handler
+adapters/
+  Chainlink.sol          // Chainlink price feed adapter
+  Api3.sol               // API3 price feed adapter
+  Pyth.sol              // Pyth Network adapter
+  Redstone.sol          // Redstone adapter
 ```
 
-2. Install dependencies:
+## Deployment
+
+The deployment process is handled through several scripts:
+
+1. Initial Deployment (`01_Deploy.s.sol`)
+2. Base Chain Configuration (`02_ConfigureBase.s.sol`)
+3. Peer Configuration (`03_ConfigurePeers.s.sol`)
+4. Local Asset Addition (`04_AddLocalAssets.s.sol`)
+
+### Prerequisites
+
 ```bash
-forge install
+export PRIVATE_KEY=your_private_key
+export ROUTER_ADDRESS=deployed_router_address
 ```
 
-3. Copy the example environment file and fill in your values:
+### Deployment Steps
+
+1. Deploy core contracts:
 ```bash
-cp env.example .env
+forge script script/01_Deploy.s.sol --broadcast
+```
+
+2. Configure Base chain:
+```bash
+forge script script/02_ConfigureBase.s.sol --broadcast
+```
+
+3. Configure peers on other chains:
+```bash
+forge script script/03_ConfigurePeers.s.sol --broadcast
+```
+
+4. Add local assets:
+```bash
+forge script script/04_AddLocalAssets.s.sol --broadcast
 ```
 
 ## Configuration
 
-Key environment variables in `.env`:
+The system uses several JSON configuration files for price feeds:
 
-```env
-# Deployment private key
-PRIVATE_KEY=
+- `balancerPriceFeeds.json`: Balancer pool configurations
+- `curvePriceFeeds.json`: Curve pool configurations
+- `priceFeedConfig.json`: General price feed configurations
+- `pythPriceFeed.json`: Pyth Network specific configurations
+- `redstonePriceFeed.json`: Redstone specific configurations
 
-# Admin address
-ADMIN_ADDRESS=
+## Supported Networks
 
-# RPC URLs
-BASE_RPC_URL=
-OPTIMISM_RPC_URL=
-ARBITRUM_RPC_URL=
+- Base (Chain ID: 8453)
+- Optimism (Chain ID: 10)
+- Arbitrum (Chain ID: 42161)
+- Polygon (Chain ID: 137)
 
-# Etherscan API Keys for verification
-ETHERSCAN_API_KEY=
-BASESCAN_API_KEY=
-ARBISCAN_API_KEY=
-OPTIMISTIC_API_KEY=
+## Security
 
-# LayerZero configuration
-LZ_GAS_LIMIT=500000
-LZ_NATIVE_VALUE=200000
+The contract implements several security features:
 
-```
+- Role-based access control
+- Sequencer uptime validation for L2s
+- Price feed heartbeat checks
+- Multiple oracle fallback mechanisms
 
-## Development and Deployment
+## Testing
 
-### Building
+Run the test suite:
+
 ```bash
-make build
+forge test
 ```
-
-### Testing
-```bash
-# Run all tests
-make test
-
-# Run with detailed output
-forge test -vvv
-```
-
-### Deployment
-```bash
-# Deploy to all networks
-make deploy-all
-
-# Or deploy to specific networks
-make deploy-base
-make deploy-optimism
-make deploy-arbitrum
-```
-
-### Configure Oracle Adapters
-```bash
-# Add Chainlink adapter for asset pricing
-make add-chainlink-adapter CHAIN=base \
-  ASSET=0x123 \
-  AGGREGATOR=0x456 \
-  HEARTBEAT=3600 \
-  IN_USD=true
-
-# Add API3 adapter for asset pricing
-make add-api3-adapter CHAIN=optimism \
-  ASSET=0x789 \
-  TICKER="BTC/USD" \
-  PROXY_FEED=0xabc \
-  HEARTBEAT=7200 \
-  IN_USD=true
-```
-
-### LayerZero Configuration
-```bash
-# Configure all networks
-make configure-all
-
-# Or configure specific networks
-make configure-base
-make configure-optimism
-make configure-arbitrum
-```
-
-### Cross-Chain Share Price Operations
-```bash
-# Send share prices from one chain to another
-make send-share-prices CHAIN=optimism \
-  DST_CHAIN=8453 \
-  VAULT_ADDRESSES=0x123,0x456 \
-  REWARDS_DELEGATE=0x789
-
-# Request share prices from another chain
-make request-share-prices CHAIN=base \
-  DST_CHAIN=10 \
-  VAULT_ADDRESSES=0x123,0x456 \
-  REWARDS_DELEGATE=0x789
-```
-
-## Smart Contract Architecture
-
-### Key Data Structures
-
-```solidity
-struct VaultReport {
-    uint256 sharePrice;
-    uint64 lastUpdate;
-    uint32 chainId;
-    address rewardsDelegate;
-    address vaultAddress;
-    address asset;
-    uint256 assetDecimals;
-}
-
-struct PriceReturnData {
-    uint240 price;       // Price normalized to WAD (1e18)
-    bool hadError;       // Error flag
-    bool inUSD;         // Price denomination
-}
-
-struct LocalAssetConfig {
-    address priceFeed;  // Priority-ordered price feeds
-    bool inUSD;         // Whether price should be in USD
-    address adaptor;    // Adapter address
-}
-```
-
-### System Limitations
-
-- Dependence on external oracle quality and uptime
-- LayerZero gas costs for cross-chain operations
-- 24-hour price staleness threshold for all assets
-- Maximum 10 reports per cross-chain message
-- Price precision limited to uint240 (to fit in storage)
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-# SharePriceOracle Deployment Guide
-
-This guide explains how to deploy and configure the SharePriceOracle protocol.
-
-## Prerequisites
-
-1. Install Foundry
-2. Set up environment variables in a `.env` file:
-```bash
-PRIVATE_KEY=your_private_key
-ADMIN_ADDRESS=admin_wallet_address
-ROUTER_ADDRESS=deployed_router_address          # Required for configuration
-CHAINLINK_ADAPTER_ADDRESS=deployed_adapter_address  # Required for configuration
-BASE_RPC_URL=base_rpc_url
-```
-
-## Deployment Process
-
-The deployment is split into three main scripts:
-
-1. `01_Deploy.s.sol`: Deploys the core contracts
-2. `02_ConfigureBase.s.sol`: Configures assets and price feeds
-3. `03_ConfigurePeers.s.sol`: Sets up cross-chain peer relationships
-
-### Step 1: Deploy Core Contracts
-
-The deployment script will automatically detect which chain you're on and deploy the appropriate contracts:
-
-- On Base chain:
-  - SharePriceRouter
-  - ChainlinkAdapter
-  - Api3Adapter
-  - MaxLzEndpoint
-
-- On other chains:
-  - Only MaxLzEndpoint
-
-To deploy:
-```bash
-forge script script/01_Deploy.s.sol:Deploy --rpc-url $RPC_URL --broadcast --verify
-```
-
-### Step 2: Configure Protocol (Base Chain Only)
-
-After deployment, configure the protocol on Base chain:
-
-```bash
-forge script script/02_ConfigureBase.s.sol:Configure --rpc-url $BASE_RPC_URL --broadcast
-```
-
-This will:
-1. Configure Chainlink price feeds for:
-   - Stablecoins (USDC, USDT)
-   - ETH assets (WETH, stETH)
-   - BTC assets (WBTC, tBTC)
-
-2. Set up cross-chain asset mappings for:
-   - Optimism (Chain ID: 10)
-   - Arbitrum (Chain ID: 42161)
-   - Polygon (Chain ID: 137)
-
-### Step 3: Configure Peers
-
-Configure peer relationships between chains:
-
-```bash
-forge script script/03_ConfigurePeers.s.sol:Configure --rpc-url $RPC_URL --broadcast
-```
-
-## Contract Addresses
-
-After deployment, save the contract addresses in a safe place. You'll need them for configuration and integration.
-
-## Verification
-
-All contracts will be automatically verified if you included the `--verify` flag during deployment. If verification fails, you can manually verify using:
-
-```bash
-forge verify-contract <CONTRACT_ADDRESS> <CONTRACT_NAME> --chain base
-```
-
-## Security Considerations
-
-1. The admin address should be a secure multisig wallet
-2. Double-check all price feed addresses and configurations
-3. Verify cross-chain asset mappings are correct
-4. Ensure proper roles are assigned to contracts
-5. Validate peer relationships between chains
-
-## Troubleshooting
-
-If you encounter issues:
-
-1. Ensure all environment variables are set correctly
-2. Verify you have sufficient ETH for deployment
-3. Check that you're using the correct RPC URL
-4. Confirm contract addresses in configuration match deployed contracts
-5. Verify LayerZero endpoint configurations
+MIT

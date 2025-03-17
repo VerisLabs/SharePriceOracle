@@ -4,8 +4,8 @@ pragma solidity ^0.8.19;
 import { Test } from "forge-std/Test.sol";
 import { Api3Adapter } from "../../src/adapters/Api3.sol";
 import { IProxy } from "../../src/interfaces/api3/IProxy.sol";
-import { ISharePriceRouter } from "../../src/interfaces/ISharePriceRouter.sol";
-import { SharePriceRouter } from "../../src/SharePriceRouter.sol";
+import { ISharePriceOracle } from "../../src/interfaces/ISharePriceOracle.sol";
+import { SharePriceOracle } from "../../src/SharePriceOracle.sol";
 
 contract Api3AdapterTest is Test {
     // Constants for BASE network
@@ -19,14 +19,14 @@ contract Api3AdapterTest is Test {
 
     // Test contracts
     Api3Adapter public adapter;
-    SharePriceRouter public router;
+    SharePriceOracle public router;
 
     function setUp() public {
         string memory baseRpcUrl = vm.envString("BASE_RPC_URL");
         vm.createSelectFork(baseRpcUrl);
 
         // Deploy router
-        router = new SharePriceRouter(
+        router = new SharePriceOracle(
             address(this) // admin
         );
 
@@ -78,7 +78,7 @@ contract Api3AdapterTest is Test {
         vm.stopPrank();
 
         // Get price
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
 
         assertFalse(priceData.hadError);
         assertTrue(priceData.inUSD);
@@ -86,7 +86,7 @@ contract Api3AdapterTest is Test {
     }
 
     function testReturnsCorrectPrice_WBTC_USD() public view {
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
 
         assertEq(priceData.hadError, false, "Price should not have error");
         assertGt(priceData.price, 0, "Price should be greater than 0");
@@ -99,7 +99,7 @@ contract Api3AdapterTest is Test {
             DAPI_PROXY_ETH_USD, abi.encodeWithSelector(IProxy.read.selector), abi.encode(-1, uint32(block.timestamp))
         );
 
-        ISharePriceRouter.PriceReturnData memory data = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory data = adapter.getPrice(WETH, true);
         assertEq(data.hadError, true, "Should error on negative price");
     }
 
@@ -111,7 +111,7 @@ contract Api3AdapterTest is Test {
             abi.encode(100, uint32(block.timestamp - 5 hours))
         );
 
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, true, "Should error on stale timestamp");
     }
 
@@ -123,7 +123,7 @@ contract Api3AdapterTest is Test {
             abi.encode(type(int224).max, uint32(block.timestamp))
         );
 
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, true, "Should error on price exceeding max");
     }
 
@@ -134,7 +134,7 @@ contract Api3AdapterTest is Test {
 
     function testRevertAfterAssetRemove() public {
         // Get price before removal to ensure it works
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, false, "Price should not have error before removal");
         assertGt(priceData.price, 0, "Price should be greater than 0 before removal");
 
@@ -167,7 +167,7 @@ contract Api3AdapterTest is Test {
         adapter.addAsset(WETH, "ETH/USD", DAPI_PROXY_ETH_USD, 1 hours, true);
 
         // Verify it still works
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, false, "Price should not have error");
         assertGt(priceData.price, 0, "Price should be greater than 0");
     }

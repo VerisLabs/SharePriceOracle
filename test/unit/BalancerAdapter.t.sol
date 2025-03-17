@@ -3,10 +3,10 @@ pragma solidity ^0.8.19;
 
 import { Test } from "forge-std/Test.sol";
 import { BalancerAdapter } from "../../src/adapters/Balancer.sol";
-import { SharePriceRouter } from "../../src/SharePriceRouter.sol";
+import { SharePriceOracle } from "../../src/SharePriceOracle.sol";
 import { IBalancerV2Vault } from "../../src/interfaces/balancer/IBalancerV2Vault.sol";
 import { IBalancerV2WeightedPool } from "../../src/interfaces/balancer/IBalancerV2WeightedPool.sol";
-import { ISharePriceRouter } from "../../src/interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "../../src/interfaces/ISharePriceOracle.sol";
 import { IERC20Metadata } from "../../src/interfaces/IERC20Metadata.sol";
 
 contract BalancerAdapterTest is Test {
@@ -23,13 +23,13 @@ contract BalancerAdapterTest is Test {
     uint256 constant HEARTBEAT = 4 hours;
 
     BalancerAdapter public adapter;
-    SharePriceRouter public router;
+    SharePriceOracle public router;
 
     function setUp() public {
         string memory baseRpcUrl = vm.envString("BASE_RPC_URL");
         vm.createSelectFork(baseRpcUrl);
 
-        router = new SharePriceRouter(address(this));
+        router = new SharePriceOracle(address(this));
 
         adapter = new BalancerAdapter(address(this), address(router), address(router), BALANCER_VAULT);
 
@@ -85,7 +85,7 @@ contract BalancerAdapterTest is Test {
     }
 
     function testReturnsCorrectPrice_WETH_USD() public {
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
 
         assertFalse(priceData.hadError, "Price should not have error");
         assertTrue(priceData.inUSD, "Price should be in USD");
@@ -97,7 +97,7 @@ contract BalancerAdapterTest is Test {
     function testCanGetPriceInETH() public {
         adapter.addAsset(USDC, WETH_USDC_POOL_ID, WETH, HEARTBEAT, false);
 
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(USDC, false);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(USDC, false);
 
         assertFalse(priceData.hadError, "Price should not have error");
         assertFalse(priceData.inUSD, "Price should not be in USD");
@@ -107,7 +107,7 @@ contract BalancerAdapterTest is Test {
     }
 
     function testPriceFallback_AlternateConfig() public view {
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, false);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, false);
 
         assertFalse(priceData.hadError, "Price should not have error");
         assertTrue(priceData.inUSD, "Price should indicate it's in USD");
@@ -121,7 +121,7 @@ contract BalancerAdapterTest is Test {
             abi.encode(new address[](2), new uint256[](2), block.number - 10_000) // Very old
         );
 
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertTrue(priceData.hadError, "Should error on stale data");
     }
 
@@ -149,7 +149,7 @@ contract BalancerAdapterTest is Test {
 
         adapter.addAsset(WETH, zeroBalancePoolId, USDC, HEARTBEAT, true);
 
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertTrue(priceData.hadError, "Should error on zero balance");
     }
 
@@ -159,7 +159,7 @@ contract BalancerAdapterTest is Test {
     }
 
     function testRevertAfterAssetRemove() public {
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertFalse(priceData.hadError, "Price should not have error before removal");
         assertGt(priceData.price, 0, "Price should be greater than 0 before removal");
 
@@ -204,7 +204,7 @@ contract BalancerAdapterTest is Test {
     function testCanAddSameAsset() public {
         adapter.addAsset(WETH, WETH_USDC_POOL_ID, USDC, 1 hours, true);
 
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertFalse(priceData.hadError, "Price should not have error");
         assertGt(priceData.price, 0, "Price should be greater than 0");
     }

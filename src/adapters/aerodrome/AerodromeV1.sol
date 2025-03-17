@@ -2,7 +2,7 @@
 pragma solidity ^0.8.17;
 
 import { AerodromeBaseAdapter } from "./AerodromeBaseAdapter.sol";
-import { ISharePriceRouter } from "../../interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "../../interfaces/ISharePriceOracle.sol";
 import { IAerodromeV1Pool } from "../../interfaces/aerodrome/IAerodromeV1Pool.sol";
 
 contract AerodromeV1Adapter is AerodromeBaseAdapter {
@@ -33,7 +33,7 @@ contract AerodromeV1Adapter is AerodromeBaseAdapter {
         view
         virtual
         override
-        returns (ISharePriceRouter.PriceReturnData memory pData)
+        returns (ISharePriceOracle.PriceReturnData memory pData)
     {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {

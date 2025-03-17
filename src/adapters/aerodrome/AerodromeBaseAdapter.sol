@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import { ISharePriceRouter } from "../../interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "../../interfaces/ISharePriceOracle.sol";
 import { BaseOracleAdapter } from "../../libs/base/BaseOracleAdapter.sol";
 
 contract AerodromeBaseAdapter is BaseOracleAdapter {
@@ -26,7 +26,7 @@ contract AerodromeBaseAdapter is BaseOracleAdapter {
     /// @dev Stable pool address => AdapterData.
     mapping(address => AdapterData) public adapterData;
 
-    ISharePriceRouter public oracleRouter;
+    ISharePriceOracle public oracleRouter;
 
     /// EVENTS ///
 
@@ -48,7 +48,7 @@ contract AerodromeBaseAdapter is BaseOracleAdapter {
     )
         BaseOracleAdapter(_admin, _oracle, _oracleRouter)
     {
-        oracleRouter = ISharePriceRouter(_oracleRouter);
+        oracleRouter = ISharePriceOracle(_oracleRouter);
     }
 
     /// EXTERNAL FUNCTIONS ///
@@ -68,7 +68,7 @@ contract AerodromeBaseAdapter is BaseOracleAdapter {
         view
         virtual
         override
-        returns (ISharePriceRouter.PriceReturnData memory pData)
+        returns (ISharePriceOracle.PriceReturnData memory pData)
     { }
 
     /// @notice Helper function for pricing support for `asset`,
@@ -113,6 +113,6 @@ contract AerodromeBaseAdapter is BaseOracleAdapter {
 
         // Notify the oracle router that we are going to stop supporting
         // the asset.
-        ISharePriceRouter(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
+        ISharePriceOracle(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
     }
 }

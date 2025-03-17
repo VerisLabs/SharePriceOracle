@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
 import "../../src/MaxLzEndpoint.sol";
-import "../../src/SharePriceRouter.sol";
+import "../../src/SharePriceOracle.sol";
 import "../helpers/Tokens.sol";
 import "../base/BaseTest.t.sol";
 import { USDCE_BASE, USDCE_POLYGON, WETH_MAINNET } from "../utils/AddressBook.sol";
@@ -19,9 +19,9 @@ contract MaxLzEndpointTest is BaseTest {
     address constant WBTC = 0x0555E30da8f98308EdB960aa94C0Db47230d2B9c;
 
     MaxLzEndpoint public endpoint;
-    SharePriceRouter public oracle;
+    SharePriceOracle public oracle;
     IERC4626 public vault;
-    SharePriceRouter public oracle_pol;
+    SharePriceOracle public oracle_pol;
     MaxLzEndpoint public endpoint_pol;
 
     address public admin;
@@ -96,7 +96,7 @@ contract MaxLzEndpointTest is BaseTest {
         vm.chainId(8453);
 
         // Deploy BASE contracts
-        oracle = new SharePriceRouter(admin);
+        oracle = new SharePriceOracle(admin);
         endpoint = new MaxLzEndpoint(admin, base_LZ_end, address(oracle));
 
         // Setup Chainlink adapter for BASE
@@ -125,7 +125,7 @@ contract MaxLzEndpointTest is BaseTest {
         vm.chainId(137);
 
         // Deploy POLYGON contracts
-        oracle_pol = new SharePriceRouter(admin);
+        oracle_pol = new SharePriceOracle(admin);
         endpoint_pol = new MaxLzEndpoint(admin, polygon_LZ_end, address(oracle_pol));
 
         // Setup Chainlink adapter for POLYGON
@@ -625,8 +625,8 @@ contract MaxLzEndpointTest is BaseTest {
         Origin memory origin = Origin(30_109, bytes32(uint256(uint160(address(endpoint_pol)))), 0);
         bytes32 guid = keccak256(abi.encodePacked(block.timestamp, msg.sender));
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: 8453,
             vaultAddress: address(vault),
             sharePrice: 1e18,
@@ -637,7 +637,7 @@ contract MaxLzEndpointTest is BaseTest {
         });
 
         vm.mockCall(
-            address(oracle), abi.encodeWithSelector(ISharePriceRouter.getSharePrices.selector), abi.encode(reports)
+            address(oracle), abi.encodeWithSelector(ISharePriceOracle.getSharePrices.selector), abi.encode(reports)
         );
 
         vm.mockCall(

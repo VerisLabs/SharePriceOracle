@@ -4,13 +4,13 @@ pragma solidity ^0.8.19;
 import "forge-std/Test.sol";
 import "../../src/adapters/Chainlink.sol";
 import "../../src/adapters/curve/Curve2Pool.sol";
-import "../../src/SharePriceRouter.sol";
+import "../../src/SharePriceOracle.sol";
 import "../helpers/Tokens.sol";
 import "../base/BaseTest.t.sol";
 import { USDCE_BASE } from "../utils/AddressBook.sol";
 import { BaseOracleAdapter } from "../../src/libs/base/BaseOracleAdapter.sol";
 import { ICurvePool } from "../../src/interfaces/curve/ICurvePool.sol";
-import { ISharePriceRouter } from "../../src/interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "../../src/interfaces/ISharePriceOracle.sol";
 import { CurveBaseAdapter } from "src/adapters/curve/CurveBaseAdapter.sol";
 
 contract TestCurve2PoolAssetAdapter is Test {
@@ -30,7 +30,7 @@ contract TestCurve2PoolAssetAdapter is Test {
     address public admin;
     Curve2PoolAssetAdapter public adapter;
     ChainlinkAdapter public chainlinkAdapter;
-    SharePriceRouter public router;
+    SharePriceOracle public router;
 
     function setUp() public {
         admin = makeAddr("admin");
@@ -38,7 +38,7 @@ contract TestCurve2PoolAssetAdapter is Test {
         vm.createSelectFork(baseRpcUrl);
 
         // Deploy router with admin
-        router = new SharePriceRouter(address(this));
+        router = new SharePriceOracle(address(this));
 
         adapter = new Curve2PoolAssetAdapter(
             address(this), // admin
@@ -80,7 +80,7 @@ contract TestCurve2PoolAssetAdapter is Test {
     }
 
     function testReturnsCorrectPrice() public {
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(CBETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(CBETH, true);
 
         assertFalse(priceData.hadError, "Price should not have error");
         assertTrue(priceData.inUSD, "Price should be in USD");

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.17;
 
 import { BaseOracleAdapter } from "../libs/base/BaseOracleAdapter.sol";
-import { ISharePriceRouter } from "../interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "../interfaces/ISharePriceOracle.sol";
 import { IChainlink } from "../interfaces/chainlink/IChainlink.sol";
 
 /**
@@ -85,7 +85,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
      * @notice Retrieves the price of a specified asset from Chainlink
      * @param asset Address of the asset to price
      * @param inUSD Whether to return the price in USD (true) or ETH (false)
-     * @return ISharePriceRouter.PriceReturnData Structure containing price, error status, and denomination
+     * @return ISharePriceOracle.PriceReturnData Structure containing price, error status, and denomination
      */
     function getPrice(
         address asset,
@@ -94,7 +94,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
         external
         view
         override
-        returns (ISharePriceRouter.PriceReturnData memory)
+        returns (ISharePriceOracle.PriceReturnData memory)
     {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
@@ -199,7 +199,7 @@ contract ChainlinkAdapter is BaseOracleAdapter {
 
         // Notify the Oracle Router that we are going to stop supporting
         // the asset.
-        ISharePriceRouter(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
+        ISharePriceOracle(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
         emit ChainlinkAssetRemoved(asset);
     }
 
@@ -210,9 +210,9 @@ contract ChainlinkAdapter is BaseOracleAdapter {
     /**
      * @notice Retrieves the price of a specified asset in USD
      * @param asset Address of the asset to price
-     * @return ISharePriceRouter.PriceReturnData Structure containing price, error status, and denomination in USD
+     * @return ISharePriceOracle.PriceReturnData Structure containing price, error status, and denomination in USD
      */
-    function _getPriceInUSD(address asset) internal view returns (ISharePriceRouter.PriceReturnData memory) {
+    function _getPriceInUSD(address asset) internal view returns (ISharePriceOracle.PriceReturnData memory) {
         if (adaptorDataUSD[asset].isConfigured) {
             return _parseData(adaptorDataUSD[asset], true);
         }
@@ -223,9 +223,9 @@ contract ChainlinkAdapter is BaseOracleAdapter {
     /**
      * @notice Retrieves the price of a specified asset in ETH
      * @param asset Address of the asset to price
-     * @return ISharePriceRouter.PriceReturnData Structure containing price, error status, and denomination in ETH
+     * @return ISharePriceOracle.PriceReturnData Structure containing price, error status, and denomination in ETH
      */
-    function _getPriceInETH(address asset) internal view returns (ISharePriceRouter.PriceReturnData memory) {
+    function _getPriceInETH(address asset) internal view returns (ISharePriceOracle.PriceReturnData memory) {
         if (adaptorDataNonUSD[asset].isConfigured) {
             return _parseData(adaptorDataNonUSD[asset], false);
         }
@@ -246,10 +246,10 @@ contract ChainlinkAdapter is BaseOracleAdapter {
     )
         internal
         view
-        returns (ISharePriceRouter.PriceReturnData memory pData)
+        returns (ISharePriceOracle.PriceReturnData memory pData)
     {
         pData.inUSD = inUSD;
-        if (!ISharePriceRouter(ORACLE_ROUTER_ADDRESS).isSequencerValid()) {
+        if (!ISharePriceOracle(ORACLE_ROUTER_ADDRESS).isSequencerValid()) {
             revert ChainlinkAdaptor__SequencerDown();
         }
 

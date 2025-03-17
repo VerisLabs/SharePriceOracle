@@ -3,7 +3,7 @@ pragma solidity ^0.8.17;
 
 import { BaseOracleAdapter } from "../libs/base/BaseOracleAdapter.sol";
 import { ERC20 } from "@solady/tokens/ERC20.sol";
-import { ISharePriceRouter } from "../interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "../interfaces/ISharePriceOracle.sol";
 import { IStaticOracle } from "../interfaces/uniswap/IStaticOracle.sol";
 import { UniswapV3Pool } from "../interfaces/uniswap/UniswapV3Pool.sol";
 
@@ -85,7 +85,7 @@ contract UniswapV3Adapter is BaseOracleAdapter {
         external
         view
         override
-        returns (ISharePriceRouter.PriceReturnData memory pData)
+        returns (ISharePriceOracle.PriceReturnData memory pData)
     {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
@@ -117,7 +117,7 @@ contract UniswapV3Adapter is BaseOracleAdapter {
             return pData;
         }
 
-        ISharePriceRouter OracleRouter = ISharePriceRouter(ORACLE_ROUTER_ADDRESS);
+        ISharePriceOracle OracleRouter = ISharePriceOracle(ORACLE_ROUTER_ADDRESS);
         pData.inUSD = inUSD;
 
         // We want the asset price in USD which uniswap cant do,
@@ -256,7 +256,7 @@ contract UniswapV3Adapter is BaseOracleAdapter {
 
         // Notify the Oracle Router that we are going
         // to stop supporting the asset.
-        ISharePriceRouter(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
+        ISharePriceOracle(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
         emit UniswapV3AssetRemoved(asset);
     }
 }

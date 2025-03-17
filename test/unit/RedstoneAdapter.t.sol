@@ -3,13 +3,13 @@ pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
 import "../../src/adapters/Redstone.sol";
-import "../../src/SharePriceRouter.sol";
+import "../../src/SharePriceOracle.sol";
 import "../helpers/Tokens.sol";
 import "../base/BaseTest.t.sol";
 import { USDCE_BASE } from "../utils/AddressBook.sol";
 import { BaseOracleAdapter } from "../../src/libs/base/BaseOracleAdapter.sol";
 import { IRedstone } from "../../src/interfaces/redstone/IRedstone.sol";
-import { ISharePriceRouter } from "../../src/interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "../../src/interfaces/ISharePriceOracle.sol";
 
 contract RedstoneAdapterTest is Test {
     // Constants for BASE network
@@ -30,14 +30,14 @@ contract RedstoneAdapterTest is Test {
 
     address public admin;
     RedStoneAdapter public adapter;
-    SharePriceRouter public router;
+    SharePriceOracle public router;
 
     function setUp() public {
         admin = makeAddr("admin");
         string memory baseRpcUrl = vm.envString("BASE_RPC_URL");
         vm.createSelectFork(baseRpcUrl);
 
-        router = new SharePriceRouter(address(this));
+        router = new SharePriceOracle(address(this));
         router.setSequencer(SEQUENCER_FEED);
 
         adapter = new RedStoneAdapter(address(this), address(router), address(router));
@@ -99,7 +99,7 @@ contract RedstoneAdapterTest is Test {
     }
 
     function testReturnsCorrectPrice_BSDETH_ETH() public {
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(BSDETH, false);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(BSDETH, false);
 
         assertFalse(priceData.hadError, "Price should not have error");
         assertFalse(priceData.inUSD, "Price should be in ETH");
@@ -109,7 +109,7 @@ contract RedstoneAdapterTest is Test {
     }
 
     function testReturnsCorrectPrice_ETH_USD() public {
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
 
         assertFalse(priceData.hadError, "Price should not have error");
         assertTrue(priceData.inUSD, "Price should be in USD");
@@ -119,7 +119,7 @@ contract RedstoneAdapterTest is Test {
     }
 
     function testReturnsCorrectPrice_WBTC_USD() public {
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
 
         assertFalse(priceData.hadError, "Price should not have error");
         assertTrue(priceData.inUSD, "Price should be in USD");
@@ -163,7 +163,7 @@ contract RedstoneAdapterTest is Test {
             abi.encode(92_233_720_368_547_777, int256(0.5e8), block.timestamp, block.timestamp, 92_233_720_368_547_777)
         );
 
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertTrue(priceData.hadError, "Should error on price below minimum");
     }
 
@@ -176,7 +176,7 @@ contract RedstoneAdapterTest is Test {
             )
         );
 
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertTrue(priceData.hadError, "Should error on price above maximum");
     }
 
@@ -186,7 +186,7 @@ contract RedstoneAdapterTest is Test {
     }
 
     function testRevertAfterAssetRemove() public {
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, false, "Price should not have error before removal");
         assertGt(priceData.price, 0, "Price should be greater than 0 before removal");
 
@@ -217,7 +217,7 @@ contract RedstoneAdapterTest is Test {
     function testCanAddSameAsset() public {
         adapter.addAsset(WETH, ETH_USD_FEED, 1 hours, true);
 
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertFalse(priceData.hadError, "Price should not have error");
         assertGt(priceData.price, 0, "Price should be greater than 0");
 

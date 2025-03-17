@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import { ISharePriceRouter } from "../../interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "../../interfaces/ISharePriceOracle.sol";
 import { OwnableRoles } from "@solady/auth/OwnableRoles.sol";
 
 /**
@@ -85,7 +85,7 @@ abstract contract BaseOracleAdapter is OwnableRoles {
         external
         view
         virtual
-        returns (ISharePriceRouter.PriceReturnData memory);
+        returns (ISharePriceOracle.PriceReturnData memory);
 
     /**
      * @notice Removes price feed support for an asset

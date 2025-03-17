@@ -9,7 +9,7 @@ import {
     MessagingReceipt,
     Origin
 } from "./interfaces/ILayerZeroEndpointV2.sol";
-import { ISharePriceRouter } from "./interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "./interfaces/ISharePriceOracle.sol";
 import { Ownable } from "@solady/auth/Ownable.sol";
 import { MsgCodec } from "./libs/MsgCodec.sol";
 
@@ -31,7 +31,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
     ////////////////////////////////////////////////////////////////
 
     /// @notice Contract state
-    ISharePriceRouter public oracle;
+    ISharePriceOracle public oracle;
 
     /// @notice Contract storage state
     ILayerZeroEndpointV2 public endpoint;
@@ -49,7 +49,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
     event SharePricesSent(uint32 indexed dstEid, address[] vaults);
     event SharePricesRequested(uint32 indexed dstEid, address[] vaults);
     event EnforcedOptionsSet(EnforcedOptionParam[] params);
-    event VaultReportsSent(uint32 indexed dstEid, ISharePriceRouter.VaultReport[] reports);
+    event VaultReportsSent(uint32 indexed dstEid, ISharePriceOracle.VaultReport[] reports);
     event RoleGranted(address indexed account, uint256 indexed role);
     event RoleRevoked(address indexed account, uint256 indexed role);
     event OracleUpdated(address indexed oldOracle, address indexed newOracle);
@@ -88,7 +88,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
     constructor(address admin_, address lzEndpoint, address oracle_) {
         if (admin_ == address(0) || oracle_ == address(0)) revert ZeroAddress();
 
-        oracle = ISharePriceRouter(oracle_);
+        oracle = ISharePriceOracle(oracle_);
         endpoint = ILayerZeroEndpointV2(lzEndpoint);
 
         _initializeOwner(admin_);
@@ -114,7 +114,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
     function setOracle(address oracle_) external onlyOwner {
         if (oracle_ == address(0)) revert InvalidInput();
         emit OracleUpdated(address(oracle), address(oracle_));
-        oracle = ISharePriceRouter(oracle_);
+        oracle = ISharePriceOracle(oracle_);
     }
 
     function setEnforcedOptions(EnforcedOptionParam[] calldata params) external onlyOwner {
@@ -153,7 +153,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
         external
         payable
     {
-        ISharePriceRouter.VaultReport[] memory reports = oracle.getSharePrices(vaultAddresses, rewardsDelegate);
+        ISharePriceOracle.VaultReport[] memory reports = oracle.getSharePrices(vaultAddresses, rewardsDelegate);
         bytes memory message = MsgCodec.encodeVaultReports(AB_TYPE, reports, options);
         bytes memory combinedOptions = _getCombinedOptions(dstEid, AB_TYPE, options);
 
@@ -268,7 +268,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
         uint16 msgType = MsgCodec.decodeMsgType(message);
 
         if (msgType == AB_TYPE) {
-            (, ISharePriceRouter.VaultReport[] memory reports,,) = MsgCodec.decodeVaultReports(message);
+            (, ISharePriceOracle.VaultReport[] memory reports,,) = MsgCodec.decodeVaultReports(message);
 
             oracle.updateSharePrices(reports[0].chainId, reports);
         } else if (msgType == ABA_TYPE) {
@@ -287,7 +287,7 @@ contract MaxLzEndpoint is ILayerZeroReceiver, Ownable {
         (, address[] memory vaultAddresses, address rewardsDelegate, uint256 start, uint256 length) =
             MsgCodec.decodeVaultAddresses(message);
 
-        ISharePriceRouter.VaultReport[] memory reports = oracle.getSharePrices(vaultAddresses, rewardsDelegate);
+        ISharePriceOracle.VaultReport[] memory reports = oracle.getSharePrices(vaultAddresses, rewardsDelegate);
 
         bytes memory returnOptions = message[start:start + length];
         bytes memory returnMessage = MsgCodec.encodeVaultReports(AB_TYPE, reports, returnOptions);

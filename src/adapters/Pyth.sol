@@ -2,7 +2,7 @@
 pragma solidity ^0.8.17;
 
 import { BaseOracleAdapter } from "../libs/base/BaseOracleAdapter.sol";
-import { ISharePriceRouter } from "../interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "../interfaces/ISharePriceOracle.sol";
 import "../interfaces/pyth/IPyth.sol";
 import "../interfaces/pyth/PythStructs.sol";
 import "../interfaces/pyth/PythUtils.sol";
@@ -10,7 +10,7 @@ import "../interfaces/pyth/PythUtils.sol";
 /**
  * @title PythAdapter
  * @notice Oracle adapter for Pyth Network price feeds
- * @dev Provides price data from Pyth Network to the SharePriceRouter
+ * @dev Provides price data from Pyth Network to the SharePriceOracle
  */
 contract PythAdapter is BaseOracleAdapter {
     /*//////////////////////////////////////////////////////////////
@@ -109,7 +109,7 @@ contract PythAdapter is BaseOracleAdapter {
         external
         view
         override
-        returns (ISharePriceRouter.PriceReturnData memory pData)
+        returns (ISharePriceOracle.PriceReturnData memory pData)
     {
         // Validate we support pricing `asset`
         if (!isSupportedAsset[asset]) {
@@ -139,7 +139,7 @@ contract PythAdapter is BaseOracleAdapter {
     )
         external
         payable
-        returns (ISharePriceRouter.PriceReturnData memory pData)
+        returns (ISharePriceOracle.PriceReturnData memory pData)
     {
         // Validate we support pricing `asset`
         if (!isSupportedAsset[asset]) {
@@ -215,7 +215,7 @@ contract PythAdapter is BaseOracleAdapter {
         delete adapterDataETH[asset];
 
         // Notify the Oracle Router that we are going to stop supporting the asset
-        ISharePriceRouter(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
+        ISharePriceOracle(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
 
         emit PythAssetRemoved(asset);
     }
@@ -236,7 +236,7 @@ contract PythAdapter is BaseOracleAdapter {
     )
         internal
         view
-        returns (ISharePriceRouter.PriceReturnData memory pData)
+        returns (ISharePriceOracle.PriceReturnData memory pData)
     {
         pData.inUSD = inUSD;
 

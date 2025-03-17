@@ -4,11 +4,11 @@ pragma solidity ^0.8.17;
 import { MessagingFee } from "./ILayerZeroEndpointV2.sol";
 
 /**
- * @title ISharePriceRouter
- * @notice Interface for cross-chain ERC4626 vault share price router
+ * @title ISharePriceOracle
+ * @notice Interface for cross-chain ERC4626 vault share price oracle
  * @dev Combines functionality of price oracle adapters and router
  */
-interface ISharePriceRouter {
+interface ISharePriceOracle {
     /*//////////////////////////////////////////////////////////////
                                 STRUCTS 
     //////////////////////////////////////////////////////////////*/

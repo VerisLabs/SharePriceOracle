@@ -7,17 +7,17 @@ import { IERC4626 } from "./interfaces/IERC4626.sol";
 import { IERC20Metadata } from "./interfaces/IERC20Metadata.sol";
 import { BaseOracleAdapter } from "./libs/base/BaseOracleAdapter.sol";
 import { IChainlink } from "./interfaces/chainlink/IChainlink.sol";
-import { ISharePriceRouter } from "./interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "./interfaces/ISharePriceOracle.sol";
 
 /**
- * @title SharePriceRouter
+ * @title SharePriceOracle
  * @notice A multi-adapter oracle system that supports multiple price feeds and fallback mechanisms
  * @dev This contract manages multiple oracle adapters and provides unified price conversion
  *
  * @dev Adapted from Curvance MIT Oracle :
  *      https://github.com/curvance/Curvance-CantinaCompetition/blob/develop/contracts/oracles/
  */
-contract SharePriceRouter is ISharePriceRouter, OwnableRoles {
+contract SharePriceOracle is ISharePriceOracle, OwnableRoles {
     using FixedPointMathLib for uint256;
 
     /* Errors */

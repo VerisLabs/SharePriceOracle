@@ -3,7 +3,7 @@ pragma solidity ^0.8.17;
 
 import { BaseOracleAdapter } from "../libs/base/BaseOracleAdapter.sol";
 import { Bytes32Helper } from "../libs/Bytes32Helper.sol";
-import { ISharePriceRouter } from "../interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "../interfaces/ISharePriceOracle.sol";
 import { IProxy } from "../interfaces/api3/IProxy.sol";
 
 contract Api3Adapter is BaseOracleAdapter {
@@ -91,7 +91,7 @@ contract Api3Adapter is BaseOracleAdapter {
         external
         view
         override
-        returns (ISharePriceRouter.PriceReturnData memory)
+        returns (ISharePriceOracle.PriceReturnData memory)
     {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
@@ -175,7 +175,7 @@ contract Api3Adapter is BaseOracleAdapter {
         delete adapterDataNonUSD[asset];
 
         // Notify the Oracle Router that we are going to stop supporting the asset.
-        ISharePriceRouter(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
+        ISharePriceOracle(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
 
         emit Api3AssetRemoved(asset);
     }
@@ -186,7 +186,7 @@ contract Api3Adapter is BaseOracleAdapter {
     /// @param asset The address of the asset for which the price is needed.
     /// @return A structure containing the price, error status,
     ///         and the quote format of the price (USD).
-    function _getPriceInUSD(address asset) internal view returns (ISharePriceRouter.PriceReturnData memory) {
+    function _getPriceInUSD(address asset) internal view returns (ISharePriceOracle.PriceReturnData memory) {
         if (adapterDataUSD[asset].isConfigured) {
             return _parseData(adapterDataUSD[asset], true);
         }
@@ -198,7 +198,7 @@ contract Api3Adapter is BaseOracleAdapter {
     /// @param asset The address of the asset for which the price is needed.
     /// @return A structure containing the price, error status,
     ///         and the quote format of the price (ETH).
-    function _getPriceInETH(address asset) internal view returns (ISharePriceRouter.PriceReturnData memory) {
+    function _getPriceInETH(address asset) internal view returns (ISharePriceOracle.PriceReturnData memory) {
         if (adapterDataNonUSD[asset].isConfigured) {
             return _parseData(adapterDataNonUSD[asset], false);
         }
@@ -219,7 +219,7 @@ contract Api3Adapter is BaseOracleAdapter {
     )
         internal
         view
-        returns (ISharePriceRouter.PriceReturnData memory pData)
+        returns (ISharePriceOracle.PriceReturnData memory pData)
     {
         (int256 price, uint256 updatedAt) = data.proxyFeed.read();
 

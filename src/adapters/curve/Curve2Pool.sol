@@ -4,7 +4,7 @@ pragma solidity ^0.8.17;
 import { CurveBaseAdapter } from "src/adapters/curve/CurveBaseAdapter.sol";
 import { CommonLib } from "src/libs/CommonLib.sol";
 
-import { ISharePriceRouter } from "../../interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "../../interfaces/ISharePriceOracle.sol";
 import { ICurvePool } from "../../interfaces/curve/ICurvePool.sol";
 import { ERC20 } from "@solady/tokens/ERC20.sol";
 
@@ -55,7 +55,7 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
     /// @dev Curve asset address => AdapterData.
     mapping(address => AdapterData) public adapterData;
 
-    ISharePriceRouter public oracleRouter;
+    ISharePriceOracle public oracleRouter;
 
     /// EVENTS ///
 
@@ -83,7 +83,7 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
     )
         CurveBaseAdapter(_admin, _oracle, _oracleRouter)
     {
-        oracleRouter = ISharePriceRouter(_oracleRouter);
+        oracleRouter = ISharePriceOracle(_oracleRouter);
     }
 
     /// EXTERNAL FUNCTIONS ///
@@ -112,7 +112,7 @@ contract Curve2PoolAssetAdapter is CurveBaseAdapter {
         external
         view
         override
-        returns (ISharePriceRouter.PriceReturnData memory pData)
+        returns (ISharePriceOracle.PriceReturnData memory pData)
     {
         // Validate we support pricing `asset`.
         if (!isSupportedAsset[asset]) {
