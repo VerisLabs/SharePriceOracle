@@ -4,13 +4,13 @@ pragma solidity ^0.8.19;
 import "forge-std/Test.sol";
 import "../../src/adapters/Chainlink.sol";
 import "../../src/adapters/aerodrome/AerodromeV2.sol";
-import "../../src/SharePriceRouter.sol";
+import "../../src/SharePriceOracle.sol";
 import "../helpers/Tokens.sol";
 import "../base/BaseTest.t.sol";
 import { USDCE_BASE } from "../utils/AddressBook.sol";
 import { BaseOracleAdapter } from "../../src/libs/base/BaseOracleAdapter.sol";
 // import { IAerodromeV1Pool } from "../../src/interfaces/aerodrome/IAerodromeV1Pool.sol";
-import { ISharePriceRouter } from "../../src/interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "../../src/interfaces/ISharePriceOracle.sol";
 import { AerodromeBaseAdapter } from "src/adapters/aerodrome/AerodromeBaseAdapter.sol";
 
 contract TestAerodromeV2Adapter is Test {
@@ -25,7 +25,7 @@ contract TestAerodromeV2Adapter is Test {
     address public admin;
     AerodromeV2Adapter public adapter;
     ChainlinkAdapter public chainlinkAdapter;
-    SharePriceRouter public router;
+    SharePriceOracle public router;
 
     function setUp() public {
         admin = makeAddr("admin");
@@ -33,7 +33,7 @@ contract TestAerodromeV2Adapter is Test {
         vm.createSelectFork(baseRpcUrl);
 
         // Deploy router with admin
-        router = new SharePriceRouter(address(this));
+        router = new SharePriceOracle(address(this));
 
         adapter = new AerodromeV2Adapter(
             address(this), // admin
@@ -69,7 +69,7 @@ contract TestAerodromeV2Adapter is Test {
     }
 
     function testReturnsCorrectPrice() public {
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(cbBTC, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(cbBTC, true);
 
         assertFalse(priceData.hadError, "Price should not have error");
         assertTrue(priceData.inUSD, "Price should be in USD");

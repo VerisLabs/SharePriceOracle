@@ -3,13 +3,13 @@ pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
 import "../../src/adapters/Chainlink.sol";
-import "../../src/SharePriceRouter.sol";
+import "../../src/SharePriceOracle.sol";
 import "../helpers/Tokens.sol";
 import "../base/BaseTest.t.sol";
 import { USDCE_BASE } from "../utils/AddressBook.sol";
 import { BaseOracleAdapter } from "../../src/libs/base/BaseOracleAdapter.sol";
 import { IChainlink } from "../../src/interfaces/chainlink/IChainlink.sol";
-import { ISharePriceRouter } from "../../src/interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "../../src/interfaces/ISharePriceOracle.sol";
 
 contract ChainlinkAdapterTest is Test {
     // Constants for BASE network
@@ -29,7 +29,7 @@ contract ChainlinkAdapterTest is Test {
     // Test contracts
     address public admin;
     ChainlinkAdapter public adapter;
-    SharePriceRouter public router;
+    SharePriceOracle public router;
 
     function setUp() public {
         admin = makeAddr("admin");
@@ -37,7 +37,7 @@ contract ChainlinkAdapterTest is Test {
         vm.createSelectFork(baseRpcUrl);
 
         // Deploy router with admin
-        router = new SharePriceRouter(address(this));
+        router = new SharePriceOracle(address(this));
 
         // Set sequencer
         router.setSequencer(SEQUENCER_FEED);
@@ -142,7 +142,7 @@ contract ChainlinkAdapterTest is Test {
     }
 
     function testReturnsCorrectPrice_ETH_USD() public {
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
 
         assertFalse(priceData.hadError, "Price should not have error");
         assertTrue(priceData.inUSD, "Price should be in USD");
@@ -153,7 +153,7 @@ contract ChainlinkAdapterTest is Test {
     }
 
     function testReturnsCorrectPrice_WBTC_USD() public view {
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
 
         assertFalse(priceData.hadError, "Price should not have error");
         assertTrue(priceData.inUSD, "Price should be in USD");
@@ -210,7 +210,7 @@ contract ChainlinkAdapterTest is Test {
             )
         );
 
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertTrue(priceData.hadError, "Should error on stale price");
     }
 
@@ -221,7 +221,7 @@ contract ChainlinkAdapterTest is Test {
 
     function testRevertAfterAssetRemove() public {
         // First verify we can get a price
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertEq(priceData.hadError, false, "Price should not have error before removal");
         assertGt(priceData.price, 0, "Price should be greater than 0 before removal");
 
@@ -248,7 +248,7 @@ contract ChainlinkAdapterTest is Test {
         adapter.addAsset(WETH, ETH_USD_FEED, 1 hours, true);
 
         // Verify it still works
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
         assertFalse(priceData.hadError, "Price should not have error");
         assertGt(priceData.price, 0, "Price should be greater than 0");
 

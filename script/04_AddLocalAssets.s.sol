@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import { Script } from "forge-std/Script.sol";
 import { console2 } from "forge-std/console2.sol";
 import { Constants } from "../script/libs/Constants.sol";
-import { SharePriceRouter } from "../src/SharePriceRouter.sol";
+import { SharePriceOracle } from "../src/SharePriceOracle.sol";
 
 contract AddLocalAssets is Script {
     function run() external {
@@ -14,7 +14,7 @@ contract AddLocalAssets is Script {
         // Load configuration
         uint256 relayerPrivateKey = vm.envUint("PRIVATE_KEY");
         address routerAddress = vm.envAddress("ROUTER_ADDRESS");
-        SharePriceRouter router = SharePriceRouter(routerAddress);
+        SharePriceOracle router = SharePriceOracle(routerAddress);
 
         vm.startBroadcast(relayerPrivateKey);
 

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.17;
 
 import { BaseOracleAdapter } from "../libs/base/BaseOracleAdapter.sol";
-import { ISharePriceRouter } from "../interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "../interfaces/ISharePriceOracle.sol";
 import { IERC20Metadata } from "../interfaces/IERC20Metadata.sol";
 import { IBalancerV2Vault } from "../interfaces/balancer/IBalancerV2Vault.sol";
 import { IBalancerV2WeightedPool } from "../interfaces/balancer/IBalancerV2WeightedPool.sol";
@@ -11,7 +11,7 @@ import { FixedPointMathLib } from "@solady/utils/FixedPointMathLib.sol";
 /**
  * @title BalancerAdapter
  * @notice Extracts asset prices from Balancer V2 weighted pools
- * @dev Provides price data from Balancer pools to the SharePriceRouter
+ * @dev Provides price data from Balancer pools to the SharePriceOracle
  */
 contract BalancerAdapter is BaseOracleAdapter {
     /*//////////////////////////////////////////////////////////////
@@ -99,7 +99,7 @@ contract BalancerAdapter is BaseOracleAdapter {
      * @notice Retrieves the price of a specified asset from Balancer
      * @param asset Address of the asset to price
      * @param inUSD Whether to return the price in USD (true) or ETH (false)
-     * @return ISharePriceRouter.PriceReturnData Structure containing price, error status, and denomination
+     * @return ISharePriceOracle.PriceReturnData Structure containing price, error status, and denomination
      */
     function getPrice(
         address asset,
@@ -108,7 +108,7 @@ contract BalancerAdapter is BaseOracleAdapter {
         external
         view
         override
-        returns (ISharePriceRouter.PriceReturnData memory)
+        returns (ISharePriceOracle.PriceReturnData memory)
     {
         // Validate we support pricing `asset`
         if (!isSupportedAsset[asset]) {
@@ -193,7 +193,7 @@ contract BalancerAdapter is BaseOracleAdapter {
         delete adapterDataETH[asset];
 
         // Notify the Oracle Router
-        ISharePriceRouter(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
+        ISharePriceOracle(ORACLE_ROUTER_ADDRESS).notifyFeedRemoval(asset);
         emit BalancerAssetRemoved(asset);
     }
 
@@ -213,7 +213,7 @@ contract BalancerAdapter is BaseOracleAdapter {
     )
         internal
         view
-        returns (ISharePriceRouter.PriceReturnData memory pData)
+        returns (ISharePriceOracle.PriceReturnData memory pData)
     {
         // Initialize return data
         pData.inUSD = inUSD;

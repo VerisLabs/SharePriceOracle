@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import { Script } from "forge-std/Script.sol";
 import { console2 } from "forge-std/console2.sol";
 import { Constants } from "../script/libs/Constants.sol";
-import { SharePriceRouter } from "../src/SharePriceRouter.sol";
+import { SharePriceOracle } from "../src/SharePriceOracle.sol";
 import { ChainlinkAdapter } from "../src/adapters/Chainlink.sol";
 import { Api3Adapter } from "../src/adapters/Api3.sol";
 import { MaxLzEndpoint } from "../src/MaxLzEndpoint.sol";
@@ -16,7 +16,7 @@ contract Deploy is Script {
 
     // Deployment state
     MaxLzEndpoint public maxLzEndpoint;
-    SharePriceRouter public router;
+    SharePriceOracle public router;
     address public admin;
     address public lzEndpointAddress;
     address public oracleAddress;
@@ -47,8 +47,8 @@ contract Deploy is Script {
     }
 
     function _deployCore() internal {
-        // Deploy SharePriceRouter
-        router = new SharePriceRouter(admin);
+        // Deploy SharePriceOracle
+        router = new SharePriceOracle(admin);
         _logDeploymentInfo();
 
         // Deploy MaxLzEndpoint
@@ -135,7 +135,7 @@ contract Deploy is Script {
         console2.log("Deployer:", msg.sender);
         console2.log("Admin:", admin);
         console2.log("");
-        console2.log("SharePriceRouter deployed at:", address(router));
+        console2.log("SharePriceOracle deployed at:", address(router));
     }
 
     function _logPermissions() internal pure {

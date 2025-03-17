@@ -3,10 +3,10 @@ pragma solidity ^0.8.17;
 
 import { Test } from "forge-std/Test.sol";
 import { PythAdapter } from "../../src/adapters/Pyth.sol";
-import { SharePriceRouter } from "../../src/SharePriceRouter.sol";
+import { SharePriceOracle } from "../../src/SharePriceOracle.sol";
 import { IPyth } from "../../src/interfaces/pyth/IPyth.sol";
 import { PythStructs } from "../../src/interfaces/pyth/PythStructs.sol";
-import { ISharePriceRouter } from "../../src/interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "../../src/interfaces/ISharePriceOracle.sol";
 import "forge-std/console.sol";
 
 contract PythAdapterTest is Test {
@@ -24,13 +24,13 @@ contract PythAdapterTest is Test {
     uint32 constant MAX_AGE = 60; // 60 seconds
 
     PythAdapter public adapter;
-    SharePriceRouter public router;
+    SharePriceOracle public router;
 
     function setUp() public {
         string memory rpcUrl = vm.envString("BASE_RPC_URL");
         vm.createSelectFork(rpcUrl);
 
-        router = new SharePriceRouter(address(this));
+        router = new SharePriceOracle(address(this));
 
         adapter = new PythAdapter(address(this), address(this), address(router), PYTH_CONTRACT);
 
@@ -75,7 +75,7 @@ contract PythAdapterTest is Test {
     }
 
     function testGetPrice_ETH_USD() public {
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
 
         assertFalse(priceData.hadError, "Price should not have an error");
         assertTrue(priceData.inUSD, "Price should be in USD");
@@ -85,7 +85,7 @@ contract PythAdapterTest is Test {
     }
 
     function testGetPrice_BTC_USD() public {
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WBTC, true);
 
         assertFalse(priceData.hadError, "Price should not have an error");
         assertTrue(priceData.inUSD, "Price should be in USD");
@@ -113,7 +113,7 @@ contract PythAdapterTest is Test {
             false // not in USD, in WETH
         );
 
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, false);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, false);
 
         assertFalse(priceData.hadError, "Price should not have an error");
         assertFalse(priceData.inUSD, "Price should be in WETH");
@@ -123,7 +123,7 @@ contract PythAdapterTest is Test {
     }
 
     function testPriceFallback_AlternateConfig() public {
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WBTC, false);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WBTC, false);
 
         assertFalse(priceData.hadError, "Price should not have an error");
         assertTrue(priceData.inUSD, "Price should indicate it fell back to USD");
@@ -147,7 +147,7 @@ contract PythAdapterTest is Test {
             abi.encode(stalePrice)
         );
 
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
 
         assertTrue(priceData.hadError, "Price should have an error due to staleness");
     }
@@ -166,7 +166,7 @@ contract PythAdapterTest is Test {
             abi.encode(negativePrice)
         );
 
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
 
         assertTrue(priceData.hadError, "Price should have an error due to negative price");
     }
@@ -178,7 +178,7 @@ contract PythAdapterTest is Test {
             "Pyth error"
         );
 
-        ISharePriceRouter.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceData = adapter.getPrice(WETH, true);
 
         assertTrue(priceData.hadError, "Price should have an error due to Pyth exception");
     }
@@ -189,7 +189,7 @@ contract PythAdapterTest is Test {
     }
 
     function testGetPrice_AfterAssetRemoved() public {
-        ISharePriceRouter.PriceReturnData memory priceDataBefore = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory priceDataBefore = adapter.getPrice(WETH, true);
         assertFalse(priceDataBefore.hadError, "Price should not have an error before removal");
 
         adapter.removeAsset(WETH);
@@ -206,7 +206,7 @@ contract PythAdapterTest is Test {
 
         vm.mockCall(PYTH_CONTRACT, abi.encodeWithSelector(IPyth.updatePriceFeeds.selector), abi.encode());
 
-        ISharePriceRouter.PriceReturnData memory priceData =
+        ISharePriceOracle.PriceReturnData memory priceData =
             adapter.updateAndGetPrice{ value: 1e15 }(WETH, true, updateData);
 
         assertFalse(priceData.hadError, "Price should not have an error");
@@ -246,12 +246,12 @@ contract PythAdapterTest is Test {
             false // in WETH
         );
 
-        ISharePriceRouter.PriceReturnData memory usdPriceData = adapter.getPrice(WETH, true);
+        ISharePriceOracle.PriceReturnData memory usdPriceData = adapter.getPrice(WETH, true);
         assertFalse(usdPriceData.hadError, "USD price should not have an error");
         assertTrue(usdPriceData.inUSD, "Price should be in USD");
         assertEq(usdPriceData.price, 2000e18, "Price should be $2000");
 
-        ISharePriceRouter.PriceReturnData memory ethPriceData = adapter.getPrice(WETH, false);
+        ISharePriceOracle.PriceReturnData memory ethPriceData = adapter.getPrice(WETH, false);
         assertFalse(ethPriceData.hadError, "WETH price should not have an error");
         assertFalse(ethPriceData.inUSD, "Price should be in WETH");
         assertEq(ethPriceData.price, 1e18, "Price should be 1.0 WETH");
@@ -260,7 +260,7 @@ contract PythAdapterTest is Test {
     function testUpdatePriceWithZeroUpdateData() public {
         bytes[] memory emptyUpdateData = new bytes[](0);
 
-        ISharePriceRouter.PriceReturnData memory priceData =
+        ISharePriceOracle.PriceReturnData memory priceData =
             adapter.updateAndGetPrice{ value: 0 }(WETH, true, emptyUpdateData);
 
         assertFalse(priceData.hadError, "Price should not have an error");

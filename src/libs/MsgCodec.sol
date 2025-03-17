@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import { ISharePriceRouter } from "../interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "../interfaces/ISharePriceOracle.sol";
 
 /**
  * @title MsgCodec
@@ -16,7 +16,7 @@ library MsgCodec {
     error MsgCodec__ZeroVaultAddress(uint256 index);
 
     // Proper ABI encoded sizes
-    /// @notice Size of a single ISharePriceRouter.VaultReport struct when ABI encoded (7 fields * 32 bytes)
+    /// @notice Size of a single ISharePriceOracle.VaultReport struct when ABI encoded (7 fields * 32 bytes)
     uint256 private constant VAULT_REPORT_SIZE = 32 * 7;
     /// @notice Size of the message header (msgType + array offset + length + rewardsDelegate)
     uint256 private constant HEADER_SIZE = 32 * 4;
@@ -51,14 +51,14 @@ library MsgCodec {
      * @notice Encodes vault reports and options into a cross-chain message
      * @dev Performs validation of vault addresses and optimizes gas usage with array length caching
      * @param _msgType Message type identifier (1 for AB, 2 for ABA pattern)
-     * @param _reports Array of ISharePriceRouter.VaultReport structs to encode
+     * @param _reports Array of ISharePriceOracle.VaultReport structs to encode
      * @param _extraReturnOptions Additional options for the return message
      * @return Encoded message bytes
      * @custom:throws MsgCodec__ZeroVaultAddress if any vault address in reports is zero
      */
     function encodeVaultReports(
         uint16 _msgType,
-        ISharePriceRouter.VaultReport[] memory _reports,
+        ISharePriceOracle.VaultReport[] memory _reports,
         bytes memory _extraReturnOptions
     )
         public
@@ -123,7 +123,7 @@ library MsgCodec {
      * @dev Performs extensive validation of message format and length
      * @param encodedMessage The encoded message bytes to decode
      * @return msgType Message type identifier
-     * @return reports Array of decoded ISharePriceRouter.VaultReport structs
+     * @return reports Array of decoded ISharePriceOracle.VaultReport structs
      * @return extraOptionsStart Starting position of extra options in the message
      * @return extraOptionsLength Length of extra options data
      * @custom:throws MsgCodec__InvalidMessageLength if message is too short
@@ -133,7 +133,7 @@ library MsgCodec {
         pure
         returns (
             uint16 msgType,
-            ISharePriceRouter.VaultReport[] memory reports,
+            ISharePriceOracle.VaultReport[] memory reports,
             uint256 extraOptionsStart,
             uint256 extraOptionsLength
         )
@@ -143,7 +143,7 @@ library MsgCodec {
         }
 
         (msgType, reports, extraOptionsLength) =
-            abi.decode(encodedMessage, (uint16, ISharePriceRouter.VaultReport[], uint256));
+            abi.decode(encodedMessage, (uint16, ISharePriceOracle.VaultReport[], uint256));
 
         // Cache array length for gas optimization
         uint256 reportsLength = reports.length;

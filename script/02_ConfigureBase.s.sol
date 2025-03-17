@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import { Script } from "forge-std/Script.sol";
 import { console2 } from "forge-std/console2.sol";
 import { Constants } from "../script/libs/Constants.sol";
-import { SharePriceRouter } from "../src/SharePriceRouter.sol";
+import { SharePriceOracle } from "../src/SharePriceOracle.sol";
 import { ChainlinkAdapter } from "../src/adapters/Chainlink.sol";
 import { MaxLzEndpoint } from "../src/MaxLzEndpoint.sol";
 import { stdJson } from "forge-std/StdJson.sol";
@@ -22,7 +22,7 @@ contract ConfigureBase is Script {
         address chainlinkAdapterAddress = vm.envAddress("CHAINLINK_ADAPTER_ADDRESS");
         address maxLzEndpointAddress = vm.envAddress("BASE_MAX_LZ_ENDPOINT_ADDRESS");
 
-        SharePriceRouter router = SharePriceRouter(routerAddress);
+        SharePriceOracle router = SharePriceOracle(routerAddress);
         ChainlinkAdapter chainlinkAdapter = ChainlinkAdapter(chainlinkAdapterAddress);
         MaxLzEndpoint maxLzEndpoint = MaxLzEndpoint(payable(maxLzEndpointAddress));
 
@@ -52,7 +52,7 @@ contract ConfigureBase is Script {
         }
     }
 
-    function _configureLocalAssetMappings(SharePriceRouter router) internal {
+    function _configureLocalAssetMappings(SharePriceOracle router) internal {
         // Get Base assets for mapping
         Constants.AssetConfig[] memory baseAssets = Constants.getBaseAssets();
 
@@ -68,7 +68,7 @@ contract ConfigureBase is Script {
         }
     }
 
-    function _configureCrossChainMappings(SharePriceRouter router) internal {
+    function _configureCrossChainMappings(SharePriceOracle router) internal {
         // Get Base assets for mapping
         Constants.AssetConfig[] memory baseAssets = Constants.getBaseAssets();
 

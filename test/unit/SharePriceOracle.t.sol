@@ -2,9 +2,9 @@
 pragma solidity ^0.8.17;
 
 import { Test } from "forge-std/Test.sol";
-import { SharePriceRouter } from "../../src/SharePriceRouter.sol";
+import { SharePriceOracle } from "../../src/SharePriceOracle.sol";
 import { IERC20Metadata } from "../../src/interfaces/IERC20Metadata.sol";
-import { ISharePriceRouter } from "../../src/interfaces/ISharePriceRouter.sol";
+import { ISharePriceOracle } from "../../src/interfaces/ISharePriceOracle.sol";
 import { MockVault } from "../mocks/MockVault.sol";
 import { MockChainlinkSequencer } from "../mocks/MockChainlinkSequencer.sol";
 import { IChainlink } from "../../src/interfaces/chainlink/IChainlink.sol";
@@ -40,9 +40,9 @@ address constant OPTIMISM_WBTC = 0x68f180fcCe6836688e9084f035309E29Bf0A2095;
 address constant OPTIMISM_TBTC = 0x6c84a8f1c29108F47a79964b5Fe888D4f4D0dE40;
 address constant OPTIMISM_DAI = 0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1;
 
-contract SharePriceRouterTest is BaseTest {
+contract SharePriceOracleTest is BaseTest {
     // Test contracts
-    SharePriceRouter public router;
+    SharePriceOracle public router;
     ChainlinkAdapter public chainlinkAdapter;
 
     // Test vaults for Base network
@@ -83,7 +83,7 @@ contract SharePriceRouterTest is BaseTest {
         oracle = makeAddr("oracle");
         // Deploy router with admin as owner
         vm.prank(admin);
-        router = new SharePriceRouter(admin);
+        router = new SharePriceOracle(admin);
 
         // Deploy and configure ChainlinkAdapter
         chainlinkAdapter = new ChainlinkAdapter(
@@ -189,7 +189,7 @@ contract SharePriceRouterTest is BaseTest {
 
     function testRevertGrantRole_InvalidRole() public {
         vm.prank(admin);
-        vm.expectRevert(SharePriceRouter.InvalidRole.selector);
+        vm.expectRevert(SharePriceOracle.InvalidRole.selector);
         router.grantRole(user, 0);
     }
 
@@ -270,7 +270,7 @@ contract SharePriceRouterTest is BaseTest {
         address localAsset = makeAddr("localAsset");
 
         vm.prank(admin);
-        vm.expectRevert(SharePriceRouter.InvalidChainId.selector);
+        vm.expectRevert(SharePriceOracle.InvalidChainId.selector);
         router.setCrossChainAssetMapping(uint32(block.chainid), srcAsset, localAsset);
     }
 
@@ -278,10 +278,10 @@ contract SharePriceRouterTest is BaseTest {
         uint32 srcChain = 10;
 
         vm.startPrank(admin);
-        vm.expectRevert(SharePriceRouter.ZeroAddress.selector);
+        vm.expectRevert(SharePriceOracle.ZeroAddress.selector);
         router.setCrossChainAssetMapping(srcChain, address(0), makeAddr("local"));
 
-        vm.expectRevert(SharePriceRouter.ZeroAddress.selector);
+        vm.expectRevert(SharePriceOracle.ZeroAddress.selector);
         router.setCrossChainAssetMapping(srcChain, makeAddr("src"), address(0));
         vm.stopPrank();
     }
@@ -300,8 +300,8 @@ contract SharePriceRouterTest is BaseTest {
         address localAsset = WETH;
         uint256 sharePrice = 1e18;
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: vaultAddr,
             asset: asset,
@@ -319,7 +319,7 @@ contract SharePriceRouterTest is BaseTest {
         router.updateSharePrices(srcChain, reports);
 
         // Verify stored data
-        ISharePriceRouter.VaultReport memory report = router.getLatestSharePriceReport(srcChain, vaultAddr);
+        ISharePriceOracle.VaultReport memory report = router.getLatestSharePriceReport(srcChain, vaultAddr);
 
         assertEq(report.chainId, srcChain, "Chain ID should match");
         assertEq(report.vaultAddress, vaultAddr, "Vault address should match");
@@ -330,8 +330,8 @@ contract SharePriceRouterTest is BaseTest {
 
     function testRevertUpdateSharePrices_InvalidChainId() public {
         uint32 srcChain = uint32(block.chainid); // Same as current chain
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: makeAddr("vault"),
             asset: makeAddr("asset"),
@@ -342,22 +342,22 @@ contract SharePriceRouterTest is BaseTest {
         });
 
         vm.prank(endpoint);
-        vm.expectRevert(SharePriceRouter.InvalidChainId.selector);
+        vm.expectRevert(SharePriceOracle.InvalidChainId.selector);
         router.updateSharePrices(srcChain, reports);
     }
 
     function testRevertUpdateSharePrices_TooManyReports() public {
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](router.MAX_REPORTS() + 1);
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](router.MAX_REPORTS() + 1);
 
         vm.prank(endpoint);
-        vm.expectRevert(SharePriceRouter.ExceedsMaxReports.selector);
+        vm.expectRevert(SharePriceOracle.ExceedsMaxReports.selector);
         router.updateSharePrices(10, reports);
     }
 
     function testRevertUpdateSharePrices_ZeroSharePrice() public {
         uint32 srcChain = 10;
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: makeAddr("vault"),
             asset: makeAddr("asset"),
@@ -368,14 +368,14 @@ contract SharePriceRouterTest is BaseTest {
         });
 
         vm.prank(endpoint);
-        vm.expectRevert(SharePriceRouter.NoValidPrice.selector);
+        vm.expectRevert(SharePriceOracle.NoValidPrice.selector);
         router.updateSharePrices(srcChain, reports);
     }
 
     function testRevertUpdateSharePrices_ZeroAsset() public {
         uint32 srcChain = 10;
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: makeAddr("vault"),
             asset: address(0), // Zero asset address
@@ -386,7 +386,7 @@ contract SharePriceRouterTest is BaseTest {
         });
 
         vm.prank(endpoint);
-        vm.expectRevert(SharePriceRouter.ZeroAddress.selector);
+        vm.expectRevert(SharePriceOracle.ZeroAddress.selector);
         router.updateSharePrices(srcChain, reports);
     }
 
@@ -399,8 +399,8 @@ contract SharePriceRouterTest is BaseTest {
         vm.prank(admin);
         router.setCrossChainAssetMapping(srcChain, OPTIMISM_USDC, USDC);
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opDaiVault),
             asset: OPTIMISM_DAI,
@@ -433,8 +433,8 @@ contract SharePriceRouterTest is BaseTest {
         vm.prank(admin);
         router.setCrossChainAssetMapping(srcChain, OPTIMISM_USDC, USDC);
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: vaultAddr,
             asset: OPTIMISM_USDC,
@@ -462,8 +462,8 @@ contract SharePriceRouterTest is BaseTest {
         vm.prank(admin);
         router.setCrossChainAssetMapping(srcChain, optimismWETH, WETH);
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: vaultAddr,
             asset: optimismWETH,
@@ -491,8 +491,8 @@ contract SharePriceRouterTest is BaseTest {
         vm.prank(admin);
         router.setCrossChainAssetMapping(srcChain, optimismWBTC, WBTC);
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: vaultAddr,
             asset: optimismWBTC,
@@ -519,8 +519,8 @@ contract SharePriceRouterTest is BaseTest {
         vm.prank(admin);
         router.setCrossChainAssetMapping(srcChain, OPTIMISM_USDC, USDC);
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: vaultAddr,
             asset: OPTIMISM_USDC,
@@ -556,10 +556,10 @@ contract SharePriceRouterTest is BaseTest {
 
     function testRevertSetLocalAssetConfig_ZeroAddresses() public {
         vm.startPrank(admin);
-        vm.expectRevert(SharePriceRouter.ZeroAddress.selector);
+        vm.expectRevert(SharePriceOracle.ZeroAddress.selector);
         router.setLocalAssetConfig(address(0), adapter, USDC_USD_FEED, 0, true);
 
-        vm.expectRevert(SharePriceRouter.ZeroAddress.selector);
+        vm.expectRevert(SharePriceOracle.ZeroAddress.selector);
         router.setLocalAssetConfig(USDC, adapter, address(0), 0, true);
         vm.stopPrank();
     }
@@ -627,10 +627,10 @@ contract SharePriceRouterTest is BaseTest {
         uint32 srcChain = 10; // Optimism
 
         // Create reports for multiple assets
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](6);
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](6);
 
         // Stablecoins
-        reports[0] = ISharePriceRouter.VaultReport({
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opUsdcVault),
             asset: OPTIMISM_USDC,
@@ -640,7 +640,7 @@ contract SharePriceRouterTest is BaseTest {
             rewardsDelegate: address(0)
         });
 
-        reports[1] = ISharePriceRouter.VaultReport({
+        reports[1] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opUsdtVault),
             asset: OPTIMISM_USDT,
@@ -651,7 +651,7 @@ contract SharePriceRouterTest is BaseTest {
         });
 
         // ETH-like assets
-        reports[2] = ISharePriceRouter.VaultReport({
+        reports[2] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opWethVault),
             asset: OPTIMISM_WETH,
@@ -661,7 +661,7 @@ contract SharePriceRouterTest is BaseTest {
             rewardsDelegate: address(0)
         });
 
-        reports[3] = ISharePriceRouter.VaultReport({
+        reports[3] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opStethVault),
             asset: OPTIMISM_STETH,
@@ -672,7 +672,7 @@ contract SharePriceRouterTest is BaseTest {
         });
 
         // BTC-like assets
-        reports[4] = ISharePriceRouter.VaultReport({
+        reports[4] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opWbtcVault),
             asset: OPTIMISM_WBTC,
@@ -682,7 +682,7 @@ contract SharePriceRouterTest is BaseTest {
             rewardsDelegate: address(0)
         });
 
-        reports[5] = ISharePriceRouter.VaultReport({
+        reports[5] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opTbtcVault),
             asset: OPTIMISM_TBTC,
@@ -697,7 +697,7 @@ contract SharePriceRouterTest is BaseTest {
 
         // Verify all reports were stored correctly
         for (uint256 i = 0; i < reports.length; i++) {
-            ISharePriceRouter.VaultReport memory report =
+            ISharePriceOracle.VaultReport memory report =
                 router.getLatestSharePriceReport(srcChain, reports[i].vaultAddress);
             assertEq(report.chainId, srcChain, "Chain ID should match");
             assertEq(report.vaultAddress, reports[i].vaultAddress, "Vault address should match");
@@ -711,8 +711,8 @@ contract SharePriceRouterTest is BaseTest {
         uint32 srcChain = 10;
 
         // Setup initial USDC vault report
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opUsdtVault),
             asset: OPTIMISM_USDT,
@@ -735,8 +735,8 @@ contract SharePriceRouterTest is BaseTest {
         uint32 srcChain = 10;
 
         // Setup initial WETH vault report
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opStethVault),
             asset: OPTIMISM_STETH,
@@ -759,8 +759,8 @@ contract SharePriceRouterTest is BaseTest {
         uint32 srcChain = 10;
 
         // Setup initial WBTC vault report
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opTbtcVault),
             asset: OPTIMISM_TBTC,
@@ -802,7 +802,7 @@ contract SharePriceRouterTest is BaseTest {
         vaultAddresses[1] = address(wethVault);
         vaultAddresses[2] = address(wbtcVault);
 
-        ISharePriceRouter.VaultReport[] memory reports = router.getSharePrices(vaultAddresses, address(0));
+        ISharePriceOracle.VaultReport[] memory reports = router.getSharePrices(vaultAddresses, address(0));
 
         assertEq(reports.length, vaultAddresses.length, "Should return correct number of reports");
 
@@ -816,8 +816,8 @@ contract SharePriceRouterTest is BaseTest {
     function test_revertWhen_UpdateSharePricesWithInvalidChain() public {
         vm.startPrank(endpoint);
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: uint32(block.chainid),
             vaultAddress: address(opUsdcVault),
             asset: OPTIMISM_USDC,
@@ -827,7 +827,7 @@ contract SharePriceRouterTest is BaseTest {
             rewardsDelegate: address(0)
         });
 
-        vm.expectRevert(SharePriceRouter.InvalidChainId.selector);
+        vm.expectRevert(SharePriceOracle.InvalidChainId.selector);
         router.updateSharePrices(uint32(block.chainid), reports);
 
         vm.stopPrank();
@@ -836,7 +836,7 @@ contract SharePriceRouterTest is BaseTest {
     function test_revertWhen_GetLocalAssetNotConfigured() public {
         address randomAsset = makeAddr("randomAsset");
 
-        vm.expectRevert(abi.encodeWithSelector(SharePriceRouter.AssetNotConfigured.selector, randomAsset));
+        vm.expectRevert(abi.encodeWithSelector(SharePriceOracle.AssetNotConfigured.selector, randomAsset));
         router.getLocalAsset(10, randomAsset);
     }
 
@@ -884,8 +884,8 @@ contract SharePriceRouterTest is BaseTest {
     function testRevertWhen_UpdateSharePricesWithZeroAsset() public {
         vm.startPrank(endpoint);
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: 10,
             vaultAddress: address(opUsdcVault),
             asset: address(0),
@@ -895,7 +895,7 @@ contract SharePriceRouterTest is BaseTest {
             rewardsDelegate: address(0)
         });
 
-        vm.expectRevert(SharePriceRouter.ZeroAddress.selector);
+        vm.expectRevert(SharePriceOracle.ZeroAddress.selector);
         router.updateSharePrices(10, reports);
         vm.stopPrank();
     }
@@ -903,8 +903,8 @@ contract SharePriceRouterTest is BaseTest {
     function testRevertWhen_UpdateSharePricesWithZeroSharePrice() public {
         vm.startPrank(endpoint);
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: 10,
             vaultAddress: address(opUsdcVault),
             asset: OPTIMISM_USDC,
@@ -914,7 +914,7 @@ contract SharePriceRouterTest is BaseTest {
             rewardsDelegate: address(0)
         });
 
-        vm.expectRevert(SharePriceRouter.NoValidPrice.selector);
+        vm.expectRevert(SharePriceOracle.NoValidPrice.selector);
         router.updateSharePrices(10, reports);
         vm.stopPrank();
     }
@@ -922,8 +922,8 @@ contract SharePriceRouterTest is BaseTest {
     function testRevertWhen_UpdateSharePricesWithMismatchedChainId() public {
         vm.startPrank(endpoint);
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: 5,
             vaultAddress: address(opUsdcVault),
             asset: OPTIMISM_USDC,
@@ -933,7 +933,7 @@ contract SharePriceRouterTest is BaseTest {
             rewardsDelegate: address(0)
         });
 
-        vm.expectRevert(SharePriceRouter.InvalidChainId.selector);
+        vm.expectRevert(SharePriceOracle.InvalidChainId.selector);
         router.updateSharePrices(10, reports);
         vm.stopPrank();
     }
@@ -946,7 +946,7 @@ contract SharePriceRouterTest is BaseTest {
         bool[] memory inUSD = new bool[](1);
         inUSD[0] = true;
 
-        vm.expectRevert(SharePriceRouter.InvalidLength.selector);
+        vm.expectRevert(SharePriceOracle.InvalidLength.selector);
         router.batchUpdatePrices(assets, inUSD);
     }
 
@@ -965,7 +965,7 @@ contract SharePriceRouterTest is BaseTest {
 
     function testRevertWhen_SetLocalAssetConfigWithZeroAdapter() public {
         vm.startPrank(admin);
-        vm.expectRevert(SharePriceRouter.ZeroAddress.selector);
+        vm.expectRevert(SharePriceOracle.ZeroAddress.selector);
         router.setLocalAssetConfig(USDC, address(0), USDC_USD_FEED, 0, true);
         vm.stopPrank();
     }
@@ -1006,8 +1006,8 @@ contract SharePriceRouterTest is BaseTest {
         uint32 srcChain = 10;
         uint256 sharePrice = 1.15e6;
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opUsdcVault),
             asset: OPTIMISM_USDC,
@@ -1030,8 +1030,8 @@ contract SharePriceRouterTest is BaseTest {
         uint32 srcChain = 10;
         uint256 sharePrice = 1.15e18;
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opWethVault),
             asset: OPTIMISM_WETH,
@@ -1058,9 +1058,9 @@ contract SharePriceRouterTest is BaseTest {
     function testUpdateSharePrices_MultipleReports() public {
         uint32 srcChain = 10;
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](3);
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](3);
 
-        reports[0] = ISharePriceRouter.VaultReport({
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opUsdcVault),
             asset: OPTIMISM_USDC,
@@ -1070,7 +1070,7 @@ contract SharePriceRouterTest is BaseTest {
             rewardsDelegate: address(0)
         });
 
-        reports[1] = ISharePriceRouter.VaultReport({
+        reports[1] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opWethVault),
             asset: OPTIMISM_WETH,
@@ -1080,7 +1080,7 @@ contract SharePriceRouterTest is BaseTest {
             rewardsDelegate: address(0)
         });
 
-        reports[2] = ISharePriceRouter.VaultReport({
+        reports[2] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opWbtcVault),
             asset: OPTIMISM_WBTC,
@@ -1094,7 +1094,7 @@ contract SharePriceRouterTest is BaseTest {
         router.updateSharePrices(srcChain, reports);
 
         for (uint256 i = 0; i < reports.length; i++) {
-            ISharePriceRouter.VaultReport memory storedReport =
+            ISharePriceOracle.VaultReport memory storedReport =
                 router.getLatestSharePriceReport(srcChain, reports[i].vaultAddress);
 
             assertEq(storedReport.chainId, reports[i].chainId, "Chain ID should match");
@@ -1108,8 +1108,8 @@ contract SharePriceRouterTest is BaseTest {
     function testRevertWhen_UpdateSharePricesWithStalePrice() public {
         uint32 srcChain = 10;
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opUsdcVault),
             asset: OPTIMISM_USDC,
@@ -1122,13 +1122,13 @@ contract SharePriceRouterTest is BaseTest {
         vm.warp(block.timestamp + router.PRICE_STALENESS_THRESHOLD() + 1);
 
         vm.prank(endpoint);
-        vm.expectRevert(SharePriceRouter.NoValidPrice.selector);
+        vm.expectRevert(SharePriceOracle.NoValidPrice.selector);
         router.updateSharePrices(srcChain, reports);
     }
 
     function testUpdateSharePricesEmptyArray() public {
         uint32 srcChain = 10;
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](0);
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](0);
 
         vm.prank(endpoint);
         router.updateSharePrices(srcChain, reports);
@@ -1140,8 +1140,8 @@ contract SharePriceRouterTest is BaseTest {
         vm.prank(admin);
         router.setCrossChainAssetMapping(srcChain, OPTIMISM_USDC, USDC);
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: srcChain,
             vaultAddress: address(opUsdcVault),
             asset: OPTIMISM_USDC,
@@ -1159,7 +1159,7 @@ contract SharePriceRouterTest is BaseTest {
         reports[0].lastUpdate = uint64(block.timestamp);
 
         vm.prank(endpoint);
-        vm.expectRevert(SharePriceRouter.NoValidPrice.selector);
+        vm.expectRevert(SharePriceOracle.NoValidPrice.selector);
         router.updateSharePrices(srcChain, reports);
     }
 
@@ -1184,8 +1184,8 @@ contract SharePriceRouterTest is BaseTest {
         inUSD[1] = true;
         router.batchUpdatePrices(assets, inUSD);
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: 10,
             vaultAddress: address(opWethVault),
             asset: OPTIMISM_WETH,
@@ -1226,11 +1226,11 @@ contract SharePriceRouterTest is BaseTest {
 
     function testInvalidChainIdValidations() public {
         vm.prank(admin);
-        vm.expectRevert(SharePriceRouter.InvalidChainId.selector);
+        vm.expectRevert(SharePriceOracle.InvalidChainId.selector);
         router.setCrossChainAssetMapping(uint32(block.chainid), WETH, USDC);
 
-        ISharePriceRouter.VaultReport[] memory reports = new ISharePriceRouter.VaultReport[](1);
-        reports[0] = ISharePriceRouter.VaultReport({
+        ISharePriceOracle.VaultReport[] memory reports = new ISharePriceOracle.VaultReport[](1);
+        reports[0] = ISharePriceOracle.VaultReport({
             chainId: uint32(block.chainid),
             vaultAddress: address(usdcVault),
             asset: USDC,
@@ -1241,7 +1241,7 @@ contract SharePriceRouterTest is BaseTest {
         });
 
         vm.prank(endpoint);
-        vm.expectRevert(SharePriceRouter.InvalidChainId.selector);
+        vm.expectRevert(SharePriceOracle.InvalidChainId.selector);
         router.updateSharePrices(uint32(block.chainid), reports);
     }
 
@@ -1266,7 +1266,7 @@ contract SharePriceRouterTest is BaseTest {
 
     function testRevertWhen_SetLocalAssetConfigWithZeroAdapter_Fixed() public {
         vm.startPrank(admin);
-        vm.expectRevert(SharePriceRouter.ZeroAddress.selector);
+        vm.expectRevert(SharePriceOracle.ZeroAddress.selector);
         router.setLocalAssetConfig(USDC, address(0), USDC_USD_FEED, 0, true);
         vm.stopPrank();
     }
@@ -1279,7 +1279,7 @@ contract SharePriceRouterTest is BaseTest {
         bool[] memory inUSD = new bool[](1);
         inUSD[0] = true;
 
-        vm.expectRevert(SharePriceRouter.InvalidLength.selector);
+        vm.expectRevert(SharePriceOracle.InvalidLength.selector);
         router.batchUpdatePrices(assets, inUSD);
     }
 
@@ -1344,7 +1344,7 @@ contract SharePriceRouterTest is BaseTest {
         assertEq(localDecimals, 6, "USDC decimals should be 6");
 
         address randomAsset = makeAddr("randomAsset");
-        vm.expectRevert(abi.encodeWithSelector(SharePriceRouter.AssetNotConfigured.selector, randomAsset));
+        vm.expectRevert(abi.encodeWithSelector(SharePriceOracle.AssetNotConfigured.selector, randomAsset));
         router.getLocalAsset(10, randomAsset);
     }
 
@@ -1356,7 +1356,7 @@ contract SharePriceRouterTest is BaseTest {
 
         address rewardsDelegate = makeAddr("rewardsDelegate");
 
-        ISharePriceRouter.VaultReport[] memory reports = router.getSharePrices(vaults, rewardsDelegate);
+        ISharePriceOracle.VaultReport[] memory reports = router.getSharePrices(vaults, rewardsDelegate);
 
         assertEq(reports.length, 3, "Should return 3 reports");
 

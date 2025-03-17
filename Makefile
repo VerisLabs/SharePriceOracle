@@ -15,14 +15,14 @@ test:
 
 # Validation commands
 validate-router-base:
-	@forge script script/ValidateSharePriceRouter.sol:ValidateSharePriceRouter \
+	@forge script script/ValidateSharePriceOracle.sol:ValidateSharePriceOracle \
 		--rpc-url ${BASE_RPC_URL} \
 		--via-ir \
 		-vvv
 
 # Mainnet deployment commands
 deploy-base:
-	@forge script script/DeploySharePriceRouter.sol:DeploySharePriceRouter \
+	@forge script script/DeploySharePriceOracle.sol:DeploySharePriceOracle \
 		--rpc-url ${BASE_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
@@ -32,7 +32,7 @@ deploy-base:
 		-vvv
 
 deploy-optimism:
-	@forge script script/DeploySharePriceRouter.sol:DeploySharePriceRouter \
+	@forge script script/DeploySharePriceOracle.sol:DeploySharePriceOracle \
 		--rpc-url ${OPTIMISM_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
@@ -42,7 +42,7 @@ deploy-optimism:
 		-vvv
 
 deploy-arbitrum:
-	@forge script script/DeploySharePriceRouter.sol:DeploySharePriceRouter \
+	@forge script script/DeploySharePriceOracle.sol:DeploySharePriceOracle \
 		--rpc-url ${ARBITRUM_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
@@ -52,7 +52,7 @@ deploy-arbitrum:
 		-vvv
 
 deploy-polygon:
-	@forge script script/DeploySharePriceRouter.sol:DeploySharePriceRouter \
+	@forge script script/DeploySharePriceOracle.sol:DeploySharePriceOracle \
 		--rpc-url ${POLYGON_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
@@ -224,7 +224,7 @@ send-share-prices-polygon:
 
 # Testnet deployment commands
 deploy-base-testnet:
-	@forge script script/DeploySharePriceRouter.sol:DeploySharePriceRouter \
+	@forge script script/DeploySharePriceOracle.sol:DeploySharePriceOracle \
 		--rpc-url ${BASE_SEPOLIA_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
@@ -234,7 +234,7 @@ deploy-base-testnet:
 		-vvv
 
 deploy-optimism-testnet:
-	@forge script script/DeploySharePriceRouter.sol:DeploySharePriceRouter \
+	@forge script script/DeploySharePriceOracle.sol:DeploySharePriceOracle \
 		--rpc-url ${OPTIMISM_SEPOLIA_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
@@ -244,7 +244,7 @@ deploy-optimism-testnet:
 		-vvv
 
 deploy-arbitrum-testnet:
-	@forge script script/DeploySharePriceRouter.sol:DeploySharePriceRouter \
+	@forge script script/DeploySharePriceOracle.sol:DeploySharePriceOracle \
 		--rpc-url ${ARBITRUM_SEPOLIA_RPC_URL} \
 		--private-key ${PRIVATE_KEY} \
 		--broadcast \
@@ -306,7 +306,7 @@ help:
 
 # Simulation commands (for testing)
 simulate-deploy:
-	@forge script script/DeploySharePriceRouter.sol:DeploySharePriceRouter --via-ir -vvv
+	@forge script script/DeploySharePriceOracle.sol:DeploySharePriceOracle --via-ir -vvv
 
 simulate-configure-lz:
 	@mkdir -p mock_deployments
