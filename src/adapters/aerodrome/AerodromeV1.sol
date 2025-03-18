@@ -4,6 +4,7 @@ pragma solidity ^0.8.17;
 import { AerodromeBaseAdapter } from "./AerodromeBaseAdapter.sol";
 import { ISharePriceRouter } from "../../interfaces/ISharePriceRouter.sol";
 import { IAerodromeV1Pool } from "../../interfaces/aerodrome/IAerodromeV1Pool.sol";
+import { WETH } from "src/helpers/AddressBook.sol";
 
 contract AerodromeV1Adapter is AerodromeBaseAdapter {
     /// CONSTRUCTOR ///
@@ -43,15 +44,18 @@ contract AerodromeV1Adapter is AerodromeBaseAdapter {
         AdapterData memory data = adapterData[asset];
 
         // Get underlying token prices.
+        (uint256 basePrice, bool errorCode) = (!inUSD && data.baseToken == WETH)
+            ? (WAD, false)
+            : oracleRouter.getPrice(data.baseToken, inUSD);      
 
-        (uint256 basePrice, bool errorCode) = oracleRouter.getPrice(data.baseToken, inUSD);
         if (errorCode) {
             pData.hadError = true;
             return pData;
         }
-        uint256 price = IAerodromeV1Pool(data.pool).getAmountOut(uint256(1 * (10 ** data.quoteTokenDecimals)), asset);
+        uint256 price = IAerodromeV1Pool(data.pool).getAmountOut(uint256(1 * (10** data.quoteTokenDecimals)), asset);
+        
+        price = (price * basePrice ) / (10 ** data.baseTokenDecimals);
 
-        price = (price * basePrice) / WAD;
         if (_checkOracleOverflow(price)) {
             pData.hadError = true;
             return pData;
